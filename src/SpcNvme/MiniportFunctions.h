@@ -1,0 +1,14 @@
+#pragma once
+HW_INITIALIZE HwInitialize;
+HW_PASSIVE_INITIALIZE_ROUTINE HwPassiveInitialize;
+HW_STARTIO HwStartIo;
+HW_BUILDIO HwBuildIo;
+HW_FIND_ADAPTER HwFindAdapter;
+HW_RESET_BUS HwResetBus;
+HW_ADAPTER_CONTROL HwAdapterControl;
+HW_PROCESS_SERVICE_REQUEST HwProcessServiceRequest;
+HW_COMPLETE_SERVICE_IRP HwCompleteServiceIrp;
+
+HW_UNIT_CONTROL HwUnitControl;
+HW_TRACING_ENABLED HwTracingEnabled;
+HW_CLEANUP_TRACING HwCleanupTracing;

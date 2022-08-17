@@ -1,0 +1,13 @@
+#pragma once
+
+typedef struct _SPCNVME_DEVEXT
+{
+    NVME_STATE State;
+
+}SPCNVME_DEVEXT, *PSPCNVME_DEVEXT;
+
+typedef struct _SPCNVME_SRBEXT
+{
+    //NVME_STATE State;
+    PSTORAGE_REQUEST_BLOCK Srb;
+}SPCNVME_SRBEXT, *PSPCNVME_SRBEXT;

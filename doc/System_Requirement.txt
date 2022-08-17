@@ -1,0 +1,2 @@
+This driver is developed in STORPORT miniport driver.
+It only supports Window8 and newer version.
