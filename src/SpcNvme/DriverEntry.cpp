@@ -1,19 +1,20 @@
 #include "pch.h"
 
-#pragma comment(lib, "storport.lib")
-
-NTSTATUS MiniportInitialize(
-    IN  PDRIVER_OBJECT      DriverObject,
-    IN  PUNICODE_STRING     RegistryPath)
+EXTERN_C_START
+sp_DRIVER_INITIALIZE DriverEntry;
+ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
 {
     CDebugCallInOut inout(__FUNCTION__);
+    if (IsSupportedOS(10) == FALSE)
+        return STOR_STATUS_UNSUPPORTED_VERSION;
+
     HW_INITIALIZATION_DATA init_data = { 0 };
     ULONG status = 0;
 
-    /* Set size of hardware initialization structure. */
+    // Set size of hardware initialization structure.
     init_data.HwInitializationDataSize = sizeof(HW_INITIALIZATION_DATA);
 
-    /* Identify required miniport entry point routines. */
+    // Identify required miniport entry point routines.
     init_data.HwInitialize = HwInitialize;
     init_data.HwBuildIo = HwBuildIo;
     init_data.HwStartIo = HwStartIo;
@@ -31,7 +32,7 @@ NTSTATUS MiniportInitialize(
     //complete NOT FINISHED IRP received in HwProcessServiceRequest. it called when device removed
     init_data.HwCompleteServiceIrp = HwCompleteServiceIrp;
 
-    /* Specifiy adapter specific information. */
+    // Specifiy adapter specific information.
     init_data.AutoRequestSense = TRUE;
     init_data.NeedPhysicalAddresses = TRUE;
     init_data.AdapterInterfaceType = PCIBus;
@@ -39,7 +40,7 @@ NTSTATUS MiniportInitialize(
     init_data.TaggedQueuing = TRUE;
     init_data.MultipleRequestPerLu = TRUE;
 
-    /* Specify support/use SRB Extension for Windows 8 and up */
+    // Specify support/use SRB Extension for Windows 8 and up
     init_data.SrbTypeFlags = SRB_TYPE_FLAG_STORAGE_REQUEST_BLOCK;
     init_data.FeatureSupport = STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES;
 
@@ -47,23 +48,9 @@ NTSTATUS MiniportInitialize(
     init_data.DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
     init_data.SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
 
-    /* Call StorPortInitialize to register with hwInitData */
-    status = StorPortInitialize(DriverObject,
-        RegistryPath,
-        &init_data,
-        NULL);
+    // Call StorPortInitialize to register with HwInitData
+    status = StorPortInitialize(DrvObj, RegPath, &init_data, NULL);
 
-    return status;
-}
-
-EXTERN_C_START
-//sp_DRIVER_INITIALIZE DriverEntry;
-NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObj, IN PUNICODE_STRING RegPath)
-{
-    if (IsSupportedOS(10) == FALSE)
-        return STOR_STATUS_UNSUPPORTED_VERSION;
-
-    NTSTATUS status = MiniportInitialize(DriverObj, RegPath);
     return status;
 }
 EXTERN_C_END

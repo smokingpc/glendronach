@@ -248,12 +248,15 @@
   <ItemGroup>
     <ClCompile Include="DriverEntry.cpp" />
     <ClCompile Include="MiniportFunctions.cpp" />
+    <ClCompile Include="SpcNvmeDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Constants.h" />
+    <ClInclude Include="Inline_Utils.h" />
+    <ClInclude Include="MiniportContext.h" />
     <ClInclude Include="MiniportFunctions.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="SpcNvme.h" />
+    <ClInclude Include="SpcNvmeDevice.h" />
     <ClInclude Include="StateMachine.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

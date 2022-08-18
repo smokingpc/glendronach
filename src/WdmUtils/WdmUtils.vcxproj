@@ -225,6 +225,7 @@
     <ClInclude Include="WdmUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AutoLock.cpp" />
     <ClCompile Include="CppSupport.cpp" />
     <ClCompile Include="DebugUtils.cpp" />
     <ClCompile Include="OS_Utils.cpp" />
