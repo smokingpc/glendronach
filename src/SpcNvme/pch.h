@@ -14,4 +14,5 @@ EXTERN_C_END
 #include "MiniportContext.h"
 #include "MiniportFunctions.h"
 #include "..\WdmUtils\WdmUtils.h"
-#include "SpcNvmeDevice.h"
+#include "NvmeQueue.h"
+#include "NvmeDevice.h"

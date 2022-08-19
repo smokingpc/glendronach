@@ -18,10 +18,9 @@ CSpinLock::~CSpinLock()
 CStorSpinLock::CStorSpinLock(PVOID devext, STOR_SPINLOCK reason, PVOID ctx)
 {
     this->DevExt = devext;
-    RtlZeroMemory(&this->Handle, sizeof(STOR_LOCK_HANDLE));
-    StorPortAcquireSpinLock(devext, reason, ctx, &this->Handle);
+    Acquire(reason, ctx);
 }
 CStorSpinLock::~CStorSpinLock()
 {
-    StorPortReleaseSpinLock(this->DevExt, &this->Handle);
+    Release();
 }

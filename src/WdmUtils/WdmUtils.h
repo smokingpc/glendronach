@@ -32,10 +32,18 @@ protected:
 //This is used in storport miniport driver.
 class CStorSpinLock {
 public:
-    CStorSpinLock(PVOID devext, STOR_SPINLOCK reason, PVOID ctx);
+    CStorSpinLock(PVOID devext, STOR_SPINLOCK reason, PVOID ctx = NULL);
     ~CStorSpinLock();
+    inline void Acquire(STOR_SPINLOCK reason, PVOID ctx = NULL)
+    {
+        StorPortAcquireSpinLock(this->DevExt, reason, ctx, &this->Handle); 
+    }
+    inline void Release()
+    {
+        StorPortReleaseSpinLock(this->DevExt, &this->Handle);
+    }
 
 protected:
     PVOID DevExt = NULL;
-    STOR_LOCK_HANDLE Handle;
+    STOR_LOCK_HANDLE Handle = {DpcLock, 0};
 };
