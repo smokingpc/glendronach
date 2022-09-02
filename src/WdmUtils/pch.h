@@ -9,4 +9,4 @@ EXTERN_C_START
 EXTERN_C_END
 
 #include "WdmUtils.h"
-
+#include "UniquePtr.hpp"

@@ -259,6 +259,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="NvmeDevice.h" />
     <ClInclude Include="NvmeQueue.h" />
+    <ClInclude Include="PoolTags.h" />
     <ClInclude Include="StateMachine.h" />
   </ItemGroup>
   <ItemGroup>

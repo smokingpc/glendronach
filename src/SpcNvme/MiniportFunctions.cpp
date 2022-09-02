@@ -44,8 +44,11 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(HwContext);
     UNREFERENCED_PARAMETER(BusInformation);
     UNREFERENCED_PARAMETER(ArgumentString);
-    UNREFERENCED_PARAMETER(ConfigInfo);
     UNREFERENCED_PARAMETER(Reserved3);
+
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+
+
     //ConfigInfo->MaximumTransferLength = MAX_TX_SIZE;
     //ConfigInfo->NumberOfPhysicalBreaks = MAX_TX_PAGES;
     //ConfigInfo->AlignmentMask = FILE_LONG_ALIGNMENT;

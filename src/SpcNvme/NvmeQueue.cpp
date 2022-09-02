@@ -20,13 +20,14 @@ void CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
     this->Depth = config->Depth;
     this->NumaNode = config->NumaNode;
     this->Type = config->Type;
-    this->AllocateQueueBuffer();
+    this->Buffer = config->PreAllocBuffer;
+    bool ok = this->SetupQueueBuffer();
 
-    Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl, this->Depth);
-    SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
-    CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
-    History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
-    this->IsReady = true;
+    ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl, this->Depth);
+    ok = ok && SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
+    ok = ok && CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
+    ok = ok && History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+    this->IsReady = ok;
 }
 void CNvmeQueuePair::Teardown()
 {
@@ -73,7 +74,46 @@ bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PSPCNVME_SRBEXT 
         *ret_srbext = (PSPCNVME_SRBEXT)info.Context;
     }
 }
-bool CNvmeQueuePair::AllocateQueueBuffer()
+
+bool CNvmeQueuePair::AllocQueueBuffer()
+{
+    PHYSICAL_ADDRESS low = { 0 };
+    PHYSICAL_ADDRESS high = { .QuadPart = (LONGLONG)-1 };
+    PHYSICAL_ADDRESS align = { 0 };
+
+    //Queue buffer doesn't need cache. Cache could cause read coherence issue and bother cpu cache performance.
+    ULONG spstatus = StorPortAllocateDmaMemory(
+        this->DevExt, this->BufferSize,
+        low, high, align,
+        MmWriteCombined, this->NumaNode,
+        &this->Buffer, &this->BufferPA);
+    if (STOR_STATUS_SUCCESS == spstatus)
+        return this->BindQueueBuffer();
+    else if (STOR_STATUS_NOT_IMPLEMENTED == spstatus)
+        KeBugCheckEx(MANUALLY_INITIATED_CRASH1, 0, 0, 0, 0);
+
+    //todo: log 
+    return false;
+}
+bool CNvmeQueuePair::BindQueueBuffer()
+{
+    if(0 == this->BufferPA.QuadPart)
+    {
+        ULONG mapped_size = 0;
+        this->BufferPA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->Buffer, &mapped_size);
+        if(mapped_size != this->BufferSize)
+            return false;       //todo: log
+    }
+
+    RtlZeroMemory(this->Buffer, this->BufferSize);
+    this->SubQBuffer = this->Buffer;
+    this->SubQBufferPA.QuadPart = this->BufferPA.QuadPart;
+
+    this->CplQBuffer = (PVOID)(((PCHAR)this->SubQBuffer) + this->SubQBufferSize);
+    this->CplQBufferPA.QuadPart = this->SubQBufferPA.QuadPart + this->SubQBufferSize;
+    return true;
+}
+bool CNvmeQueuePair::SetupQueueBuffer()
 {
     //SubQ and CplQ should be placed on same continuous memory block.
     //1.Calculate total block size. 
@@ -85,29 +125,10 @@ bool CNvmeQueuePair::AllocateQueueBuffer()
     this->CplQBufferSize = ROUND_TO_PAGES(this->CplQBufferSize);
 
     this->BufferSize = this->SubQBufferSize + this->CplQBufferSize;
-
-    PHYSICAL_ADDRESS low = {0};
-    PHYSICAL_ADDRESS high = {.QuadPart = (LONGLONG)-1};
-    PHYSICAL_ADDRESS align = {0};
-    //Queue buffer doesn't need cache. Cache could cause read coherence issue and bother cpu cache performance.
-    ULONG spstatus = StorPortAllocateDmaMemory(
-                        this->DevExt, this->BufferSize, 
-                        low, high, align, 
-                        MmWriteCombined, this->NumaNode, 
-                        &this->Buffer, &this->BufferPA);
-    if(STOR_STATUS_SUCCESS == spstatus)
-    {
-        RtlZeroMemory(this->Buffer, this->BufferSize);
-        this->SubQBuffer = this->Buffer;
-        this->SubQBufferPA.QuadPart = this->BufferPA.QuadPart;
-
-        this->CplQBuffer = (PVOID)(((PCHAR)this->SubQBuffer) + this->SubQBufferSize);
-        this->CplQBufferPA.QuadPart = this->SubQBufferPA.QuadPart + this->SubQBufferSize;
-    }
-    else if (STOR_STATUS_NOT_IMPLEMENTED == spstatus)
-    {
-        KeBugCheckEx(MANUALLY_INITIATED_CRASH1, 0, 0, 0, 0);
-    }
+    if(NULL == this->Buffer)
+        return this->AllocQueueBuffer();
+    else
+        return this->BindQueueBuffer();
 }
 #pragma endregion
 
@@ -177,7 +198,7 @@ CNvmeSubmitQueue::~CNvmeSubmitQueue()
 {
     Teardown();
 }
-void CNvmeSubmitQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+bool CNvmeSubmitQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
 {
     ULONG mapped_size = 0;
     this->Parent = parent;
@@ -187,6 +208,8 @@ void CNvmeSubmitQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID b
     RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
     this->QueuePA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->RawBuffer, &mapped_size);
     this->Cmds = (PNVME_COMMAND)this->RawBuffer;
+
+    return true;
 }
 void CNvmeSubmitQueue::Teardown()
 {
@@ -201,7 +224,7 @@ CNvmeSubmitQueue::operator STOR_PHYSICAL_ADDRESS() const
 {
     return this->QueuePA;
 }
-void CNvmeSubmitQueue::Submit(USHORT sub_tail, PNVME_COMMAND new_cmd)
+bool CNvmeSubmitQueue::Submit(USHORT sub_tail, PNVME_COMMAND new_cmd)
 {
     NVME_COMMAND* cmd = NULL;
     cmd = &this->Cmds[sub_tail];
@@ -222,7 +245,7 @@ CNvmeCompleteQueue::~CNvmeCompleteQueue()
 {
     Teardown();
 }
-void CNvmeCompleteQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+bool CNvmeCompleteQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
 {
     ULONG mapped_size = 0;
     this->Parent = parent;
@@ -233,6 +256,7 @@ void CNvmeCompleteQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID
     RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
     this->QueuePA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->RawBuffer, &mapped_size);
     this->Entries = (PNVME_COMPLETION_ENTRY)this->RawBuffer;
+    return true;
 }
 void CNvmeCompleteQueue::Teardown()
 {
@@ -279,7 +303,7 @@ CCmdHistory::~CCmdHistory()
 {
     Teardown();
 }
-void CCmdHistory::Setup(class CNvmeQueuePair* parent, PVOID devext, USHORT depth, ULONG numa_node)
+bool CCmdHistory::Setup(class CNvmeQueuePair* parent, PVOID devext, USHORT depth, ULONG numa_node)
 {
     this->Parent = parent;
     this->NumaNode = numa_node;
@@ -296,7 +320,10 @@ void CCmdHistory::Setup(class CNvmeQueuePair* parent, PVOID devext, USHORT depth
     {
         RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
         this->History = (PCMD_INFO)this->RawBuffer;
+        return true;
     }
+
+    return false;
 }
 void CCmdHistory::Teardown()
 {

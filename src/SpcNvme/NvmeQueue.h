@@ -30,6 +30,7 @@ typedef struct _QUEUE_PAIR_CONFIG {
     QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
     ULONG *SubDbl = NULL;
     ULONG *CplDbl = NULL;
+    PVOID PreAllocBuffer = NULL;            //SubQ and CplQ should be continuous memory together
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
 typedef struct _CMD_INFO
@@ -79,10 +80,10 @@ public:
     CNvmeSubmitQueue(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     ~CNvmeSubmitQueue();
 
-    void Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
+    bool Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     void Teardown();
     operator STOR_PHYSICAL_ADDRESS() const;
-    void Submit(USHORT sub_tail, PNVME_COMMAND new_cmd);
+    bool Submit(USHORT sub_tail, PNVME_COMMAND new_cmd);
 private:
     PVOID DevExt = NULL;
     PVOID RawBuffer = NULL;                 //RawBuffer should be PAGE_ALIGNED
@@ -102,7 +103,7 @@ public:
     CNvmeCompleteQueue();
     CNvmeCompleteQueue(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     ~CNvmeCompleteQueue();
-    void Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
+    bool Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     void Teardown();
     operator STOR_PHYSICAL_ADDRESS() const;
     bool PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY popdata);
@@ -133,7 +134,7 @@ public:
     CCmdHistory(class CNvmeQueuePair*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
     ~CCmdHistory();
 
-    void Setup(class CNvmeQueuePair*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
+    bool Setup(class CNvmeQueuePair*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
     void Teardown();
     bool Push(USHORT index, NVME_CMD_TYPE type, PSPCNVME_SRBEXT srbext);
     bool Pop(USHORT index, PCMD_INFO result);
@@ -189,5 +190,7 @@ private:
     CCmdHistory History;
     CNvmeDoorbell Doorbell;
 
-    bool AllocateQueueBuffer();
+    bool SetupQueueBuffer();
+    bool AllocQueueBuffer();
+    bool BindQueueBuffer();
 };

@@ -222,6 +222,7 @@
   <ItemGroup>
     <ClInclude Include="Constants.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="UniquePtr.hpp" />
     <ClInclude Include="WdmUtils.h" />
   </ItemGroup>
   <ItemGroup>

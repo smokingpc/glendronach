@@ -47,9 +47,6 @@
     <ClInclude Include="Constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="NvmeDevice.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="StateMachine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -59,7 +56,13 @@
     <ClInclude Include="Inline_Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NvmeDevice.h">
+      <Filter>Classes</Filter>
+    </ClInclude>
     <ClInclude Include="NvmeQueue.h">
+      <Filter>Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="PoolTags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

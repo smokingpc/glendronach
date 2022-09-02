@@ -3,6 +3,7 @@
 typedef struct _SPCNVME_DEVEXT
 {
     NVME_STATE State;
+    CSpcNvmeDevice NvmeDev;
 
 }SPCNVME_DEVEXT, * PSPCNVME_DEVEXT;
 

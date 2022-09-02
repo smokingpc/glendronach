@@ -8,11 +8,13 @@ EXTERN_C_START
 #include <srbhelper.h>
 EXTERN_C_END
 
+#include "..\WdmUtils\WdmUtils.h"
+#include "..\WdmUtils\UniquePtr.hpp"
+#include "PoolTags.h"
 #include "Constants.h"
 #include "Inline_Utils.h"
 #include "StateMachine.h"
 #include "MiniportContext.h"
 #include "MiniportFunctions.h"
-#include "..\WdmUtils\WdmUtils.h"
 #include "NvmeQueue.h"
 #include "NvmeDevice.h"
