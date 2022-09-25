@@ -16,11 +16,39 @@ BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
 }
 
 _Use_decl_annotations_
-BOOLEAN HwBuildIo(_In_ PVOID DeviceExtension,_In_ PSCSI_REQUEST_BLOCK Srb)
+BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
 {
-    UNREFERENCED_PARAMETER(DeviceExtension);
-    UNREFERENCED_PARAMETER(Srb);
-    return FALSE;
+    PSPCNVME_SRBEXT srbext = InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
+    BOOLEAN need_startio = FALSE;
+    UCHAR srb_status = 0;
+
+    switch (srbext->FuncCode)
+    {
+        //case SRB_FUNCTION_ABORT_COMMAND:
+    //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
+    //case SRB_FUNCTION_RESET_DEVICE:
+    //case SRB_FUNCTION_RESET_BUS:
+    //case SRB_FUNCTION_WMI:
+    //case SRB_FUNCTION_POWER:
+    //    srb_status = DefaultCmdHandler(srb, srbext);
+    //    break;
+    case SRB_FUNCTION_IO_CONTROL:
+    case SRB_FUNCTION_PNP:
+        //pnp handlers
+    case SRB_FUNCTION_EXECUTE_SCSI:
+        //scsi handlers
+    default:
+        need_startio = BuildIo_DefaultHandler(srbext);
+        break;
+
+    }
+
+    if(FALSE != need_startio)
+    {
+        StorPortNotification(RequestComplete, DevExt, Srb);
+    }
+
+    return need_startio;
 }
 
 _Use_decl_annotations_

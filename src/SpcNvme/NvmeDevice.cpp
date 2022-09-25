@@ -1,5 +1,19 @@
 #include "pch.h"
 
+#pragma region ======== CSpcNvmeDevice Factory Methods ======== 
+CSpcNvmeDevice *CSpcNvmeDevice::Create(PVOID devext, PSPCNVME_CONFIG cfg)
+{
+    CSpcNvmeDevice *ret = new CSpcNvmeDevice(devext, cfg);
+
+    return ret;
+}
+void CSpcNvmeDevice::Delete(CSpcNvmeDevice* ptr)
+{
+    ptr->Teardown();
+    delete ptr;
+}
+#pragma endregion
+
 #pragma region ======== class CSpcNvmeDevice ======== 
 
 CSpcNvmeDevice::CSpcNvmeDevice(){}

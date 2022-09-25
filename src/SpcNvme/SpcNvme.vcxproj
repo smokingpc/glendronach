@@ -246,12 +246,14 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BuildIo_Utils.cpp" />
     <ClCompile Include="DriverEntry.cpp" />
     <ClCompile Include="MiniportFunctions.cpp" />
     <ClCompile Include="NvmeDevice.cpp" />
     <ClCompile Include="NvmeQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BuildIo_Utils.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />
     <ClInclude Include="MiniportContext.h" />

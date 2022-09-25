@@ -21,6 +21,9 @@ typedef struct _SPCNVME_CONFIG {
 
 class CSpcNvmeDevice {
 public:
+    static CSpcNvmeDevice *Create(PVOID devext, PSPCNVME_CONFIG cfg);
+    static void Delete(CSpcNvmeDevice *ptr);
+public:
     CSpcNvmeDevice();
     CSpcNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg);
     ~CSpcNvmeDevice();
@@ -29,6 +32,7 @@ public:
     bool BindHBA(PPORT_CONFIGURATION_INFORMATION pci, HW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE isr);
     void Teardown();
 
+    void CompleteNVMeCmd();
     //void ReloadCtrlRegs();
 
 private:
@@ -43,10 +47,8 @@ private:
     ULONG IoQueueCount = 0;
     ULONG MaxIoQueueCount = 0;      //calculate by device returned config
     
-    //SPC::CUniquePtr<CNvmeQueuePair, NonPagedPool, TAG_QUEUEPAIR> AdminQueue;
-    //SPC::CUniquePtr<CNvmeQueuePair, NonPagedPool, TAG_QUEUEPAIR> IoQueue;
     CNvmeQueuePair  *AdminQueue = NULL;
-    CNvmeQueuePair  **IoQueue = NULL;
+    CNvmeQueuePair  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
 
     ULONG MaxTxSize = 0;
     ULONG MaxTxPages = 0;
@@ -54,8 +56,6 @@ private:
     UCHAR MaxTargets = 0;
     ULONG MaxIoPerLU = 0;
     INTERFACE_TYPE InterfaceType = PCIBus;
-    PHW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE CplIntRoutine = NULL;
-    PHW_DPC_ROUTINE CplDpcRoutine = NULL;
 
     bool IsReady = false;
     
@@ -68,3 +68,4 @@ private:
     bool RegisterIoQueuePairs();
     bool RegisterIoQueuePair(ULONG index);
 };
+
