@@ -26,6 +26,9 @@
     <Filter Include="SCSI_Handlers">
       <UniqueIdentifier>{abf383f4-256a-42b7-a3fa-be1767784a3a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="SRB_Utils">
+      <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="SpcNvme.inf">
@@ -45,8 +48,8 @@
     <ClCompile Include="NvmeQueue.cpp">
       <Filter>Classes</Filter>
     </ClCompile>
-    <ClCompile Include="BuildIo_Utils.cpp">
-      <Filter>BuildIo_Handlers</Filter>
+    <ClCompile Include="Srb_Utils.cpp">
+      <Filter>SRB_Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -77,7 +80,13 @@
     <ClInclude Include="PoolTags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BuildIo_Utils.h">
+    <ClInclude Include="Srb_Utils.h">
+      <Filter>SRB_Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildIo_Handlers.h">
+      <Filter>BuildIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildIo_DefaultHandler.cpp">
       <Filter>BuildIo_Handlers</Filter>
     </ClInclude>
   </ItemGroup>

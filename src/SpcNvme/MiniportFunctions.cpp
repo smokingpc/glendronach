@@ -20,7 +20,7 @@ BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
 {
     PSPCNVME_SRBEXT srbext = InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
     BOOLEAN need_startio = FALSE;
-    UCHAR srb_status = 0;
+    //UCHAR srb_status = 0;
 
     switch (srbext->FuncCode)
     {
