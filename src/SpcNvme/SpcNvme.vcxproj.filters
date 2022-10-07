@@ -51,6 +51,18 @@
     <ClCompile Include="Srb_Utils.cpp">
       <Filter>SRB_Utils</Filter>
     </ClCompile>
+    <ClCompile Include="ScsiHandler_CDB6.cpp">
+      <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="ScsiHandler_CDB10.cpp">
+      <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="ScsiHandler_CDB12.cpp">
+      <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="ScsiHandler_CDB16.cpp">
+      <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MiniportFunctions.h">
@@ -88,6 +100,18 @@
     </ClInclude>
     <ClInclude Include="BuildIo_DefaultHandler.cpp">
       <Filter>BuildIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScsiHandler_CDB6.h">
+      <Filter>SCSI_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScsiHandler_CDB10.h">
+      <Filter>SCSI_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScsiHandler_CDB12.h">
+      <Filter>SCSI_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScsiHandler_CDB16.h">
+      <Filter>SCSI_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

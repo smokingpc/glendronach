@@ -8,35 +8,38 @@
 
 namespace SPC
 {
-    template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class SpcDefaultDeleter {
-    public:
-        constexpr SpcDefaultDeleter() noexcept = default;
-        SpcDefaultDeleter(const SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>&) noexcept 
-        {
-            //no copy constructor
-        }
-        virtual void operator()(_Ty* _Ptr) const noexcept
-        {
-            static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
-        }
-    };
+    //template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
+    //class SpcDefaultDeleter {
+    //public:
+    //    constexpr SpcDefaultDeleter() noexcept = default;
+    //    SpcDefaultDeleter(const SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>&) noexcept 
+    //    {
+    //        //no copy constructor
+    //    }
+
+    //    virtual void operator()(_Ty* _Ptr) const noexcept = 0;
+    //    //{
+    //    //    static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
+    //    //}
+    //};
 
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class SpcCppDeleter : SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
+    class SpcCppDeleter //: SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
     { 
     public:
         constexpr SpcCppDeleter() noexcept = default;
         SpcCppDeleter(const SpcCppDeleter<_Ty, _PoolType, _PoolTag>&) noexcept {}
+        
         void operator()(_Ty* _Ptr) const noexcept 
         {
-            SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
+            //SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
+            static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
             delete _Ptr;
         }
     };
 
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class WinKernelDeleter : SpcDefaultDeleter<_Ty, _PoolType, _PoolTag> 
+    class WinKernelDeleter //: SpcDefaultDeleter<_Ty, _PoolType, _PoolTag> 
     {
     public:
         static constexpr POOL_TYPE pool_type = _PoolType;
@@ -45,8 +48,10 @@ namespace SPC
 
         WinKernelDeleter(const WinKernelDeleter<_Ty, _PoolType, _PoolTag>&) noexcept
         {}
+
         void operator()(_Ty* _Ptr) const noexcept {
-            SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
+            //SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
+            static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
             ExFreePoolWithTag(_Ptr, _PoolTag);
         }
     };
