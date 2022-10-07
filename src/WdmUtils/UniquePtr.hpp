@@ -1,12 +1,18 @@
 #pragma once
-#include <memory>
+// P0607R0 Inline Variables For The STL
+#if _HAS_CXX17
+#define _INLINE_VAR inline
+#else // _HAS_CXX17
+#define _INLINE_VAR
+#endif // _HAS_CXX17
+
 namespace SPC
 {
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
     class SpcDefaultDeleter {
     public:
         constexpr SpcDefaultDeleter() noexcept = default;
-        SpcDefaultDeleter(const SpcDefaultDeleter<_Ty>&) noexcept 
+        SpcDefaultDeleter(const SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>&) noexcept 
         {
             //no copy constructor
         }
@@ -17,11 +23,11 @@ namespace SPC
     };
 
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class CppDeleter : SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
+    class SpcCppDeleter : SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
     { 
     public:
-        constexpr CppDeleter() noexcept = default;
-        CppDeleter(const CppDeleter<_Ty>&) noexcept {}
+        constexpr SpcCppDeleter() noexcept = default;
+        SpcCppDeleter(const SpcCppDeleter<_Ty, _PoolType, _PoolTag>&) noexcept {}
         void operator()(_Ty* _Ptr) const noexcept 
         {
             SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
@@ -35,9 +41,9 @@ namespace SPC
     public:
         static constexpr POOL_TYPE pool_type = _PoolType;
         static constexpr ULONG pool_tag = _PoolTag;
-        constexpr KernelDeleter() noexcept = default;
+        constexpr WinKernelDeleter() noexcept = default;
 
-        KernelDeleter(const KernelDeleter<_Ty, _PoolType, _PoolTag>&) noexcept
+        WinKernelDeleter(const WinKernelDeleter<_Ty, _PoolType, _PoolTag>&) noexcept
         {}
         void operator()(_Ty* _Ptr) const noexcept {
             SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
@@ -45,23 +51,23 @@ namespace SPC
         }
     };
 
-    template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = CppDeleter<_Ty, _PoolType, _PoolTag>>
+    template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = SpcCppDeleter<_Ty, _PoolType, _PoolTag>>
     class CUniquePtr
         {
         public:
             using DataType = _Ty;
             using DeleterType = _Dx;
 
-            CKernalAutoPtr(DataType* ptr = nullptr) noexcept {
+            CUniquePtr(DataType* ptr = nullptr) noexcept {
                 this->Ptr = ptr;
             }
 
-            ~CKernalAutoPtr() noexcept {
+            ~CUniquePtr() noexcept {
                 if (nullptr != this->Ptr)
                     this->Deleter(this->Ptr);
             }
 
-            CKernalAutoPtr& operator=(CKernalAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept 
+            CUniquePtr& operator=(CUniquePtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
             {
                 Reset(_Right.release());
                 return *this;
