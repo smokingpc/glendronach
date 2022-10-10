@@ -46,9 +46,6 @@ public:
 
     void Setup(PVOID devext, PSPCNVME_CONFIG cfg);
     void Teardown();
-    //inline void BindCtrlReg(PNVME_CONTROLLER_REGISTERS ctrlreg)
-    //{this->CtrlReg = ctrlreg;}
-
     void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
     void SetMaxIoQueueCount(ULONG max);
 
@@ -71,7 +68,6 @@ private:
     USHORT  DeviceID;
     bool IsReady = false;
     
-    //bool MapControllerRegisters(PACCESS_RANGE range);
     bool MapControllerRegisters(PCI_COMMON_HEADER& header);
     bool GetPciBusData(PCI_COMMON_HEADER& header);
 
