@@ -27,4 +27,4 @@ EXTERN_C_END
 #include "ScsiHandler_CDB12.h"
 #include "ScsiHandler_CDB16.h"
 #include "ScsiHandler_InlineUtils.h"
-
+#include "MSIX_and_DPC.h"

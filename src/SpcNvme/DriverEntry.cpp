@@ -39,10 +39,18 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS;
     init_data.TaggedQueuing = TRUE;
     init_data.MultipleRequestPerLu = TRUE;
-
+    init_data.NumberOfAccessRanges = 2;
     // Specify support/use SRB Extension for Windows 8 and up
     init_data.SrbTypeFlags = SRB_TYPE_FLAG_STORAGE_REQUEST_BLOCK;
-    init_data.FeatureSupport = STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES;
+    
+    //stornvme uses these features:
+    //  STOR_FEATURE_DUMP_INFO
+    //  STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER
+    //  STOR_FEATURE_EXTRA_IO_INFORMATION
+    //  STOR_FEATURE_DUMP_RESUME_CAPABLE
+    //  STOR_FEATURE_DEVICE_NAME_NO_SUFFIX
+    //  STOR_FEATURE_DUMP_POINTERS
+    init_data.FeatureSupport = STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES | STOR_FEATURE_NVME;
 
     /* Set required extension sizes. */
     init_data.DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);

@@ -22,93 +22,83 @@ CSpcNvmeDevice::CSpcNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg)
 {
     Setup(devext, cfg);
 }
-CSpcNvmeDevice::~CSpcNvmeDevice(){}
-
-bool CSpcNvmeDevice::BindHBA(PPORT_CONFIGURATION_INFORMATION pci, HW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE isr)
+CSpcNvmeDevice::~CSpcNvmeDevice()
 {
-    if(NULL == this->DevExt)
-        return false;
-
-    this->BusNumber = pci->SystemIoBusNumber;
-
-    //All untouched fields in PPORT_CONFIGURATION_INFORMATION are marked as 
-    //"miniport driver should not modify it" in MSDN. So skip them...
-    pci->MaximumTransferLength = this->MaxTxSize;
-    pci->NumberOfPhysicalBreaks = this->MaxTxPages + 1;    //default value == 0x11
-    pci->AlignmentMask = FILE_LONG_ALIGNMENT;   //Address Alignment of SRB request's buffer
-    pci->MiniportDumpData = NULL;
-    pci->NumberOfBuses = 1;
-    pci->InitiatorBusId[0] = 1;
-    pci->ScatterGather = TRUE;
-    
-    //todo: enable this and implement cache flush
-    pci->CachesData = FALSE;
-    pci->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE;
-    pci->MaximumNumberOfTargets = this->MaxTargets;
-    pci->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    pci->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
-    //pci->SpecificLuExtensionSize  ??
-    //Caller should set SrbExtensionSize. this object only handle common fields.
-    //pPCI->SrbExtensionSize = sizeof(NVME_SRB_EXTENSION);
-    if (pci->Dma64BitAddresses == SCSI_DMA64_SYSTEM_SUPPORTED)
-        pci->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
-
-    pci->MaximumNumberOfLogicalUnits = this->MaxNamespaces;
-    pci->SynchronizationModel = StorSynchronizeFullDuplex;
-    pci->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    pci->HwMSInterruptRoutine = isr;
-
-//TODO: SUPPORT dump     
-    pci->DumpRegion.Length = 0;
-    pci->DumpRegion.PhysicalBase.QuadPart = 0;
-    pci->DumpRegion.VirtualBase = NULL;
-    pci->RequestedDumpBufferSize = 0;
-    pci->DumpMode = DUMP_MODE_CRASH;
-    pci->MaxNumberOfIO = this->MaxIoPerLU * this->MaxNamespaces;
-
-    if(0==pci->NumberOfAccessRanges)
-        return false;
-    
-    PACCESS_RANGE range = &(*(pci->AccessRanges))[0];
-    
-
-    return true;
+    Teardown();
 }
 
 void CSpcNvmeDevice::Setup(PVOID devext, PSPCNVME_CONFIG cfg)
 {
     this->DevExt = devext;
+    RtlCopyMemory(&this->Cfg, cfg, sizeof(SPCNVME_CONFIG));
 
-    this->MaxTxSize = cfg->MaxTxSize;
-    this->MaxTxPages = cfg->MaxTxPages;
-    this->MaxNamespaces = cfg->MaxNamespaces;
-    this->MaxTargets = cfg->MaxTargets;
-    this->MaxIoPerLU = cfg->MaxIoPerLU;
-    this->InterfaceType = cfg->InterfaceType;
+    PCI_COMMON_HEADER header = { 0 };
+    if (GetPciBusData(header))
+    {
+        this->IsReady = MapControllerRegisters(header);
+    }
 }
-void CSpcNvmeDevice::Teardown(){}
-
-//void CSpcNvmeDevice::Init()
-//{
-//}
-
-
-bool CSpcNvmeDevice::MapControllerRegisters(PACCESS_RANGE range)
+void CSpcNvmeDevice::Teardown()
 {
-    this->CtrlReg = (PNVME_CONTROLLER_REGISTERS)StorPortGetDeviceBase(
-        this->DevExt,
-        this->InterfaceType,
-        this->BusNumber,
-        range->RangeStart,
-        range->RangeLength,
-        FALSE);
+    if(!this->IsReady)
+        return ;
 
-    if (NULL == this->CtrlReg)
+    this->IsReady = false;
+}
+
+void CSpcNvmeDevice::UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data)
+{
+    RtlCopyMemory(&this->IdentData, data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+}
+
+void CSpcNvmeDevice::SetMaxIoQueueCount(ULONG max)
+{
+    this->MaxIoQueueCount = max;
+}
+
+bool CSpcNvmeDevice::MapControllerRegisters(PCI_COMMON_HEADER &header)
+{
+    if(NULL == this->DevExt)
         return false;
 
+    BOOLEAN in_iospace = FALSE;
 
-    return true;
+    STOR_PHYSICAL_ADDRESS bar0 = { 0 };
+    this->CtrlReg = NULL;
+    //todo: use correct structure to parse and convert this physical address
+    bar0.LowPart = (header.u.type0.BaseAddresses[0] & 0xFFFFC000);
+    bar0.HighPart = header.u.type0.BaseAddresses[1];
 
+    PACCESS_RANGE range = this->Cfg.AccessRanges;
+    for (ULONG i = 0; i < this->Cfg.AccessRangeCount; i++)
+    {
+        if(true == PA_Utils::IsAddrEqual(range->RangeStart, bar0))
+        {
+            in_iospace = !range->RangeInMemory;
+            this->CtrlReg = (PNVME_CONTROLLER_REGISTERS)StorPortGetDeviceBase(
+                                    this->DevExt, PCIBus, 
+                                    this->Cfg.BusNumber, bar0, 
+                                    range->RangeLength, in_iospace);
+            if (NULL != this->CtrlReg)
+                return true;
+        }
+    }
+
+    return false;
 }
+bool CSpcNvmeDevice::GetPciBusData(PCI_COMMON_HEADER& header)
+{
+    ULONG size = sizeof(PCI_COMMON_HEADER);
+    ULONG status = StorPortGetBusData(this->DevExt, this->Cfg.InterfaceType,
+        this->Cfg.BusNumber, this->Cfg.SlotNumber, &header, size);
+
+    if (2 == status || status != size)
+        return false;
+
+    this->VendorID = header.VendorID;
+    this->DeviceID = header.DeviceID;
+    return true;
+}
+
 #pragma endregion
 

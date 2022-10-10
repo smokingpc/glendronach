@@ -9,4 +9,10 @@
 
 
 #define MAX_LOGIC_UNIT      1
-#define MAX_IO_QUEUE_COUNT       32
+#define MAX_IO_QUEUE_COUNT  32
+
+#define MAX_TX_PAGES        32
+#define MAX_TX_SIZE         (PAGE_SIZE * MAX_TX_PAGES)
+#define MAX_CONCURRENT_IO   4096
+
+#define ACCESS_RANGE_COUNT  2

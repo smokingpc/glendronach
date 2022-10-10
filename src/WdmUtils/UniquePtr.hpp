@@ -8,21 +8,6 @@
 
 namespace SPC
 {
-    //template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    //class SpcDefaultDeleter {
-    //public:
-    //    constexpr SpcDefaultDeleter() noexcept = default;
-    //    SpcDefaultDeleter(const SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>&) noexcept 
-    //    {
-    //        //no copy constructor
-    //    }
-
-    //    virtual void operator()(_Ty* _Ptr) const noexcept = 0;
-    //    //{
-    //    //    static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
-    //    //}
-    //};
-
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
     class SpcCppDeleter //: SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
     { 

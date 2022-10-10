@@ -1,5 +1,18 @@
 #include "pch.h"
 
+static bool InitDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION pcicfg)
+{
+    CSpcNvmeDevice* obj = CSpcNvmeDevice::Create(devext, cfg);
+    if(NULL == obj)
+        return false;
+    devext->NvmeDev[0] = obj;
+
+    //prepare DPC for MSIX interrupt
+    StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
+
+    return true;
+}
+
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
 {
     CDebugCallInOut inout(__FUNCTION__);
@@ -60,54 +73,59 @@ BOOLEAN HwStartIo(PVOID DeviceExtension, PSCSI_REQUEST_BLOCK Srb)
 }
 
 _Use_decl_annotations_ ULONG HwFindAdapter(
-    _In_ PVOID DeviceExtension,
-    _In_ PVOID HwContext,
-    _In_ PVOID BusInformation,
-    _In_z_ PCHAR ArgumentString,
+    _In_ PVOID dev_ext,
+    _In_ PVOID ctx,
+    _In_ PVOID businfo,
+    _In_z_ PCHAR arg_str,
     _Inout_ PPORT_CONFIGURATION_INFORMATION ConfigInfo,
     _In_ PBOOLEAN Reserved3)
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
-    UNREFERENCED_PARAMETER(HwContext);
-    UNREFERENCED_PARAMETER(BusInformation);
-    UNREFERENCED_PARAMETER(ArgumentString);
+    UNREFERENCED_PARAMETER(ctx);
+    UNREFERENCED_PARAMETER(businfo);
+    UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
 
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
+    SPCNVME_CONFIG nvmecfg = {
+        .BusNumber = ConfigInfo->SystemIoBusNumber,
+        .SlotNumber = ConfigInfo->SlotNumber,
+    };
+    nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
+    if(false == InitDeviceExtension(devext, &nvmecfg, ConfigInfo))
+        return SP_RETURN_NOT_FOUND;
 
+    ConfigInfo->MaximumTransferLength = nvmecfg.MaxTxSize;//MAX_TX_SIZE;
+    ConfigInfo->NumberOfPhysicalBreaks = nvmecfg.MaxTxPages;//MAX_TX_PAGES;
+    ConfigInfo->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
+    ConfigInfo->MiniportDumpData = NULL;
+    ConfigInfo->InitiatorBusId[0] = 1;
+    ConfigInfo->CachesData = FALSE;
+    ConfigInfo->MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS; //specify bounce buffer type?
+    ConfigInfo->MaximumNumberOfTargets = nvmecfg.MaxTargets;
+    ConfigInfo->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
+    ConfigInfo->DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
+    ConfigInfo->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
+    ConfigInfo->MaximumNumberOfLogicalUnits = nvmecfg.MaxLu;
+    ConfigInfo->SynchronizationModel = StorSynchronizeFullDuplex;
+    ConfigInfo->HwMSInterruptRoutine = NvmeMsixISR;
+    ConfigInfo->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
+    ConfigInfo->NumberOfBuses = 1;
+    ConfigInfo->ScatterGather = TRUE;
+    ConfigInfo->Master = TRUE;
+    ConfigInfo->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
+    ConfigInfo->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
+    ConfigInfo->MaxNumberOfIO = nvmecfg.MaxTotalIo;
+    ConfigInfo->MaxIOsPerLun = nvmecfg.MaxIoPerLU;
 
-    //ConfigInfo->MaximumTransferLength = MAX_TX_SIZE;
-    //ConfigInfo->NumberOfPhysicalBreaks = MAX_TX_PAGES;
-    //ConfigInfo->AlignmentMask = FILE_LONG_ALIGNMENT;
-    //ConfigInfo->MiniportDumpData = NULL;
-    //ConfigInfo->InitiatorBusId[0] = 1;
-    //ConfigInfo->CachesData = FALSE;
-    //ConfigInfo->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
-    //ConfigInfo->MaximumNumberOfTargets = 1;
-    //ConfigInfo->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    //ConfigInfo->DeviceExtensionSize = sizeof(SMOKY_EXT);
-    //ConfigInfo->SrbExtensionSize = sizeof(SMOKY_SRBEXT);
-    //ConfigInfo->MaximumNumberOfLogicalUnits = 1;
-    //ConfigInfo->SynchronizationModel = StorSynchronizeFullDuplex;
-    //ConfigInfo->HwMSInterruptRoutine = NULL;
-    //ConfigInfo->InterruptSynchronizationMode = InterruptSupportNone;
-    //ConfigInfo->VirtualDevice = TRUE;
-    //ConfigInfo->MaxNumberOfIO = MAX_CONCURRENT_IO;
-    //ConfigInfo->NumberOfBuses = 1;
-    //ConfigInfo->ScatterGather = TRUE;
-    //ConfigInfo->Master = TRUE;
-    //ConfigInfo->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
-    //ConfigInfo->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
+    //Dump is not supported now. Will be supported in future.
+    ConfigInfo->RequestedDumpBufferSize = 0;
+    ConfigInfo->DumpMode = DUMP_MODE_CRASH;
+    ConfigInfo->DumpRegion.VirtualBase = NULL;
+    ConfigInfo->DumpRegion.PhysicalBase.QuadPart = NULL;
+    ConfigInfo->DumpRegion.Length = 0;
 
-    //{
-    //    ConfigInfo->DumpRegion.VirtualBase = NULL;
-    //    ConfigInfo->DumpRegion.PhysicalBase.QuadPart = NULL;
-    //    ConfigInfo->DumpRegion.Length = 0;
-    //}
-    // If the buffer is not mapped, DataBuffer is the same as MDL's original virtual address, 
-    // which could even be zero.
-    return SP_RETURN_NOT_FOUND;
+    return SP_RETURN_FOUND;
 }
 
 _Use_decl_annotations_
