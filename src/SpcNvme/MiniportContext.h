@@ -1,5 +1,6 @@
 #pragma once
 
+class CSpcNvmeDevice;
 typedef struct _SPCNVME_DEVEXT
 {
     PNVME_CONTROLLER_REGISTERS CtrlReg;

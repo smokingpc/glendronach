@@ -19,6 +19,8 @@ typedef struct _CDB6_REQUESTSENSE
 
 inline UCHAR HandleInquiryVPD(SPCNVME_SRBEXT srbext, ULONG& ret_size)
 {
+    UNREFERENCED_PARAMETER(srbext);
+    UNREFERENCED_PARAMETER(ret_size);
     return SRB_STATUS_INVALID_REQUEST;
 
     //PCDB cdb = srbext->Cdb;
@@ -200,6 +202,7 @@ inline void FillInquiry_InquiryData(PINQUIRYDATA data, char* vid, char* pid, cha
 
 UCHAR Scsi_RequestSense6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
     ////request sense is used to query error information from device.
@@ -249,16 +252,19 @@ UCHAR Scsi_RequestSense6(SPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_Read6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, FALSE);
 }
 UCHAR Scsi_Write6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, TRUE);
 }
 UCHAR Scsi_Inquiry6(SPCNVME_SRBEXT srbext) 
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
     //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
@@ -297,6 +303,7 @@ UCHAR Scsi_Inquiry6(SPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_Verify6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
 ////VERIFY(6) seems obsoleted? I didn't see description in Seagate SCSI reference.
@@ -309,6 +316,7 @@ UCHAR Scsi_Verify6(SPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_ModeSelect6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
     //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     ////ULONG ret_size = 0;
@@ -318,6 +326,7 @@ UCHAR Scsi_ModeSelect6(SPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_ModeSense6(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    UCHAR srb_status = SRB_STATUS_ERROR;
 //    PCDB cdb = srbext->Cdb;

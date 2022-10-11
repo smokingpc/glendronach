@@ -2,18 +2,21 @@
 
 UCHAR Scsi_Read16(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, FALSE);
 }
 
 UCHAR Scsi_Write16(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, TRUE);
 }
 
 UCHAR Scsi_Verify16(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
     //todo: complete this handler for FULL support of verify
     //UCHAR srb_status = SRB_STATUS_ERROR;
@@ -35,6 +38,7 @@ UCHAR Scsi_Verify16(SPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_ReadCapacity16(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
     //UCHAR srb_status = SRB_STATUS_SUCCESS;
     //ULONG ret_size = sizeof(READ_CAPACITY16_DATA);

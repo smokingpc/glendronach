@@ -9,10 +9,6 @@
       <UniqueIdentifier>{8E41214B-6785-4CFE-B992-037D68949A14}</UniqueIdentifier>
       <Extensions>inf;inv;inx;mof;mc;</Extensions>
     </Filter>
-    <Filter Include="Miniport">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="Classes">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -29,6 +25,13 @@
     <Filter Include="SRB_Utils">
       <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DriverMain">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="ISR_and_DPC">
+      <UniqueIdentifier>{241797aa-4e4a-4272-8b64-edace1d2dcb0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="SpcNvme.inf">
@@ -37,10 +40,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DriverEntry.cpp">
-      <Filter>Miniport</Filter>
+      <Filter>DriverMain</Filter>
     </ClCompile>
     <ClCompile Include="MiniportFunctions.cpp">
-      <Filter>Miniport</Filter>
+      <Filter>DriverMain</Filter>
     </ClCompile>
     <ClCompile Include="NvmeDevice.cpp">
       <Filter>Classes</Filter>
@@ -62,6 +65,12 @@
     </ClCompile>
     <ClCompile Include="ScsiHandler_CDB16.cpp">
       <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="MSIX_and_DPC.cpp">
+      <Filter>ISR_and_DPC</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildIo_Handler.cpp">
+      <Filter>BuildIo_Handlers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -98,9 +107,6 @@
     <ClInclude Include="BuildIo_Handlers.h">
       <Filter>BuildIo_Handlers</Filter>
     </ClInclude>
-    <ClInclude Include="BuildIo_DefaultHandler.cpp">
-      <Filter>BuildIo_Handlers</Filter>
-    </ClInclude>
     <ClInclude Include="ScsiHandler_CDB6.h">
       <Filter>SCSI_Handlers</Filter>
     </ClInclude>
@@ -112,6 +118,12 @@
     </ClInclude>
     <ClInclude Include="ScsiHandler_CDB16.h">
       <Filter>SCSI_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScsiHandler_InlineUtils.h">
+      <Filter>SCSI_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="MSIX_and_DPC.h">
+      <Filter>ISR_and_DPC</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

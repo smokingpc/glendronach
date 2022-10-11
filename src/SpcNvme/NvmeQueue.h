@@ -106,7 +106,7 @@ public:
     bool Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     void Teardown();
     operator STOR_PHYSICAL_ADDRESS() const;
-    bool PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY popdata);
+    bool PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY entry);
 
 private:
     PVOID DevExt = NULL;
@@ -153,16 +153,21 @@ private:
 class CNvmeQueuePair
 {
 public:
-    const ULONG BufferTag = (ULONG)'QMVN';
+    const static ULONG BufferTag = (ULONG)'QMVN';
+
     CNvmeQueuePair();
     CNvmeQueuePair(QUEUE_PAIR_CONFIG* config);
     ~CNvmeQueuePair();
 
-    void Setup(QUEUE_PAIR_CONFIG* config);
+    bool Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
 
     bool SubmitCmd(PNVME_COMMAND cmd, PSPCNVME_SRBEXT srbext, bool self = false);
     bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PSPCNVME_SRBEXT* ret_srbext);
+
+    void GetQueueAddrVA(PVOID *subq, PVOID* cplq);
+    void GetQueueAddrPA(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
+
 private:
     PVOID DevExt = NULL;
     USHORT QueueID = NVME_INVALID_QID;

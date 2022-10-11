@@ -2,6 +2,7 @@
 
 UCHAR Scsi_ReportLuns12(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
     //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
@@ -14,6 +15,7 @@ UCHAR Scsi_ReportLuns12(SPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Read12(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
 //    return ReadWriteRamdisk(srbext, FALSE);
@@ -21,6 +23,7 @@ UCHAR Scsi_Read12(SPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Write12(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
 //    return ReadWriteRamdisk(srbext, TRUE);
@@ -28,6 +31,7 @@ UCHAR Scsi_Write12(SPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Verify12(SPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 
     ////todo: complete this handler for FULL support of verify

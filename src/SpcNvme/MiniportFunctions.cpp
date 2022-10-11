@@ -1,16 +1,50 @@
 #include "pch.h"
 
-static bool InitDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION pcicfg)
+static bool InitDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg)
 {
     CSpcNvmeDevice* obj = CSpcNvmeDevice::Create(devext, cfg);
     if(NULL == obj)
         return false;
+
     devext->NvmeDev[0] = obj;
 
     //prepare DPC for MSIX interrupt
     StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
 
     return true;
+}
+
+static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCNVME_CONFIG nvmecfg)
+{
+    portcfg->MaximumTransferLength = nvmecfg->MaxTxSize;//MAX_TX_SIZE;
+    portcfg->NumberOfPhysicalBreaks = nvmecfg->MaxTxPages;//MAX_TX_PAGES;
+    portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
+    portcfg->MiniportDumpData = NULL;
+    portcfg->InitiatorBusId[0] = 1;
+    portcfg->CachesData = FALSE;
+    portcfg->MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS; //specify bounce buffer type?
+    portcfg->MaximumNumberOfTargets = nvmecfg->MaxTargets;
+    portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
+    portcfg->DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
+    portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
+    portcfg->MaximumNumberOfLogicalUnits = nvmecfg->MaxLu;
+    portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
+    portcfg->HwMSInterruptRoutine = NvmeMsixISR;
+    portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
+    portcfg->NumberOfBuses = 1;
+    portcfg->ScatterGather = TRUE;
+    portcfg->Master = TRUE;
+    portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
+    portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
+    portcfg->MaxNumberOfIO = nvmecfg->MaxTotalIo;
+    portcfg->MaxIOsPerLun = nvmecfg->MaxIoPerLU;
+
+    //Dump is not supported now. Will be supported in future.
+    portcfg->RequestedDumpBufferSize = 0;
+    portcfg->DumpMode = DUMP_MODE_CRASH;
+    portcfg->DumpRegion.VirtualBase = NULL;
+    portcfg->DumpRegion.PhysicalBase.QuadPart = NULL;
+    portcfg->DumpRegion.Length = 0;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
@@ -92,38 +126,10 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
         .SlotNumber = ConfigInfo->SlotNumber,
     };
     nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
-    if(false == InitDeviceExtension(devext, &nvmecfg, ConfigInfo))
+    if(false == InitDeviceExtension(devext, &nvmecfg))
         return SP_RETURN_NOT_FOUND;
 
-    ConfigInfo->MaximumTransferLength = nvmecfg.MaxTxSize;//MAX_TX_SIZE;
-    ConfigInfo->NumberOfPhysicalBreaks = nvmecfg.MaxTxPages;//MAX_TX_PAGES;
-    ConfigInfo->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
-    ConfigInfo->MiniportDumpData = NULL;
-    ConfigInfo->InitiatorBusId[0] = 1;
-    ConfigInfo->CachesData = FALSE;
-    ConfigInfo->MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS; //specify bounce buffer type?
-    ConfigInfo->MaximumNumberOfTargets = nvmecfg.MaxTargets;
-    ConfigInfo->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    ConfigInfo->DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
-    ConfigInfo->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
-    ConfigInfo->MaximumNumberOfLogicalUnits = nvmecfg.MaxLu;
-    ConfigInfo->SynchronizationModel = StorSynchronizeFullDuplex;
-    ConfigInfo->HwMSInterruptRoutine = NvmeMsixISR;
-    ConfigInfo->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    ConfigInfo->NumberOfBuses = 1;
-    ConfigInfo->ScatterGather = TRUE;
-    ConfigInfo->Master = TRUE;
-    ConfigInfo->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
-    ConfigInfo->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
-    ConfigInfo->MaxNumberOfIO = nvmecfg.MaxTotalIo;
-    ConfigInfo->MaxIOsPerLun = nvmecfg.MaxIoPerLU;
-
-    //Dump is not supported now. Will be supported in future.
-    ConfigInfo->RequestedDumpBufferSize = 0;
-    ConfigInfo->DumpMode = DUMP_MODE_CRASH;
-    ConfigInfo->DumpRegion.VirtualBase = NULL;
-    ConfigInfo->DumpRegion.PhysicalBase.QuadPart = NULL;
-    ConfigInfo->DumpRegion.Length = 0;
+    FillPortConfiguration(ConfigInfo, &nvmecfg);
 
     return SP_RETURN_FOUND;
 }

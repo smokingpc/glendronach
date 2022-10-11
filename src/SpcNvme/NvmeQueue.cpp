@@ -13,7 +13,7 @@ CNvmeQueuePair::~CNvmeQueuePair()
 {
     Teardown();
 }
-void CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
+bool CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
 {
     this->DevExt = config->DevExt;
     this->QueueID = config->QID;
@@ -23,11 +23,16 @@ void CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
     this->Buffer = config->PreAllocBuffer;
     bool ok = this->SetupQueueBuffer();
 
-    ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl, this->Depth);
-    ok = ok && SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
-    ok = ok && CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
-    ok = ok && History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+    if(ok)
+    {
+        ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl, this->Depth);
+        ok = ok && SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
+        ok = ok && CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
+        ok = ok && History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+    }
     this->IsReady = ok;
+
+    return IsReady;
 }
 void CNvmeQueuePair::Teardown()
 {
@@ -72,9 +77,28 @@ bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PSPCNVME_SRBEXT 
         CMD_INFO info = { USE_STATE::FREE, NVME_CMD_TYPE::UNKNOWN_CMD};
         History.Pop(sub_old_tail, &info);
         *ret_srbext = (PSPCNVME_SRBEXT)info.Context;
-    }
-}
 
+        return true;
+    }
+
+    return false;
+}
+void CNvmeQueuePair::GetQueueAddrVA(PVOID* subq, PVOID* cplq)
+{  
+    if(subq != NULL)
+        *subq = SubQBuffer;
+
+    if (cplq != NULL)
+        *cplq = CplQBuffer;
+}
+void CNvmeQueuePair::GetQueueAddrPA(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq)
+{
+    if (subq != NULL)
+        subq->QuadPart = SubQBufferPA.QuadPart;
+
+    if (cplq != NULL)
+        cplq->QuadPart = CplQBufferPA.QuadPart;
+}
 bool CNvmeQueuePair::AllocQueueBuffer()
 {
     PHYSICAL_ADDRESS low = { 0 };
@@ -132,7 +156,6 @@ bool CNvmeQueuePair::SetupQueueBuffer()
 }
 #pragma endregion
 
-
 #pragma region ======== class CNvmeQueuePair ========
 CNvmeDoorbell::CNvmeDoorbell()
 {}
@@ -148,6 +171,7 @@ bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, ULONG* sub
     this->SubDbl = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL) subdbl;
     this->CplDbl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL) cpldbl;
     this->Depth = depth;
+    return true;
 }
 void CNvmeDoorbell::Teardown()
 {
@@ -184,7 +208,6 @@ void CNvmeDoorbell::DoorbellCplHead(USHORT new_value)
     StorPortWriteRegisterUlong(this->DevExt, &this->CplDbl->AsUlong, new_value);
 }
 #pragma endregion
-
 
 #pragma region ======== class CNvmeSubmitQueue ========
 CNvmeSubmitQueue::CNvmeSubmitQueue()
@@ -229,6 +252,7 @@ bool CNvmeSubmitQueue::Submit(USHORT sub_tail, PNVME_COMMAND new_cmd)
     NVME_COMMAND* cmd = NULL;
     cmd = &this->Cmds[sub_tail];
     StorPortCopyMemory((PVOID)cmd, new_cmd, sizeof(NVME_COMMAND));
+    return true;
 }
 #pragma endregion
 
@@ -271,7 +295,7 @@ CNvmeCompleteQueue::operator STOR_PHYSICAL_ADDRESS() const
 {
     return this->QueuePA;
 }
-bool CNvmeCompleteQueue::PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY popdata)
+bool CNvmeCompleteQueue::PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY entry)
 {
     PNVME_COMPLETION_ENTRY cpl = &this->Entries[*cpl_head];
 
@@ -283,7 +307,7 @@ bool CNvmeCompleteQueue::PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY po
     if(this->Phase.Tag == cpl->DW3.Status.P)
         return false;
     
-    StorPortCopyMemory(&popdata, cpl, sizeof(NVME_COMPLETION_ENTRY));
+    StorPortCopyMemory(entry, cpl, sizeof(NVME_COMPLETION_ENTRY));
     *cpl_head = (*cpl_head + 1) % this->Depth;
     if(0 == *cpl_head)
         this->Phase.Tag = !this->Phase.Tag;

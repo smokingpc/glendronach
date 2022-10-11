@@ -246,6 +246,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="MSIX_and_DPC.cpp" />
     <ClCompile Include="ScsiHandler_CDB10.cpp" />
     <ClCompile Include="ScsiHandler_CDB12.cpp" />
     <ClCompile Include="ScsiHandler_CDB16.cpp" />
@@ -257,12 +258,14 @@
     <ClCompile Include="NvmeQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BuildIo_DefaultHandler.cpp" />
+    <ClCompile Include="BuildIo_Handler.cpp" />
     <ClInclude Include="BuildIo_Handlers.h" />
+    <ClInclude Include="MSIX_and_DPC.h" />
     <ClInclude Include="ScsiHandler_CDB10.h" />
     <ClInclude Include="ScsiHandler_CDB12.h" />
     <ClInclude Include="ScsiHandler_CDB16.h" />
     <ClInclude Include="ScsiHandler_CDB6.h" />
+    <ClInclude Include="ScsiHandler_InlineUtils.h" />
     <ClInclude Include="Srb_Utils.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />

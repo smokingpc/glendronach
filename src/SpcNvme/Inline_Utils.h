@@ -10,17 +10,13 @@ FORCEINLINE size_t RoundUp(size_t value, size_t align_size)
     return (DivRoundUp(value, align_size) * align_size);
 }
 
-
-namespace PA_Utils
+FORCEINLINE bool IsAddrEqual(PPHYSICAL_ADDRESS a, PPHYSICAL_ADDRESS b)
 {
-    bool IsAddrEqual(PPHYSICAL_ADDRESS a, PPHYSICAL_ADDRESS b)
-    {
-        if(a->QuadPart == b->QuadPart)
-            return true;
-        return false;
-    }
-    bool IsAddrEqual(PHYSICAL_ADDRESS &a, PHYSICAL_ADDRESS& b)
-    {
-        return IsAddrEqual(&a , &b);
-    }
+    if (a->QuadPart == b->QuadPart)
+        return true;
+    return false;
+}
+FORCEINLINE bool IsAddrEqual(PHYSICAL_ADDRESS& a, PHYSICAL_ADDRESS& b)
+{
+    return IsAddrEqual(&a, &b);
 }
