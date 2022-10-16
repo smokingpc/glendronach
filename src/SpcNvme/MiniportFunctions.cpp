@@ -50,6 +50,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
 {
     CDebugCallInOut inout(__FUNCTION__);
+    //initialize perf options
     StorPortEnablePassiveInitialization(DeviceExtension, HwPassiveInitialize);
     return FALSE;
 }
@@ -59,6 +60,7 @@ BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
 {
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(DeviceExtension);
+    //INITIALIZE driver contexts
     return FALSE;
 }
 
@@ -79,31 +81,51 @@ BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
     //case SRB_FUNCTION_POWER:
     //    srb_status = DefaultCmdHandler(srb, srbext);
     //    break;
+    case SRB_FUNCTION_EXECUTE_SCSI:
+        need_startio = BuildIo_ScsiHandler(srbext);
+        break;
     case SRB_FUNCTION_IO_CONTROL:
     case SRB_FUNCTION_PNP:
         //pnp handlers
-    case SRB_FUNCTION_EXECUTE_SCSI:
         //scsi handlers
     default:
         need_startio = BuildIo_DefaultHandler(srbext);
         break;
 
     }
-
-    if(FALSE != need_startio)
-    {
-        StorPortNotification(RequestComplete, DevExt, Srb);
-    }
-
     return need_startio;
 }
 
 _Use_decl_annotations_
-BOOLEAN HwStartIo(PVOID DeviceExtension, PSCSI_REQUEST_BLOCK Srb)
+BOOLEAN HwStartIo(PVOID DevExt, PSCSI_REQUEST_BLOCK Srb)
 {
-    UNREFERENCED_PARAMETER(DeviceExtension);
-    UNREFERENCED_PARAMETER(Srb);
-    return FALSE;
+    PSPCNVME_SRBEXT srbext = InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
+    BOOLEAN ok = FALSE;
+
+    switch (srbext->FuncCode)
+    {
+        //case SRB_FUNCTION_ABORT_COMMAND:
+    //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
+    //case SRB_FUNCTION_RESET_DEVICE:
+    //case SRB_FUNCTION_RESET_BUS:
+    //case SRB_FUNCTION_WMI:
+    //case SRB_FUNCTION_POWER:
+    //    srb_status = DefaultCmdHandler(srb, srbext);
+    //    break;
+    case SRB_FUNCTION_EXECUTE_SCSI:
+        ok = StartIo_ScsiHandler(srbext);
+        break;
+    case SRB_FUNCTION_IO_CONTROL:
+    case SRB_FUNCTION_PNP:
+        //pnp handlers
+        //scsi handlers
+    default:
+        ok = StartIo_DefaultHandler(srbext);
+        break;
+
+    }
+    //each handler should complete the requests.
+    return ok;
 }
 
 _Use_decl_annotations_ ULONG HwFindAdapter(
@@ -119,6 +141,8 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(businfo);
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
+
+    //PCI bus related initialize
 
     PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
     SPCNVME_CONFIG nvmecfg = {

@@ -72,6 +72,9 @@
     <ClCompile Include="BuildIo_Handler.cpp">
       <Filter>BuildIo_Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="StartIo_Handler.cpp">
+      <Filter>StartIo_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MiniportFunctions.h">
@@ -124,6 +127,9 @@
     </ClInclude>
     <ClInclude Include="MSIX_and_DPC.h">
       <Filter>ISR_and_DPC</Filter>
+    </ClInclude>
+    <ClInclude Include="StartIo_Handler.h">
+      <Filter>StartIo_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

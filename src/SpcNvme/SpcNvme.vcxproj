@@ -256,6 +256,7 @@
     <ClCompile Include="MiniportFunctions.cpp" />
     <ClCompile Include="NvmeDevice.cpp" />
     <ClCompile Include="NvmeQueue.cpp" />
+    <ClCompile Include="StartIo_Handler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BuildIo_Handler.cpp" />
@@ -275,6 +276,7 @@
     <ClInclude Include="NvmeDevice.h" />
     <ClInclude Include="NvmeQueue.h" />
     <ClInclude Include="PoolTags.h" />
+    <ClInclude Include="StartIo_Handler.h" />
     <ClInclude Include="StateMachine.h" />
   </ItemGroup>
   <ItemGroup>

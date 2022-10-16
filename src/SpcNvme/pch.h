@@ -21,6 +21,7 @@ EXTERN_C_END
 
 #include "Srb_Utils.h"
 #include "BuildIo_Handlers.h"
+#include "StartIo_Handler.h"
 
 #include "ScsiHandler_CDB6.h"
 #include "ScsiHandler_CDB10.h"
@@ -28,3 +29,4 @@ EXTERN_C_END
 #include "ScsiHandler_CDB16.h"
 #include "ScsiHandler_InlineUtils.h"
 #include "MSIX_and_DPC.h"
+
