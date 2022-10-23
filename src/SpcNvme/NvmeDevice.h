@@ -67,8 +67,27 @@ public:
     void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
     void SetMaxIoQueueCount(ULONG max);
 
+    void DoAdminCompletion();       //called when AdminQueue Completion Interrupt invoked
+    void DoIoCompletion();          //called when IoQueue Completion Interrupt invoked
+
+    //Controller control and admin behavior
     bool EnableController();
     bool DisableController();
+
+    bool IdentifyController();
+    bool IdentifyNamespace();
+
+    bool CreateIoSubQ();
+    bool DeleteIoSubQ();
+    bool CreateIoCplQ();
+    bool DeleteIoCplQ();
+
+    bool SetInterruptCoalescing();
+    bool SetArbitration();
+    bool SyncHostTime();
+    bool SetPowerManagement();
+    bool SetAsyncEvent();
+
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;

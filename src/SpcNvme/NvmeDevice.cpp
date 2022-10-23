@@ -82,7 +82,6 @@ bool CSpcNvmeDevice::EnableController()
     cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
     cc.IOSQES = SPCNVME_CONFIG::IOSQES;
     cc.IOCQES = SPCNVME_CONFIG::IOCQES;
-    //cc.MPS = ??;
     cc.EN = 0;
     StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
     ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
@@ -114,7 +113,6 @@ bool CSpcNvmeDevice::EnableController()
 
     return WaitForCtrlerState(CtrlerTimeout, 1);
 }
-
 bool CSpcNvmeDevice::DisableController()
 {
     NVME_CONTROLLER_STATUS csts = {0};
@@ -157,7 +155,9 @@ bool CSpcNvmeDevice::DisableController()
 void CSpcNvmeDevice::RefreshByCapability()
 {
     //CtrlReg->CAP.TO is timeout value in 500 ms.
-    //We should convert it to micro-seconds for StorPortStallExecution using.
+    //It indicates the timeout worst case of Enabling/Disabling Controller.
+    //e.g. CAP.TO==3 means worst case timout to Enable/Disable controller is 1500 milli-second.
+    //We should convert it to micro-seconds for StorPortStallExecution() using.
     ULONG cap_timeout = CtrlReg->CAP.TO;
     CtrlerTimeout = cap_timeout * (500 * 1000);
 }
