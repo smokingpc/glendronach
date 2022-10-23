@@ -70,10 +70,10 @@ public:
     void DoAdminCompletion();       //called when AdminQueue Completion Interrupt invoked
     void DoIoCompletion();          //called when IoQueue Completion Interrupt invoked
 
-    //Controller control and admin behavior
     bool EnableController();
     bool DisableController();
 
+    //Controller Admin Commands
     bool IdentifyController();
     bool IdentifyNamespace();
 
