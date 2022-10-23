@@ -36,11 +36,15 @@ static UCHAR SetScsiSenseData(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 
 PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 {
+    if(NULL == srb)
+        return NULL;
+
     PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
 
     if(NULL == srbext)
         return NULL;
 
+    RtlZeroMemory(srbext, sizeof(SPCNVME_SRBEXT));
     srbext->DevExt = (PSPCNVME_DEVEXT)devext;
     srbext->Srb = srb;
     srbext->FuncCode = SrbGetSrbFunction((PVOID)srb);
@@ -55,6 +59,10 @@ PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
     srbext->DataBufLen = (SrbGetDataTransferLength((PVOID)srb));
     srbext->TargetID = (SrbGetTargetId((PVOID)srb));
     srbext->Lun = (SrbGetLun((PVOID)srb));
+
+    srbext->DataBuf = SrbGetDataBuffer(srb);
+    if(NULL != srbext->DataBuf)
+        srbext->DataBufLen = SrbGetDataTransferLength(srb);
     return srbext;
 }
 void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)

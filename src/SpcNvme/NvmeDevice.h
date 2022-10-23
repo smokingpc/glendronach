@@ -50,7 +50,9 @@ public:
     static void Delete(CSpcNvmeDevice *ptr);
     static const ULONG STALL_INTERVAL_US = 500;
     //static const ULONG WAIT_STATE_TIMEOUT_US = 20* STALL_INTERVAL_US;
-    static const ULONG BUGCHECK_ADAPTER = 0x00851573;
+    static const ULONG BUGCHECK_BASE = 0x85157300;
+    static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE+1;
+    static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE+2;
 
     static const USHORT ADM_QDEPTH = 128;
 
@@ -64,8 +66,8 @@ public:
 
     void Setup(PVOID devext, PSPCNVME_CONFIG cfg);
     void Teardown();
-    void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
-    void SetMaxIoQueueCount(ULONG max);
+//    void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
+//    void SetMaxIoQueueCount(ULONG max);
 
     void DoAdminCompletion();       //called when AdminQueue Completion Interrupt invoked
     void DoIoCompletion();          //called when IoQueue Completion Interrupt invoked
@@ -74,8 +76,8 @@ public:
     bool DisableController();
 
     //Controller Admin Commands
-    bool IdentifyController();
-    bool IdentifyNamespace();
+    //bool IdentifyController();
+    //bool IdentifyNamespace();
 
     bool CreateIoSubQ();
     bool DeleteIoSubQ();
@@ -88,6 +90,8 @@ public:
     bool SetPowerManagement();
     bool SetAsyncEvent();
 
+    bool SubmitAdminCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    bool SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
@@ -123,5 +127,21 @@ private:
 
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy);
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc_en);
+
+    bool SubmitNvmeCommand(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid);
+    bool SubmitNvmeCommand(OUT PNVME_COMPLETION_ENTRY completion, PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid);
+
+
+    inline void ReadRegisters(NVME_CONTROLLER_STATUS &csts, NVME_CONTROLLER_CONFIGURATION &cc)
+    {
+        MemoryBarrier();
+        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+        cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+    }
+    inline void ReadRegisters(NVME_CONTROLLER_STATUS& csts)
+    {
+        MemoryBarrier();
+        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+    }
 };
 

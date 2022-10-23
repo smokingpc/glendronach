@@ -58,15 +58,62 @@ void CSpcNvmeDevice::Teardown()
     IsReady = false;
 }
 
-void CSpcNvmeDevice::UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data)
+void CSpcNvmeDevice::DoAdminCompletion()
 {
-    RtlCopyMemory(&IdentData, data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+void CSpcNvmeDevice::DoIoCompletion()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::CreateIoSubQ()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::DeleteIoSubQ()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::CreateIoCplQ()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::DeleteIoCplQ()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
 }
 
-void CSpcNvmeDevice::SetMaxIoQueueCount(ULONG max)
+bool CSpcNvmeDevice::SetInterruptCoalescing()
 {
-    MaxIoQueueCount = max;
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
 }
+bool CSpcNvmeDevice::SetArbitration()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::SyncHostTime()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::SetPowerManagement()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::SetAsyncEvent()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+
+
+//void CSpcNvmeDevice::UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data)
+//{
+//    RtlCopyMemory(&IdentData, data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+//}
+
+//void CSpcNvmeDevice::SetMaxIoQueueCount(ULONG max)
+//{
+//    MaxIoQueueCount = max;
+//}
 
 bool CSpcNvmeDevice::EnableController()
 {
@@ -222,11 +269,34 @@ bool CSpcNvmeDevice::SetupAdminQueuePair()
 
     return AdminQueue.Setup(&qpcfg);
 }
+
+bool CSpcNvmeDevice::SetupAdminQueuePair()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::RegisterAdminQueuePair()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::CreateIoQueuePairs()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::RegisterIoQueuePairs()
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+bool CSpcNvmeDevice::RegisterIoQueuePair(ULONG index)
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+}
+
 bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
 {
     ULONG elapsed = 0;
     NVME_CONTROLLER_STATUS csts = { 0 };
-    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+    //csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+    ReadRegisters(csts);
 
     while(csts.RDY != csts_rdy)
     {
@@ -235,7 +305,7 @@ bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
         if(elapsed > time_us)
             return false;
 
-        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+        ReadRegisters(csts);
     }
 
     return true;
@@ -246,9 +316,7 @@ bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN
     NVME_CONTROLLER_STATUS csts = { 0 };
     NVME_CONTROLLER_CONFIGURATION cc = { 0 };
 
-    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
-
+    ReadRegisters(csts, cc);
     while (csts.RDY != csts_rdy || cc.EN != cc_en)
     {
         StorPortStallExecution(STALL_INTERVAL_US);
@@ -256,12 +324,27 @@ bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN
         if (elapsed > time_us)
             return false;
 
-        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-        cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+        ReadRegisters(csts, cc);
     }
 
     return true;
 }
+
+bool CSpcNvmeDevice::SubmitNvmeCommand(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid)
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, (ULONG_PTR) srbext, (ULONG_PTR) cmd, (ULONG_PTR) qid);
+}
+
+bool CSpcNvmeDevice::SubmitNvmeCommand(
+        OUT PNVME_COMPLETION_ENTRY completion, 
+        PSPCNVME_SRBEXT srbext, 
+        PNVME_COMMAND cmd, 
+        ULONG qid)
+{
+    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, (ULONG_PTR)srbext, (ULONG_PTR)cmd, (ULONG_PTR)qid);
+}
+
+
 
 #pragma endregion
 

@@ -11,6 +11,8 @@ BOOLEAN NvmeMsixISR(IN PVOID dev_ext, IN ULONG msgid)
     ok = StorPortIssueDpc(dev_ext, &devext->NvmeDPC, NULL, NULL);
     status = StorPortReleaseMSISpinLock(dev_ext, msgid, irql);
 
+    //Todo: add debug print or log if IssueDPC failed.
+
     return TRUE;
 }
 
