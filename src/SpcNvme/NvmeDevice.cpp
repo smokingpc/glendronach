@@ -16,6 +16,48 @@ void CSpcNvmeDevice::Delete(CSpcNvmeDevice* ptr)
 
 #pragma region ======== class CSpcNvmeDevice ======== 
 
+inline void CSpcNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
+{
+    if(barrier)
+        MemoryBarrier();
+    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+}
+inline void CSpcNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+}
+
+inline void CSpcNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
+}
+
+inline void CSpcNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong, csts.AsUlong);
+}
+
+inline void CSpcNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS& asq,
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS& acq,
+    bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
+}
+
+
+
 CSpcNvmeDevice::CSpcNvmeDevice(){}
 CSpcNvmeDevice::CSpcNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg) 
     : CSpcNvmeDevice()
@@ -45,7 +87,7 @@ void CSpcNvmeDevice::Setup(PVOID devext, PSPCNVME_CONFIG cfg)
     if(map_ok)
     {
         RefreshByCapability();
-        IsReady = map_ok && SetupAdminQueuePair();
+  //      IsReady = map_ok && SetupAdminQueuePair();
     }
 }
 void CSpcNvmeDevice::Teardown()
@@ -58,29 +100,88 @@ void CSpcNvmeDevice::Teardown()
     IsReady = false;
 }
 
-void CSpcNvmeDevice::DoAdminCompletion()
+bool CSpcNvmeDevice::EnableController()
 {
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+    //if set CC.EN = 1 WHEN CSTS.RDY == 1 and CC.EN == 0, it is undefined behavior.
+    //we should wait controller state changing until (CC.EN == 0 and CSTS.RDY == 0).
+    bool ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
+    if (!ok)
+        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
+
+    NVME_CONTROLLER_CONFIGURATION cc = { 0 };
+    cc.CSS = NVME_CSS_NVM_COMMAND_SET;
+    cc.AMS = NVME_AMS_ROUND_ROBIN;
+    cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
+    cc.IOSQES = SPCNVME_CONFIG::IOSQES;
+    cc.IOCQES = SPCNVME_CONFIG::IOCQES;
+    cc.EN = 0;
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
+    ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
+    if (!ok)
+        return false;
+
+    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
+
+    //tell controller: how many entries in my Admin Sub and Cpl Queue?
+    //these attributes should be write to controller ONLY WHEN CC.EN == 0.
+    aqa.ASQS = ADM_QDEPTH;
+    aqa.ACQS = ADM_QDEPTH;
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
+
+    PHYSICAL_ADDRESS subq_pa = { 0 };
+    PHYSICAL_ADDRESS cplq_pa = { 0 };
+    AdminQueue.GetQueueAddrPA(&subq_pa, &cplq_pa);
+
+    asq.AsUlonglong = subq_pa.QuadPart;
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
+
+    acq.AsUlonglong = cplq_pa.QuadPart;
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
+
+    cc.EN = 1;
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
+
+    return WaitForCtrlerState(CtrlerTimeout, 1);
 }
-void CSpcNvmeDevice::DoIoCompletion()
+bool CSpcNvmeDevice::DisableController()
 {
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::CreateIoSubQ()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::DeleteIoSubQ()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::CreateIoCplQ()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::DeleteIoCplQ()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
+    NVME_CONTROLLER_STATUS csts = { 0 };
+    NVME_CONTROLLER_CONFIGURATION cc = { 0 };
+
+#if 0
+    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+
+    if (csts.RDY == 0 && cc.EN == 0)
+        return;
+
+    //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
+    if (0 == csts.RDY && 1 == cc.EN)
+    {
+        //stall and wait our desired state become the correct value we want.
+        bool ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
+        //cc and csts not meet our desired state, the controller could have problem.
+        if (!ok)
+            KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)&cc, (ULONG_PTR)&csts, 0);
+    }
+    else if (1 == csts.RDY && 0 == cc.EN)   //abnormal state...
+        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)&cc, (ULONG_PTR)&csts, 0);
+#endif
+
+    //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
+    //we should wait controller state changing until (CC.EN == 1 and CSTS.RDY == 1).
+    bool ok = WaitForCtrlerState(CtrlerTimeout, 1, 1);
+    if (!ok)
+        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
+
+    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+    cc.EN = FALSE;
+    cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
+
+    return WaitForCtrlerState(CtrlerTimeout, 0);
 }
 
 bool CSpcNvmeDevice::SetInterruptCoalescing()
@@ -104,100 +205,11 @@ bool CSpcNvmeDevice::SetAsyncEvent()
     KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
 }
 
-
-//void CSpcNvmeDevice::UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data)
-//{
-//    RtlCopyMemory(&IdentData, data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
-//}
-
-//void CSpcNvmeDevice::SetMaxIoQueueCount(ULONG max)
-//{
-//    MaxIoQueueCount = max;
-//}
-
-bool CSpcNvmeDevice::EnableController()
-{
-    //if set CC.EN = 1 WHEN CSTS.RDY == 1 and CC.EN == 0, it is undefined behavior.
-    //we should wait controller state changing until (CC.EN == 0 and CSTS.RDY == 0).
-    bool ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
-    if (!ok)
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
-
-    NVME_CONTROLLER_CONFIGURATION cc = {0};
-    cc.CSS = NVME_CSS_NVM_COMMAND_SET;
-    cc.AMS = NVME_AMS_ROUND_ROBIN;
-    cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
-    cc.IOSQES = SPCNVME_CONFIG::IOSQES;
-    cc.IOCQES = SPCNVME_CONFIG::IOCQES;
-    cc.EN = 0;
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
-    ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
-    if (!ok)
-        return false;
-
-    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = {0};
-    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = {0};
-    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = {0};
-
-    //tell controller: how many entries in my Admin Sub and Cpl Queue?
-    //these attributes should be write to controller ONLY WHEN CC.EN == 0.
-    aqa.ASQS = ADM_QDEPTH;
-    aqa.ACQS = ADM_QDEPTH;
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
-
-    PHYSICAL_ADDRESS subq_pa = {0};
-    PHYSICAL_ADDRESS cplq_pa = { 0 };
-    AdminQueue.GetQueueAddrPA(&subq_pa, &cplq_pa);
-
-    asq.AsUlonglong = subq_pa.QuadPart;
-    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
-
-    acq.AsUlonglong = cplq_pa.QuadPart;
-    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
-
-    cc.EN = 1;
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
-
-    return WaitForCtrlerState(CtrlerTimeout, 1);
-}
-bool CSpcNvmeDevice::DisableController()
-{
-    NVME_CONTROLLER_STATUS csts = {0};
-    NVME_CONTROLLER_CONFIGURATION cc = { 0 };
-
-#if 0
-    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
-
-    if (csts.RDY == 0 && cc.EN == 0)
-        return;
-
-    //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
-    if (0 == csts.RDY && 1 == cc.EN)
-    {
-        //stall and wait our desired state become the correct value we want.
-        bool ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
-        //cc and csts not meet our desired state, the controller could have problem.
-        if(!ok)
-            KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR) this, (ULONG_PTR) &cc, (ULONG_PTR) &csts, 0);
-    }
-    else if (1 == csts.RDY && 0 == cc.EN)   //abnormal state...
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)&cc, (ULONG_PTR)&csts, 0);
-#endif
-
-    //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
-    //we should wait controller state changing until (CC.EN == 1 and CSTS.RDY == 1).
-    bool ok = WaitForCtrlerState(CtrlerTimeout, 1, 1);
-    if(!ok)
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
-
-    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
-    cc.EN = FALSE;
-    cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
-
-    return WaitForCtrlerState(CtrlerTimeout, 0);
-}
+void CSpcNvmeDevice::UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data){}
+bool CSpcNvmeDevice::RegisterAdminQueuePair(CNvmeQueuePair& qp){}
+bool CSpcNvmeDevice::UnregisterAdminQueuePair(){}
+bool CSpcNvmeDevice::RegisterIoQueuePair(CNvmeQueuePair& qp){}
+bool CSpcNvmeDevice::UnregisterIoQueuePair(CNvmeQueuePair& qp){}
 
 void CSpcNvmeDevice::RefreshByCapability()
 {
@@ -257,39 +269,6 @@ bool CSpcNvmeDevice::GetPciBusData(PCI_COMMON_HEADER& header)
     DeviceID = header.DeviceID;
     return true;
 }
-bool CSpcNvmeDevice::SetupAdminQueuePair()
-{
-    QUEUE_PAIR_CONFIG qpcfg = { 0 };
-    qpcfg.Type = QUEUE_TYPE::ADM_QUEUE;
-    qpcfg.Depth = ADM_QDEPTH;
-    qpcfg.DevExt = DevExt;
-    qpcfg.QID = 0;
-    qpcfg.SubDbl = &Doorbells[qpcfg.QID].SubTail.AsUlong;
-    qpcfg.CplDbl = &Doorbells[qpcfg.QID].CplHead.AsUlong;
-
-    return AdminQueue.Setup(&qpcfg);
-}
-
-bool CSpcNvmeDevice::SetupAdminQueuePair()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::RegisterAdminQueuePair()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::CreateIoQueuePairs()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::RegisterIoQueuePairs()
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
-bool CSpcNvmeDevice::RegisterIoQueuePair(ULONG index)
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, 0, 0, 0);
-}
 
 bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
 {
@@ -329,22 +308,6 @@ bool CSpcNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN
 
     return true;
 }
-
-bool CSpcNvmeDevice::SubmitNvmeCommand(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid)
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, (ULONG_PTR) srbext, (ULONG_PTR) cmd, (ULONG_PTR) qid);
-}
-
-bool CSpcNvmeDevice::SubmitNvmeCommand(
-        OUT PNVME_COMPLETION_ENTRY completion, 
-        PSPCNVME_SRBEXT srbext, 
-        PNVME_COMMAND cmd, 
-        ULONG qid)
-{
-    KeBugCheckEx(this->BUGCHECK_NOT_IMPLEMENTED, (ULONG_PTR)this, (ULONG_PTR)srbext, (ULONG_PTR)cmd, (ULONG_PTR)qid);
-}
-
-
 
 #pragma endregion
 

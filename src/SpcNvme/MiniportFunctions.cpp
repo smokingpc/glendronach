@@ -49,6 +49,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
 {
+//Running at DIRQL
     CDebugCallInOut inout(__FUNCTION__);
     //initialize perf options
     StorPortEnablePassiveInitialization(DeviceExtension, HwPassiveInitialize);
@@ -58,9 +59,12 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
 _Use_decl_annotations_
 BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
 {
+    //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(DeviceExtension);
     //INITIALIZE driver contexts
+    //TODO: register IoQueues
+
     return FALSE;
 }
 
@@ -136,6 +140,8 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     _Inout_ PPORT_CONFIGURATION_INFORMATION ConfigInfo,
     _In_ PBOOLEAN Reserved3)
 {
+    //Running at PASSIVE_LEVEL!!!!!!!!!
+
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(ctx);
     UNREFERENCED_PARAMETER(businfo);
@@ -152,6 +158,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
     if(false == InitDeviceExtension(devext, &nvmecfg))
         return SP_RETURN_NOT_FOUND;
+
+    //TODO: init controller, register ADminQ, query controller identify, query namespace identify,
+    //      set features, 
 
     FillPortConfiguration(ConfigInfo, &nvmecfg);
 

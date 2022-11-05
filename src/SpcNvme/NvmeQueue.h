@@ -24,10 +24,10 @@ typedef enum _USE_STATE
 
 typedef struct _QUEUE_PAIR_CONFIG {
     PVOID DevExt = NULL;
-    USHORT QID = 0;
+    USHORT QID = 0;         //QueueID is zero-based. ID==0 is assigned to AdminQueue constantly
     USHORT Depth = 0;
     ULONG NumaNode = 0;
-    QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
+    QUEUE_TYPE Type = QUEUE_TYPE::ADM_QUEUE;
     ULONG *SubDbl = NULL;
     ULONG *CplDbl = NULL;
     PVOID PreAllocBuffer = NULL;            //SubQ and CplQ should be continuous memory together

@@ -46,18 +46,17 @@ typedef struct _DOORBELL_PAIR{
 
 class CSpcNvmeDevice {
 public:
-    static CSpcNvmeDevice *Create(PVOID devext, PSPCNVME_CONFIG cfg);
-    static void Delete(CSpcNvmeDevice *ptr);
     static const ULONG STALL_INTERVAL_US = 500;
     //static const ULONG WAIT_STATE_TIMEOUT_US = 20* STALL_INTERVAL_US;
     static const ULONG BUGCHECK_BASE = 0x85157300;
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE+1;
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE+2;
-
-    static const USHORT ADM_QDEPTH = 128;
-
+    static const USHORT ADM_QDEPTH = 64;
     static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
+
+    static CSpcNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
+    static void Delete(CSpcNvmeDevice* ptr);
 
 public:
     CSpcNvmeDevice();
@@ -66,23 +65,9 @@ public:
 
     void Setup(PVOID devext, PSPCNVME_CONFIG cfg);
     void Teardown();
-//    void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
-//    void SetMaxIoQueueCount(ULONG max);
-
-    void DoAdminCompletion();       //called when AdminQueue Completion Interrupt invoked
-    void DoIoCompletion();          //called when IoQueue Completion Interrupt invoked
 
     bool EnableController();
     bool DisableController();
-
-    //Controller Admin Commands
-    //bool IdentifyController();
-    //bool IdentifyNamespace();
-
-    bool CreateIoSubQ();
-    bool DeleteIoSubQ();
-    bool CreateIoCplQ();
-    bool DeleteIoCplQ();
 
     bool SetInterruptCoalescing();
     bool SetArbitration();
@@ -90,8 +75,11 @@ public:
     bool SetPowerManagement();
     bool SetAsyncEvent();
 
-    bool SubmitAdminCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
-    bool SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
+    bool RegisterAdminQueuePair(CNvmeQueuePair& qp);
+    bool UnregisterAdminQueuePair();
+    bool RegisterIoQueuePair(CNvmeQueuePair& qp);
+    bool UnregisterIoQueuePair(CNvmeQueuePair& qp);
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
@@ -118,30 +106,16 @@ private:
     bool MapControllerRegisters(PCI_COMMON_HEADER& header);
     bool GetPciBusData(PCI_COMMON_HEADER& header);
 
-    bool SetupAdminQueuePair();
-    bool RegisterAdminQueuePair();
-    
-    bool CreateIoQueuePairs();
-    bool RegisterIoQueuePairs();
-    bool RegisterIoQueuePair(ULONG index);
-
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy);
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc_en);
 
-    bool SubmitNvmeCommand(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid);
-    bool SubmitNvmeCommand(OUT PNVME_COMPLETION_ENTRY completion, PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, ULONG qid);
-
-
-    inline void ReadRegisters(NVME_CONTROLLER_STATUS &csts, NVME_CONTROLLER_CONFIGURATION &cc)
-    {
-        MemoryBarrier();
-        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-        cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
-    }
-    inline void ReadRegisters(NVME_CONTROLLER_STATUS& csts)
-    {
-        MemoryBarrier();
-        csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-    }
+    void ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier = true);
+    void ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier = true);
+    void WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier = true);
+    void WriteNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier = true);
+    void WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES &aqa, 
+                        NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS &asq, 
+                        NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS &acq, 
+                        bool barrier = true);
 };
 
