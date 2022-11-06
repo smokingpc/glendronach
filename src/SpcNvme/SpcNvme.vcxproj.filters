@@ -32,6 +32,9 @@
     <Filter Include="ISR_and_DPC">
       <UniqueIdentifier>{241797aa-4e4a-4272-8b64-edace1d2dcb0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Nvme_Handlers">
+      <UniqueIdentifier>{e936662c-51e4-464a-979b-f74a7f4c0686}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="SpcNvme.inf">
@@ -74,6 +77,9 @@
     </ClCompile>
     <ClCompile Include="StartIo_Handler.cpp">
       <Filter>StartIo_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="NvmeCommander.cpp">
+      <Filter>Nvme_Handlers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -130,6 +136,9 @@
     </ClInclude>
     <ClInclude Include="StartIo_Handler.h">
       <Filter>StartIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="NvmeCommander.h">
+      <Filter>Nvme_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

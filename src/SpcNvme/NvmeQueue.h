@@ -28,8 +28,8 @@ typedef struct _QUEUE_PAIR_CONFIG {
     USHORT Depth = 0;
     ULONG NumaNode = 0;
     QUEUE_TYPE Type = QUEUE_TYPE::ADM_QUEUE;
-    ULONG *SubDbl = NULL;
-    ULONG *CplDbl = NULL;
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
     PVOID PreAllocBuffer = NULL;            //SubQ and CplQ should be continuous memory together
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
@@ -41,7 +41,7 @@ typedef struct _CMD_INFO
     USHORT CID = NVME_INVALID_CID;   //CmdID in SubQ which submit this request.
 }CMD_INFO, *PCMD_INFO;
 
-class CSpcNvmeDevice;
+class CNvmeDevice;
 class CNvmeQueuePair;
 
 class CNvmeDoorbell

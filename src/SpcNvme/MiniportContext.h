@@ -1,14 +1,19 @@
 #pragma once
 
-class CSpcNvmeDevice;
+class CNvmeDevice;
 typedef struct _SPCNVME_DEVEXT
 {
-    PNVME_CONTROLLER_REGISTERS CtrlReg;
-    NVME_VERSION CurrentVer;
+    //PNVME_CONTROLLER_REGISTERS CtrlReg;
+    //NVME_VERSION CurrentVer;
+    //PORT_CONFIGURATION_INFORMATION PortConfig;
+    ACCESS_RANGE *PciSpace;
 
     NVME_STATE State;
-    CSpcNvmeDevice *NvmeDev[MAX_LOGIC_UNIT];
+    CNvmeDevice *NvmeDev;
+    CNvmeQueuePair *AdminQueue;
+    CNvmeQueuePair *IoQueue[MAX_IO_QUEUE_COUNT];
 
+    BOOLEAN IsReady;
     STOR_DPC NvmeDPC;      //DPC for MSIX interrupt which triggerred from NVMe Device
 
 }SPCNVME_DEVEXT, * PSPCNVME_DEVEXT;

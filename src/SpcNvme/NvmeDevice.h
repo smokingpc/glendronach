@@ -11,6 +11,7 @@ typedef struct _SPCNVME_CONFIG {
     static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
     static const UCHAR INTCOAL_TIME = 10;   //Interrupt Coalescing time threshold in 100us unit.
     static const UCHAR INTCOAL_THRESHOLD = 8;   //Interrupt Coalescing trigger threshold.
+    static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?
 
 
     ULONG MaxTxSize = DEFAULT_TX_SIZE;
@@ -44,24 +45,24 @@ typedef struct _DOORBELL_PAIR{
 }DOORBELL_PAIR, *PDOORBELL_PAIR;
 
 
-class CSpcNvmeDevice {
+class CNvmeDevice {
 public:
     static const ULONG STALL_INTERVAL_US = 500;
     //static const ULONG WAIT_STATE_TIMEOUT_US = 20* STALL_INTERVAL_US;
     static const ULONG BUGCHECK_BASE = 0x85157300;
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE+1;
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE+2;
-    static const USHORT ADM_QDEPTH = 64;
+//    static const USHORT ADM_QDEPTH = 64;
     static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
 
-    static CSpcNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
-    static void Delete(CSpcNvmeDevice* ptr);
+    static CNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
+    static void Delete(CNvmeDevice* ptr);
 
 public:
-    CSpcNvmeDevice();
-    CSpcNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg);
-    ~CSpcNvmeDevice();
+    CNvmeDevice();
+    CNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg);
+    ~CNvmeDevice();
 
     void Setup(PVOID devext, PSPCNVME_CONFIG cfg);
     void Teardown();
@@ -69,17 +70,16 @@ public:
     bool EnableController();
     bool DisableController();
 
-    bool SetInterruptCoalescing();
-    bool SetArbitration();
-    bool SyncHostTime();
-    bool SetPowerManagement();
-    bool SetAsyncEvent();
+    inline bool GetAdmDoorbell(PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL *subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL *cpldbl)
+    { GetDoorbell(0, subdbl, cpldbl); }
+    //qid == 0 is always AdminQ. IoQueue QID is 1 based.
+    bool GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL* cpldbl);
 
-    void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
-    bool RegisterAdminQueuePair(CNvmeQueuePair& qp);
+    //void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
+    bool RegisterAdminQueuePair(CNvmeQueuePair* qp);
     bool UnregisterAdminQueuePair();
-    bool RegisterIoQueuePair(CNvmeQueuePair& qp);
-    bool UnregisterIoQueuePair(CNvmeQueuePair& qp);
+    bool RegisterIoQueuePair(CNvmeQueuePair* qp);
+    bool UnregisterIoQueuePair(CNvmeQueuePair* qp);
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
@@ -90,9 +90,10 @@ private:
     ULONG SlotNumber = NVME_INVALID_ID;
     
     PVOID DevExt = NULL;      //StorPort Device Extension 
-    ULONG IoQueueCount = 0;
-    ULONG MaxIoQueueCount = 0;      //calculate by device returned config
-    
+    ULONG MaxDblCount = 0;
+    //ULONG IoQueueCount = 0;
+    //ULONG MaxIoQueueCount = 0;      //calculate by device returned config
+
     ULONG CtrlerTimeout = 2000 * STALL_INTERVAL_US;        //should be updated by CAP, unit in micro-seconds
     CNvmeQueuePair  AdminQueue;
     CNvmeQueuePair  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
@@ -117,5 +118,10 @@ private:
                         NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS &asq, 
                         NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS &acq, 
                         bool barrier = true);
+
+    bool IsControllerEnabled(bool barrier = true);
+    bool IsControllerReady(bool barrier = true);
+
+    void TakeSnooze(ULONG interval = STALL_INTERVAL_US);
 };
 

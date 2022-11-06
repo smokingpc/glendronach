@@ -1,17 +1,45 @@
 #include "pch.h"
 
-static bool InitDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg)
+static void CreateAdminQueue(PSPCNVME_DEVEXT devext)
 {
-    CSpcNvmeDevice* obj = CSpcNvmeDevice::Create(devext, cfg);
-    if(NULL == obj)
+    QUEUE_PAIR_CONFIG qcfg = {
+        .DevExt = devext,
+        .QID = 0,
+        .Depth = ADMIN_QUEUE_DEPTH,
+        .Type = QUEUE_TYPE::ADM_QUEUE,
+    };
+    devext->NvmeDev->GetAdmDoorbell(&qcfg.SubDbl, &qcfg.CplDbl);
+    devext->AdminQueue = new CNvmeQueuePair(&qcfg);
+}
+static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
+{
+    if (nullptr != devext->AdminQueue)
+    {
+        //devext->AdminQueue->Teardown();
+        delete devext->AdminQueue;
+        devext->AdminQueue = nullptr;
+    }
+}
+
+
+static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION portcfg)
+{
+    devext->NvmeDev = CNvmeDevice::Create(devext, cfg);
+    if(NULL == devext->NvmeDev)
         return false;
 
-    devext->NvmeDev[0] = obj;
-
+    CreateAdminQueue(devext);
     //prepare DPC for MSIX interrupt
     StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
-
+    
     return true;
+}
+
+static void TeardownDeviceExtension(PSPCNVME_DEVEXT devext)
+{
+    //stop msix
+    //teardown io queues
+    DeleteAdminQueue(devext);
 }
 
 static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCNVME_CONFIG nvmecfg)
@@ -45,6 +73,57 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
     portcfg->DumpRegion.VirtualBase = NULL;
     portcfg->DumpRegion.PhysicalBase.QuadPart = NULL;
     portcfg->DumpRegion.Length = 0;
+}
+
+
+_Use_decl_annotations_ ULONG HwFindAdapter(
+    _In_ PVOID dev_ext,
+    _In_ PVOID ctx,
+    _In_ PVOID businfo,
+    _In_z_ PCHAR arg_str,
+    _Inout_ PPORT_CONFIGURATION_INFORMATION ConfigInfo,
+    _In_ PBOOLEAN Reserved3)
+{
+    //Running at PASSIVE_LEVEL!!!!!!!!!
+
+    CDebugCallInOut inout(__FUNCTION__);
+    UNREFERENCED_PARAMETER(ctx);
+    UNREFERENCED_PARAMETER(businfo);
+    UNREFERENCED_PARAMETER(arg_str);
+    UNREFERENCED_PARAMETER(Reserved3);
+
+    SPCNVME_CONFIG nvmecfg;
+    nvmecfg.BusNumber = ConfigInfo->SystemIoBusNumber;
+    nvmecfg.SlotNumber = ConfigInfo->SlotNumber;
+
+    //PCI bus related initialize
+    FillPortConfiguration(ConfigInfo, &nvmecfg);
+
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
+    nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
+    if (false == SetupDeviceExtension(devext, &nvmecfg, ConfigInfo))
+        return SP_RETURN_NOT_FOUND;
+
+    //because this function is not returned, MSIX won't fire.
+    //so we do some admin commands here...
+
+    //NOTE: If return SP_RETURN_NOT_FOUND, driver routine will call PNP_REMOVE.
+    //      so I don't put teardown codes here.
+    CNvmeDevice* nvme = devext->NvmeDev;
+    if (!nvme->DisableController())
+        return SP_RETURN_NOT_FOUND;
+
+    if(!nvme->RegisterAdminQueuePair(devext->AdminQueue))
+        return SP_RETURN_NOT_FOUND;
+
+    if (!nvme->EnableController())
+        return SP_RETURN_NOT_FOUND;
+
+    //TODO: query controller identify, query namespace identify,
+    //      set features, 
+
+
+    return SP_RETURN_FOUND;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
@@ -130,41 +209,6 @@ BOOLEAN HwStartIo(PVOID DevExt, PSCSI_REQUEST_BLOCK Srb)
     }
     //each handler should complete the requests.
     return ok;
-}
-
-_Use_decl_annotations_ ULONG HwFindAdapter(
-    _In_ PVOID dev_ext,
-    _In_ PVOID ctx,
-    _In_ PVOID businfo,
-    _In_z_ PCHAR arg_str,
-    _Inout_ PPORT_CONFIGURATION_INFORMATION ConfigInfo,
-    _In_ PBOOLEAN Reserved3)
-{
-    //Running at PASSIVE_LEVEL!!!!!!!!!
-
-    CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(ctx);
-    UNREFERENCED_PARAMETER(businfo);
-    UNREFERENCED_PARAMETER(arg_str);
-    UNREFERENCED_PARAMETER(Reserved3);
-
-    //PCI bus related initialize
-
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
-    SPCNVME_CONFIG nvmecfg = {
-        .BusNumber = ConfigInfo->SystemIoBusNumber,
-        .SlotNumber = ConfigInfo->SlotNumber,
-    };
-    nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
-    if(false == InitDeviceExtension(devext, &nvmecfg))
-        return SP_RETURN_NOT_FOUND;
-
-    //TODO: init controller, register ADminQ, query controller identify, query namespace identify,
-    //      set features, 
-
-    FillPortConfiguration(ConfigInfo, &nvmecfg);
-
-    return SP_RETURN_FOUND;
 }
 
 _Use_decl_annotations_
