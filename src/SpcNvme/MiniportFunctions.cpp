@@ -122,7 +122,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     //      set features, 
     //because this function is not returned, MSIX won't fire.
     //so we do some admin commands here...
-    status = NvmeIdentify(devext);
+    status = NvmeIdentifyController(devext);
     if (!NT_SUCCESS(status))
         goto error;
 
