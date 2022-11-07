@@ -219,5 +219,37 @@ NTSTATUS NvmeIdentifyController(PSPCNVME_DEVEXT devext, bool wait)
 
 NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    NVME_COMMAND cmd = { 0 };
+    PVOID buffer = NULL;
+    ULONG size = PAGE_SIZE;
+    cmd.CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
+    //each namespace map to one LUN. each namespace replied data should save to one LunExt.
+    //Now It only support 1 namespace on NVMe so I hardcode the LunExt array here.
+    cmd.NSID = 1;
+    cmd.u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_SPECIFIC_NAMESPACE;
+
+    StorPortAllocatePool(devext, size, TAG_GENERIC_BUFFER, &buffer);
+    RtlZeroMemory(buffer, size);
+
+    cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, buffer, &size).QuadPart;
+
+    //submit command
+    bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, true);
+    if (!ok)
+        return STATUS_INTERNAL_ERROR;
+
+    if (!wait)
+        return STATUS_SUCCESS;
+
+    //todo: refactor NVME_STATUS replying
+    NVME_COMMAND_STATUS nvme_status = { 0 };
+    NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
+
+    if (NT_SUCCESS(status) && nvme_status.SC == 0 && nvme_status.SCT == 0)
+        RtlCopyMemory(&devext->NsData[0], buffer, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
+
+    //todo: maybe crash when STATUS_TIMEOUT?
+    StorPortFreePool(devext, buffer);
+
+    return status;
 }

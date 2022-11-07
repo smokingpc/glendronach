@@ -31,6 +31,8 @@ static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PP
     if(NULL == devext->NvmeDev)
         return false;
 
+    devext->CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+
     CreateAdminQueue(devext);
     //prepare DPC for MSIX interrupt
     StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
@@ -126,6 +128,10 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
 
+    status = NvmeIdentifyNamespace(devext);
+    if (!NT_SUCCESS(status))
+        goto error;
+
     status = NvmeSetFeatures(devext);
     if(!NT_SUCCESS(status))
         goto error;
@@ -142,8 +148,45 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
 //Running at DIRQL
     CDebugCallInOut inout(__FUNCTION__);
     //initialize perf options
+    PERF_CONFIGURATION_DATA read_data = { 0 };
+    PERF_CONFIGURATION_DATA write_data = { 0 };
+    GROUP_AFFINITY affinity;
+    ULONG stor_status;
+
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+
+    memset(&affinity, 0, sizeof(GROUP_AFFINITY));
+    read_data.Version = STOR_PERF_VERSION;
+    read_data.Size = sizeof(PERF_CONFIGURATION_DATA);
+    read_data.MessageTargets = &affinity;
+
+    stor_status = StorPortInitializePerfOpts(devext, TRUE, &read_data);
+
+    if (stor_status == STOR_STATUS_SUCCESS) 
+    {
+        write_data.Version = STOR_PERF_VERSION;
+        write_data.Size = sizeof(PERF_CONFIGURATION_DATA);
+
+        if (read_data.Flags & STOR_PERF_CONCURRENT_CHANNELS)
+        {
+            write_data.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
+            write_data.ConcurrentChannels = devext->CpuCount;
+        }
+        if (read_data.Flags & STOR_PERF_NO_SGL)
+            write_data.Flags |= STOR_PERF_NO_SGL;
+        if (read_data.Flags & STOR_PERF_DPC_REDIRECTION)
+            write_data.Flags |= STOR_PERF_DPC_REDIRECTION;
+        if (read_data.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO)
+            write_data.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
+        if (read_data.Flags & STOR_PERF_DPC_REDIRECTION_CURRENT_CPU)
+            write_data.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
+
+        stor_status = StorPortInitializePerfOpts(devext, FALSE, &write_data);
+        ASSERT(STOR_STATUS_SUCCESS == stor_status);
+    }
+
     StorPortEnablePassiveInitialization(DeviceExtension, HwPassiveInitialize);
-    return FALSE;
+    return TRUE;
 }
 
 _Use_decl_annotations_

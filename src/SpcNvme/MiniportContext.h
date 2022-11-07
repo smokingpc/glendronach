@@ -5,7 +5,7 @@ typedef struct _SPCNVME_DEVEXT
 {
     //todo: runtime allocate a memory here... no hardcode....
     ACCESS_RANGE PciSpace[4];
-
+    ULONG CpuCount;
     NVME_STATE State;
     CNvmeDevice *NvmeDev;
     CNvmeQueuePair *AdminQueue;
@@ -14,7 +14,7 @@ typedef struct _SPCNVME_DEVEXT
     BOOLEAN IsReady;
     STOR_DPC NvmeDPC;      //DPC for MSIX interrupt which triggerred from NVMe Device
     NVME_IDENTIFY_CONTROLLER_DATA IdentData;
-
+    NVME_IDENTIFY_NAMESPACE_DATA NsData[NVME_CONST::SUPPORT_NAMESPACES];
 }SPCNVME_DEVEXT, * PSPCNVME_DEVEXT;
 
 typedef struct _SPCNVME_SRBEXT
