@@ -140,5 +140,11 @@
     <ClInclude Include="NvmeCommander.h">
       <Filter>Nvme_Handlers</Filter>
     </ClInclude>
+    <ClInclude Include="NvmeConstants.h">
+      <Filter>Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="NvmeEnums.h">
+      <Filter>Classes</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

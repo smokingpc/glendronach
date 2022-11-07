@@ -6,4 +6,4 @@ __inline PSPCNVME_SRBEXT GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
 }
 
 PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb);
-void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
+void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status);

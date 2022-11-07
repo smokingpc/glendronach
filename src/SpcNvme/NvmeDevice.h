@@ -1,26 +1,13 @@
 #pragma once
 
 typedef struct _SPCNVME_CONFIG {
-    static const ULONG DEFAULT_TX_PAGES = 512; //PRP1 + PRP2 MAX PAGES
-    static const ULONG DEFAULT_TX_SIZE = PAGE_SIZE * DEFAULT_TX_PAGES;
-    static const UCHAR SUPPORT_NAMESPACES = 1;
-    static const UCHAR MAX_TARGETS = 1;
-    static const UCHAR MAX_LU = 1;
-    static const ULONG MAX_IO_PER_LU = 1024;
-    static const UCHAR IOSQES = 6; //sizeof(NVME_COMMAND)==64 == 2^6, so IOSQES== 6.
-    static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
-    static const UCHAR INTCOAL_TIME = 10;   //Interrupt Coalescing time threshold in 100us unit.
-    static const UCHAR INTCOAL_THRESHOLD = 8;   //Interrupt Coalescing trigger threshold.
-    static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?
-
-
-    ULONG MaxTxSize = DEFAULT_TX_SIZE;
-    ULONG MaxTxPages = DEFAULT_TX_PAGES;
-    UCHAR MaxNamespaces = SUPPORT_NAMESPACES;
-    UCHAR MaxTargets = MAX_TARGETS;
-    UCHAR MaxLu = MAX_LU;
-    ULONG MaxIoPerLU = MAX_IO_PER_LU;
-    ULONG MaxTotalIo = MAX_IO_PER_LU * MAX_LU;
+    ULONG MaxTxSize = NVME_CONST::TX_SIZE;
+    ULONG MaxTxPages = NVME_CONST::TX_PAGES;
+    UCHAR MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
+    UCHAR MaxTargets = NVME_CONST::MAX_TARGETS;
+    UCHAR MaxLu = NVME_CONST::MAX_LU;
+    ULONG MaxIoPerLU = NVME_CONST::MAX_IO_PER_LU;
+    ULONG MaxTotalIo = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
     INTERFACE_TYPE InterfaceType = PCIBus;
     
     ULONG BusNumber = NVME_INVALID_ID;
@@ -47,14 +34,9 @@ typedef struct _DOORBELL_PAIR{
 
 class CNvmeDevice {
 public:
-    static const ULONG STALL_INTERVAL_US = 500;
-    //static const ULONG WAIT_STATE_TIMEOUT_US = 20* STALL_INTERVAL_US;
     static const ULONG BUGCHECK_BASE = 0x85157300;
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE+1;
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE+2;
-//    static const USHORT ADM_QDEPTH = 64;
-    static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
-    static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
 
     static CNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
     static void Delete(CNvmeDevice* ptr);
@@ -71,7 +53,7 @@ public:
     bool DisableController();
 
     inline bool GetAdmDoorbell(PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL *subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL *cpldbl)
-    { GetDoorbell(0, subdbl, cpldbl); }
+    { return GetDoorbell(0, subdbl, cpldbl); }
     //qid == 0 is always AdminQ. IoQueue QID is 1 based.
     bool GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL* cpldbl);
 
@@ -83,7 +65,9 @@ public:
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
-    NVME_IDENTIFY_CONTROLLER_DATA       IdentData = { 0 };
+    NVME_VERSION NvmeVer = {0};
+    NVME_CONTROLLER_CAPABILITIES NvmeCap = {0};
+    //NVME_IDENTIFY_CONTROLLER_DATA       IdentData = { 0 };
     PDOORBELL_PAIR                      Doorbells = NULL;
 
     ULONG BusNumber = NVME_INVALID_ID;
@@ -91,10 +75,9 @@ private:
     
     PVOID DevExt = NULL;      //StorPort Device Extension 
     ULONG MaxDblCount = 0;
-    //ULONG IoQueueCount = 0;
-    //ULONG MaxIoQueueCount = 0;      //calculate by device returned config
 
-    ULONG CtrlerTimeout = 2000 * STALL_INTERVAL_US;        //should be updated by CAP, unit in micro-seconds
+    ULONG CtrlerTimeout = 2000 * NVME_CONST::STALL_INTERVAL_US;        //should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay = NVME_CONST::SLEEP_TIME_US;
     CNvmeQueuePair  AdminQueue;
     CNvmeQueuePair  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
 
@@ -103,7 +86,7 @@ private:
     USHORT  DeviceID;
     bool IsReady = false;
     
-    void RefreshByCapability();
+    void ReadCtrlCapAndInfo();      //load capability and informations AFTER register address mapped.
     bool MapControllerRegisters(PCI_COMMON_HEADER& header);
     bool GetPciBusData(PCI_COMMON_HEADER& header);
 
@@ -112,6 +95,9 @@ private:
 
     void ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier = true);
     void ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier = true);
+    void ReadNvmeRegister(NVME_VERSION &ver, bool barrier = true);
+    void ReadNvmeRegister(NVME_CONTROLLER_CAPABILITIES &cap, bool barrier = true);
+
     void WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier = true);
     void WriteNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier = true);
     void WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES &aqa, 
@@ -119,9 +105,9 @@ private:
                         NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS &acq, 
                         bool barrier = true);
 
-    bool IsControllerEnabled(bool barrier = true);
-    bool IsControllerReady(bool barrier = true);
+    BOOLEAN IsControllerEnabled(bool barrier = true);
+    BOOLEAN IsControllerReady(bool barrier = true);
 
-    void TakeSnooze(ULONG interval = STALL_INTERVAL_US);
+    //void TakeSnooze(ULONG interval = NVME_CONST::SLEEP_TIME_US);
 };
 

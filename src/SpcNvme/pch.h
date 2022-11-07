@@ -2,6 +2,7 @@
 
 #include <wdm.h>
 #include <nvme.h>
+#include <ntifs.h>
 
 EXTERN_C_START
 #include <storport.h>
@@ -14,10 +15,12 @@ EXTERN_C_END
 #include "Constants.h"
 #include "Inline_Utils.h"
 #include "StateMachine.h"
-#include "MiniportContext.h"
-#include "MiniportFunctions.h"
+#include "NvmeConstants.h"
+#include "NvmeEnums.h"
 #include "NvmeQueue.h"
 #include "NvmeDevice.h"
+#include "MiniportContext.h"
+#include "MiniportFunctions.h"
 #include "NvmeCommander.h"
 
 #include "Srb_Utils.h"

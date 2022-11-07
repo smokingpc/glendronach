@@ -3,10 +3,8 @@
 class CNvmeDevice;
 typedef struct _SPCNVME_DEVEXT
 {
-    //PNVME_CONTROLLER_REGISTERS CtrlReg;
-    //NVME_VERSION CurrentVer;
-    //PORT_CONFIGURATION_INFORMATION PortConfig;
-    ACCESS_RANGE *PciSpace;
+    //todo: runtime allocate a memory here... no hardcode....
+    ACCESS_RANGE PciSpace[4];
 
     NVME_STATE State;
     CNvmeDevice *NvmeDev;
@@ -15,6 +13,7 @@ typedef struct _SPCNVME_DEVEXT
 
     BOOLEAN IsReady;
     STOR_DPC NvmeDPC;      //DPC for MSIX interrupt which triggerred from NVMe Device
+    NVME_IDENTIFY_CONTROLLER_DATA IdentData;
 
 }SPCNVME_DEVEXT, * PSPCNVME_DEVEXT;
 

@@ -1,27 +1,5 @@
 #pragma once
 
-typedef enum _QUEUE_TYPE
-{
-    IO_QUEUE = 0,
-    //INTIO_QUEUE = 1,
-    ADM_QUEUE = 99,
-}QUEUE_TYPE;
-
-_Enum_is_bitflag_
-typedef enum _NVME_CMD_TYPE
-{
-    UNKNOWN_CMD = 0,
-    ADM_CMD = 1,
-    IO_CMD = 2,
-    SELF_ISSUED = 0x80000000,           //this command issued by SpcNvme.sys myself.
-}NVME_CMD_TYPE;
-
-typedef enum _USE_STATE
-{
-    FREE = 0,
-    USED = 1,
-}USE_STATE;
-
 typedef struct _QUEUE_PAIR_CONFIG {
     PVOID DevExt = NULL;
     USHORT QID = 0;         //QueueID is zero-based. ID==0 is assigned to AdminQueue constantly
@@ -51,25 +29,37 @@ class CNvmeDoorbell
 
 public:
     CNvmeDoorbell();
-    CNvmeDoorbell(class CNvmeQueuePair*parent, PVOID devext, ULONG *subdbl, ULONG *cpldbl, USHORT depth);
+    CNvmeDoorbell(class CNvmeQueuePair*parent, PVOID devext, ULONG *subdbl, ULONG *cpldbl);
     ~CNvmeDoorbell();
 
-    bool Setup(class CNvmeQueuePair*parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl, USHORT depth);
+    bool Setup(class CNvmeQueuePair*parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl);
+    bool Setup(class CNvmeQueuePair* parent, PVOID devext,
+                    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL subdbl,
+                    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL cpldbl);
     void Teardown();
     void UpdateSubQHead(USHORT new_head);
-    USHORT GetNextSubTail();
-    void DoorbellSubTail(USHORT new_value);
-    USHORT GetCurrentCplHead();
-    void DoorbellCplHead(USHORT new_value);
+    
+    
+    //USHORT GetNextSubTail();
+    inline ULONG GetSubTail() { return SubTail; }
+    inline ULONG GetSubHead() { return SubHead; }
+    //void WriteSubTail(ULONG new_value);
+    ULONG GetCplHead() { return CplHead; }
+
+    void UpdateSubTail();
+    void UpdateCplHead();
 private:
     class CNvmeQueuePair* Parent = NULL;
     PVOID DevExt = NULL;
-    USHORT Depth = 0;
-    USHORT SubTail = INVALID_DBL_TAIL;
-    USHORT SubHead = INVALID_DBL_HEAD;
-    USHORT CplHead = INIT_CPL_DBL_HEAD;
-    volatile PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
-    volatile PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
+    //USHORT Depth = 0;
+    ULONG SubTail = INVALID_DBL_TAIL;
+    ULONG SubHead = INVALID_DBL_HEAD;
+    ULONG CplHead = INIT_CPL_DBL_HEAD;
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
+
+    void WriteSubDbl(ULONG new_value);
+    void WriteCplDbl(ULONG new_value);
 };
 
 class CNvmeSubmitQueue
@@ -83,7 +73,7 @@ public:
     bool Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     void Teardown();
     operator STOR_PHYSICAL_ADDRESS() const;
-    bool Submit(USHORT sub_tail, PNVME_COMMAND new_cmd);
+    bool Submit(ULONG sub_tail, PNVME_COMMAND new_cmd);
 private:
     PVOID DevExt = NULL;
     PVOID RawBuffer = NULL;                 //RawBuffer should be PAGE_ALIGNED
@@ -106,7 +96,7 @@ public:
     bool Setup(class CNvmeQueuePair*parent, USHORT depth, PVOID buffer, size_t size);
     void Teardown();
     operator STOR_PHYSICAL_ADDRESS() const;
-    bool PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY entry);
+    bool PopCplEntry(ULONG *cpl_head, PNVME_COMPLETION_ENTRY entry);
 
 private:
     PVOID DevExt = NULL;
@@ -136,14 +126,14 @@ public:
 
     bool Setup(class CNvmeQueuePair*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
     void Teardown();
-    bool Push(USHORT index, NVME_CMD_TYPE type, PSPCNVME_SRBEXT srbext);
-    bool Pop(USHORT index, PCMD_INFO result);
+    bool Push(ULONG index, NVME_CMD_TYPE type, NVME_COMMAND* cmd, PVOID context);
+    bool Pop(ULONG index, PCMD_INFO result);
 private:
     PVOID DevExt = NULL;
     PVOID RawBuffer = NULL;
     size_t RawBufferSize = 0;
     PCMD_INFO History = NULL;     //Cast of RawBuffer
-    USHORT Depth = 0;                   //how many items in this->History ?
+    ULONG Depth = 0;                   //how many items in this->History ?
     USHORT QueueID = NVME_INVALID_QID;
     ULONG NumaNode = 0;
 
@@ -161,9 +151,9 @@ public:
 
     bool Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
-
-    bool SubmitCmd(PNVME_COMMAND cmd, PSPCNVME_SRBEXT srbext, bool self = false);
-    bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PSPCNVME_SRBEXT* ret_srbext);
+    
+    bool SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self = false);
+    bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID *context);
 
     void GetQueueAddrVA(PVOID *subq, PVOID* cplq);
     void GetQueueAddrPA(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
@@ -189,11 +179,15 @@ private:
     PHYSICAL_ADDRESS CplQBufferPA = { 0 }; 
     size_t CplQBufferSize = 0;
 
+    ULONG CID = 0;
     QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
     CNvmeSubmitQueue SubQ;
     CNvmeCompleteQueue CplQ;
     CCmdHistory History;
     CNvmeDoorbell Doorbell;
+
+    KSPIN_LOCK SubLock;
+    KSPIN_LOCK CplLock;
 
     bool SetupQueueBuffer();
     bool AllocQueueBuffer();

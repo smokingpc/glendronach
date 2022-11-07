@@ -1,8 +1,9 @@
 #include "pch.h"
 
+#if 0
 static UCHAR SetScsiSenseData(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 {
-    UCHAR scsi_status = SCSISTAT_GOOD;
+    //UCHAR scsi_status = SCSISTAT_GOOD;
     PSENSE_DATA sdata = (PSENSE_DATA)SrbGetSenseInfoBuffer(srb);
     UCHAR sdata_size = SrbGetSenseInfoBufferLength(srb);
 
@@ -33,6 +34,7 @@ static UCHAR SetScsiSenseData(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 
     return SCSISTAT_CONDITION_MET;
 }
+#endif
 
 PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 {

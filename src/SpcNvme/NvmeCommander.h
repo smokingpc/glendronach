@@ -1,11 +1,18 @@
 #pragma once
-NTSTATUS SetInterruptCoalescing(PSPCNVME_DEVEXT devext);
-NTSTATUS SetArbitration(PSPCNVME_DEVEXT devext);
-NTSTATUS SyncHostTime(PSPCNVME_DEVEXT devext);
-NTSTATUS SetPowerManagement(PSPCNVME_DEVEXT devext);
-NTSTATUS SetAsyncEvent(PSPCNVME_DEVEXT devext);
 
-NTSTATUS IdentifyController(PSPCNVME_DEVEXT devext);
-NTSTATUS IdentifyNamespace(PSPCNVME_DEVEXT devext);
-NTSTATUS RegisterIoQueues(PSPCNVME_DEVEXT devext);
 
+//if true==wait, this command is sync call and poll AdminQueue to get completion result.
+NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait = true);
+
+NTSTATUS IdentifyController(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS IdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS RegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait = true);
+
+NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS NvmeGetFeatures(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS NvmeIdentifyController(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait = true);

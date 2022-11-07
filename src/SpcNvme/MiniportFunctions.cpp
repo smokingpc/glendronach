@@ -5,7 +5,7 @@ static void CreateAdminQueue(PSPCNVME_DEVEXT devext)
     QUEUE_PAIR_CONFIG qcfg = {
         .DevExt = devext,
         .QID = 0,
-        .Depth = ADMIN_QUEUE_DEPTH,
+        .Depth = NVME_CONST::ADMIN_QUEUE_DEPTH,
         .Type = QUEUE_TYPE::ADM_QUEUE,
     };
     devext->NvmeDev->GetAdmDoorbell(&qcfg.SubDbl, &qcfg.CplDbl);
@@ -24,6 +24,9 @@ static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
 
 static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION portcfg)
 {
+//workaround
+    RtlCopyMemory(devext->PciSpace, (*portcfg->AccessRanges), sizeof(ACCESS_RANGE)*portcfg->NumberOfAccessRanges);
+
     devext->NvmeDev = CNvmeDevice::Create(devext, cfg);
     if(NULL == devext->NvmeDev)
         return false;
@@ -100,30 +103,38 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     FillPortConfiguration(ConfigInfo, &nvmecfg);
 
     PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
+    CNvmeDevice* nvme = devext->NvmeDev;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
     nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
     if (false == SetupDeviceExtension(devext, &nvmecfg, ConfigInfo))
-        return SP_RETURN_NOT_FOUND;
+        goto error;
 
-    //because this function is not returned, MSIX won't fire.
-    //so we do some admin commands here...
-
-    //NOTE: If return SP_RETURN_NOT_FOUND, driver routine will call PNP_REMOVE.
-    //      so I don't put teardown codes here.
-    CNvmeDevice* nvme = devext->NvmeDev;
     if (!nvme->DisableController())
-        return SP_RETURN_NOT_FOUND;
+        goto error;
 
     if(!nvme->RegisterAdminQueuePair(devext->AdminQueue))
-        return SP_RETURN_NOT_FOUND;
+        goto error;
 
     if (!nvme->EnableController())
-        return SP_RETURN_NOT_FOUND;
+        goto error;
 
     //TODO: query controller identify, query namespace identify,
     //      set features, 
+    //because this function is not returned, MSIX won't fire.
+    //so we do some admin commands here...
+    status = NvmeIdentify(devext);
+    if (!NT_SUCCESS(status))
+        goto error;
 
+    status = NvmeSetFeatures(devext);
+    if(!NT_SUCCESS(status))
+        goto error;
 
     return SP_RETURN_FOUND;
+
+error:
+    TeardownDeviceExtension(devext);
+    return SP_RETURN_NOT_FOUND;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)

@@ -3,6 +3,8 @@
 #pragma region ======== class CNvmeQueuePair ========
 CNvmeQueuePair::CNvmeQueuePair()
 {
+    KeInitializeSpinLock(&SubLock);
+    KeInitializeSpinLock(&CplLock);
 }
 CNvmeQueuePair::CNvmeQueuePair(QUEUE_PAIR_CONFIG* config)
     : CNvmeQueuePair()
@@ -25,7 +27,7 @@ bool CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
 
     if(ok)
     {
-        ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl, this->Depth);
+        ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl);
         ok = ok && SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
         ok = ok && CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
         ok = ok && History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
@@ -42,42 +44,48 @@ void CNvmeQueuePair::Teardown()
     History.Teardown();
     Doorbell.Teardown();
 }
-bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PSPCNVME_SRBEXT srbext, bool self)
+bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self)
 {
-    CStorSpinLock(this->DevExt, StartIoLock);
+    CSpinLock lock(&SubLock);
     if (!this->IsReady)
         return false;
+    
     //submit command are called from StartIo so I use StorportSpinLock(StartIoLock)
-    USHORT sub_tail = Doorbell.GetNextSubTail();
-    if(INVALID_DBL_TAIL == sub_tail)
-        return false;
-    NVME_CMD_TYPE type = (this->Type == QUEUE_TYPE::ADM_QUEUE)? NVME_CMD_TYPE::ADM_CMD : NVME_CMD_TYPE::IO_CMD;
-    if(self)
-        type = (NVME_CMD_TYPE)(type | NVME_CMD_TYPE::SELF_ISSUED);
-    if(false == History.Push(sub_tail, type, srbext))
-        return false;
+    ULONG sub_tail = Doorbell.GetSubTail();
+
+    CID++;
+    cmd->CDW0.CID = CID;
+
+    if(NULL != context)
+    {
+        NVME_CMD_TYPE type = (this->Type == QUEUE_TYPE::ADM_QUEUE)? NVME_CMD_TYPE::ADM_CMD : NVME_CMD_TYPE::IO_CMD;
+        if(self)
+            type = (NVME_CMD_TYPE)(type | NVME_CMD_TYPE::SELF_ISSUED);
+        if(false == History.Push(sub_tail, type, cmd, context))
+            return false;
+    }
 
     SubQ.Submit(sub_tail, cmd);
-    Doorbell.DoorbellSubTail(sub_tail);
+    Doorbell.UpdateSubTail();
     return true;
 }
-bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PSPCNVME_SRBEXT *ret_srbext)
+bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID *context)
 {
     //Cmd Completion is always called from DPC routine, which triggered by Interrupt or Timer.
-    CStorSpinLock(this->DevExt, DpcLock);
-    USHORT cpl_head = Doorbell.GetCurrentCplHead();
+    CSpinLock lock(&CplLock);
+    ULONG cpl_head = Doorbell.GetCplHead();
     bool ok = CplQ.PopCplEntry(&cpl_head, result);
     if(ok)
     {
-        Doorbell.DoorbellCplHead(cpl_head);
         USHORT sub_head = result->DW2.SQHD;
         USHORT sub_old_tail = result->DW3.CID;
         Doorbell.UpdateSubQHead(sub_head);
 
         CMD_INFO info = { USE_STATE::FREE, NVME_CMD_TYPE::UNKNOWN_CMD};
-        History.Pop(sub_old_tail, &info);
-        *ret_srbext = (PSPCNVME_SRBEXT)info.Context;
+        if(NULL != context && true == History.Pop(sub_old_tail, &info))
+            *context = (PSPCNVME_SRBEXT)info.Context;
 
+        Doorbell.UpdateCplHead();
         return true;
     }
 
@@ -157,20 +165,36 @@ bool CNvmeQueuePair::SetupQueueBuffer()
 #pragma endregion
 
 #pragma region ======== class CNvmeQueuePair ========
+inline void CNvmeDoorbell::WriteSubDbl(ULONG new_value)
+{
+    MemoryBarrier();
+    StorPortWriteRegisterUlong(DevExt, &SubDbl->AsUlong, new_value);
+}
+inline void CNvmeDoorbell::WriteCplDbl(ULONG new_value)
+{
+    MemoryBarrier();
+    StorPortWriteRegisterUlong(DevExt, &CplDbl->AsUlong, new_value);
+}
+
 CNvmeDoorbell::CNvmeDoorbell()
 {}
-CNvmeDoorbell::CNvmeDoorbell(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl, USHORT depth)
+CNvmeDoorbell::CNvmeDoorbell(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl)
     :CNvmeDoorbell()
-{   Setup(parent, devext, subdbl, cpldbl, depth);  }
+{   Setup(parent, devext, subdbl, cpldbl);  }
 CNvmeDoorbell::~CNvmeDoorbell()
 {   Teardown(); }
-bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl, USHORT depth)
+bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl)
+{
+    return Setup(parent, devext, (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)subdbl, (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)cpldbl);
+}
+bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, 
+                        PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL subdbl, 
+                        PNVME_COMPLETION_QUEUE_HEAD_DOORBELL cpldbl)
 {
     this->Parent = parent;
     this->DevExt = devext;
-    this->SubDbl = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL) subdbl;
-    this->CplDbl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL) cpldbl;
-    this->Depth = depth;
+    this->SubDbl = subdbl;
+    this->CplDbl = cpldbl;
     return true;
 }
 void CNvmeDoorbell::Teardown()
@@ -181,32 +205,48 @@ void CNvmeDoorbell::UpdateSubQHead(USHORT new_head)
     if(new_head != this->SubHead)
         this->SubHead = new_head;
 }
-USHORT CNvmeDoorbell::GetNextSubTail()
+
+void CNvmeDoorbell::UpdateSubTail()
 {
-    USHORT new_tail = ((this->SubTail + 1) % this->Depth);
-    if(new_tail == this->SubHead)
-        return INVALID_DBL_TAIL;
-    return new_tail;
+    SubTail++;
+    WriteSubDbl(SubTail);
+}
+void CNvmeDoorbell::UpdateCplHead()
+{
+    CplHead++;
+    WriteCplDbl(CplHead);
 }
 
-void CNvmeDoorbell::DoorbellSubTail(USHORT new_value)
-{
-    if(this->SubTail == new_value)
-        return;
-    this->SubTail = new_value;
-    StorPortWriteRegisterUlong(this->DevExt, &this->SubDbl->AsUlong, new_value);
-}
-USHORT CNvmeDoorbell::GetCurrentCplHead()
-{
-    return this->CplHead;
-}
-void CNvmeDoorbell::DoorbellCplHead(USHORT new_value)
-{
-    if(this->CplHead == new_value)
-        return;
-    this->CplHead = new_value;
-    StorPortWriteRegisterUlong(this->DevExt, &this->CplDbl->AsUlong, new_value);
-}
+//USHORT CNvmeDoorbell::GetNextSubTail()
+//{
+//    USHORT new_tail = ((this->SubTail + 1) % this->Depth);
+//    if(new_tail == this->SubHead)
+//        return INVALID_DBL_TAIL;
+//    return new_tail;
+//}
+//USHORT CNvmeDoorbell::ReadSubTail()
+//{
+//    return this->SubTail;
+//}
+//
+//void CNvmeDoorbell::WriteSubTail(USHORT new_value)
+//{
+//    if(this->SubTail == new_value)
+//        return;
+//    this->SubTail = new_value;
+//    StorPortWriteRegisterUlong(this->DevExt, &this->SubDbl->AsUlong, new_value);
+//}
+//USHORT CNvmeDoorbell::ReadCplHead()
+//{
+//    return this->CplHead;
+//}
+//void CNvmeDoorbell::WriteCplHead(USHORT new_value)
+//{
+//    if(this->CplHead == new_value)
+//        return;
+//    this->CplHead = new_value;
+//    StorPortWriteRegisterUlong(this->DevExt, &this->CplDbl->AsUlong, new_value);
+//}
 #pragma endregion
 
 #pragma region ======== class CNvmeSubmitQueue ========
@@ -247,11 +287,10 @@ CNvmeSubmitQueue::operator STOR_PHYSICAL_ADDRESS() const
 {
     return this->QueuePA;
 }
-bool CNvmeSubmitQueue::Submit(USHORT sub_tail, PNVME_COMMAND new_cmd)
+bool CNvmeSubmitQueue::Submit(ULONG sub_tail, PNVME_COMMAND new_cmd)
 {
-    NVME_COMMAND* cmd = NULL;
-    cmd = &this->Cmds[sub_tail];
-    StorPortCopyMemory((PVOID)cmd, new_cmd, sizeof(NVME_COMMAND));
+    NVME_COMMAND* cmd_slot = &Cmds[sub_tail];
+    StorPortCopyMemory((PVOID)cmd_slot, new_cmd, sizeof(NVME_COMMAND));
     return true;
 }
 #pragma endregion
@@ -295,7 +334,7 @@ CNvmeCompleteQueue::operator STOR_PHYSICAL_ADDRESS() const
 {
     return this->QueuePA;
 }
-bool CNvmeCompleteQueue::PopCplEntry(USHORT *cpl_head, PNVME_COMPLETION_ENTRY entry)
+bool CNvmeCompleteQueue::PopCplEntry(ULONG *cpl_head, PNVME_COMPLETION_ENTRY entry)
 {
     PNVME_COMPLETION_ENTRY cpl = &this->Entries[*cpl_head];
 
@@ -359,7 +398,7 @@ void CCmdHistory::Teardown()
     this->RawBuffer = NULL;
     this->History = NULL;
 }
-bool CCmdHistory::Push(USHORT index, NVME_CMD_TYPE type, PSPCNVME_SRBEXT srbext)
+bool CCmdHistory::Push(ULONG index, NVME_CMD_TYPE type, NVME_COMMAND *cmd, PVOID context)
 {
     USE_STATE old_state = (USE_STATE)InterlockedCompareExchange(
                                 (volatile long*)&History[index].InUsed, 
@@ -368,12 +407,12 @@ bool CCmdHistory::Push(USHORT index, NVME_CMD_TYPE type, PSPCNVME_SRBEXT srbext)
         return false;
 
     PCMD_INFO entry = &History[index];
-    entry->CID = index;
-    entry->Context = srbext;
+    entry->CID = cmd->CDW0.CID;
+    entry->Context = context;
     entry->Type = type;
     return true;
 }
-bool CCmdHistory::Pop(USHORT index, PCMD_INFO result)
+bool CCmdHistory::Pop(ULONG index, PCMD_INFO result)
 {
     if(History[index].InUsed == USE_STATE::FREE)
         return false;

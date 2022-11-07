@@ -28,6 +28,18 @@ inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool bar
         MemoryBarrier();
     csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
 }
+inline void CNvmeDevice::ReadNvmeRegister(NVME_VERSION& ver, bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+    ver.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->VS.AsUlong);
+}
+inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CAPABILITIES& cap, bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+    cap.AsUlonglong = StorPortReadRegisterUlong64(DevExt, &CtrlReg->CAP.AsUlonglong);
+}
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
     if (barrier)
@@ -53,21 +65,17 @@ inline void CNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
 }
 
-inline bool CNvmeDevice::IsControllerEnabled(bool barrier)
+inline BOOLEAN CNvmeDevice::IsControllerEnabled(bool barrier)
 {
     NVME_CONTROLLER_CONFIGURATION cc = {0};
     ReadNvmeRegister(cc, barrier);
-    return (TRUE == cc.EN);
+    return (TRUE == cc.EN)?TRUE:FALSE;
 }
-inline bool CNvmeDevice::IsControllerReady(bool barrier)
+inline BOOLEAN CNvmeDevice::IsControllerReady(bool barrier)
 {
     NVME_CONTROLLER_STATUS csts = { 0 };
     ReadNvmeRegister(csts, barrier);
-    return (TRUE == csts.RDY);
-}
-inline void CNvmeDevice::TakeSnooze(ULONG interval)
-{
-    StorPortStallExecution(interval);
+    return (TRUE == csts.RDY)?TRUE:FALSE;
 }
 
 CNvmeDevice::CNvmeDevice(){}
@@ -97,7 +105,7 @@ void CNvmeDevice::Setup(PVOID devext, PSPCNVME_CONFIG cfg)
     }
 
     if(map_ok)
-        RefreshByCapability();
+        ReadCtrlCapAndInfo();
 
     IsReady = map_ok;
 }
@@ -124,13 +132,13 @@ bool CNvmeDevice::EnableController()
     cc.CSS = NVME_CSS_NVM_COMMAND_SET;
     cc.AMS = NVME_AMS_ROUND_ROBIN;
     cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
-    cc.IOSQES = SPCNVME_CONFIG::IOSQES;
-    cc.IOCQES = SPCNVME_CONFIG::IOCQES;
+    cc.IOSQES = NVME_CONST::IOSQES;
+    cc.IOCQES = NVME_CONST::IOCQES;
     cc.EN = 0;
     WriteNvmeRegister(cc);
 
     //take a break let controller have enough time to retrieve CC values.
-    TakeSnooze();
+    StorPortStallExecution(StallDelay);
 
     cc.EN = 1;
     WriteNvmeRegister(cc);
@@ -184,6 +192,7 @@ bool CNvmeDevice::GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* s
 
     *subdbl = &Doorbells[qid].SubTail;
     *cpldbl = &Doorbells[qid].CplHead;
+    return true;
 }
 
 bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueuePair* qp)
@@ -200,8 +209,8 @@ bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueuePair* qp)
 
     //tell controller: how many entries in my Admin Sub and Cpl Queue?
     //these attributes should be write to controller ONLY WHEN CC.EN == 0.
-    aqa.ASQS = Cfg.ADMIN_QUEUE_DEPTH;
-    aqa.ACQS = Cfg.ADMIN_QUEUE_DEPTH;
+    aqa.ASQS = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    aqa.ACQS = NVME_CONST::ADMIN_QUEUE_DEPTH;
 
     PHYSICAL_ADDRESS subq_pa = { 0 };
     PHYSICAL_ADDRESS cplq_pa = { 0 };
@@ -210,19 +219,45 @@ bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueuePair* qp)
     acq.AsUlonglong = cplq_pa.QuadPart;
 
     WriteNvmeRegister(aqa, asq, acq);
+    return true;
 }
-bool CNvmeDevice::UnregisterAdminQueuePair(){}
-bool CNvmeDevice::RegisterIoQueuePair(CNvmeQueuePair* qp){}
-bool CNvmeDevice::UnregisterIoQueuePair(CNvmeQueuePair* qp){}
+bool CNvmeDevice::UnregisterAdminQueuePair()
+{
+    if (IsControllerEnabled())
+    {
+        if (false == WaitForCtrlerState(CtrlerTimeout, FALSE, FALSE))
+            return false;
+    }
 
-void CNvmeDevice::RefreshByCapability()
+    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
+
+    WriteNvmeRegister(aqa, asq, acq);
+    return true;
+}
+bool CNvmeDevice::RegisterIoQueuePair(CNvmeQueuePair* qp)
+{
+    UNREFERENCED_PARAMETER(qp);
+    return false;
+}
+bool CNvmeDevice::UnregisterIoQueuePair(CNvmeQueuePair* qp)
+{
+    UNREFERENCED_PARAMETER(qp);
+    return false;
+}
+
+void CNvmeDevice::ReadCtrlCapAndInfo()
 {
     //CtrlReg->CAP.TO is timeout value in 500 ms.
     //It indicates the timeout worst case of Enabling/Disabling Controller.
     //e.g. CAP.TO==3 means worst case timout to Enable/Disable controller is 1500 milli-second.
     //We should convert it to micro-seconds for StorPortStallExecution() using.
-    ULONG cap_timeout = CtrlReg->CAP.TO;
-    CtrlerTimeout = cap_timeout * (500 * 1000);
+    
+    ReadNvmeRegister(NvmeVer);
+    ReadNvmeRegister(NvmeCap);
+    CtrlerTimeout = ((UCHAR)NvmeCap.TO) * (500 * 1000);
+
 }
 bool CNvmeDevice::MapControllerRegisters(PCI_COMMON_HEADER &header)
 {
@@ -234,7 +269,10 @@ bool CNvmeDevice::MapControllerRegisters(PCI_COMMON_HEADER &header)
     STOR_PHYSICAL_ADDRESS bar0 = { 0 };
     CtrlReg = NULL;
     Doorbells = NULL;
+    
     //todo: use correct structure to parse and convert this physical address
+
+    //I got this mapping method by cracking stornvme.sys.
     bar0.LowPart = (header.u.type0.BaseAddresses[0] & 0xFFFFC000);
     bar0.HighPart = header.u.type0.BaseAddresses[1];
 
@@ -279,12 +317,12 @@ bool CNvmeDevice::GetPciBusData(PCI_COMMON_HEADER& header)
 bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
 {
     ULONG elapsed = 0;
-    bool is_ready = IsControllerReady();
+    BOOLEAN is_ready = IsControllerReady();
 
     while(is_ready != csts_rdy)
     {
-        TakeSnooze();
-        elapsed += STALL_INTERVAL_US;
+        StorPortStallExecution(StallDelay);
+        elapsed += StallDelay;
         if(elapsed > time_us)
             return false;
 
@@ -296,13 +334,13 @@ bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
 bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc_en)
 {
     ULONG elapsed = 0;
-    bool is_enable = IsControllerEnabled();
-    bool is_ready = IsControllerReady();
+    BOOLEAN is_enable = IsControllerEnabled();
+    BOOLEAN is_ready = IsControllerReady();
 
     while (is_ready != csts_rdy || is_enable != cc_en)
     {
-        TakeSnooze();
-        elapsed += STALL_INTERVAL_US;
+        StorPortStallExecution(StallDelay);
+        elapsed += StallDelay;
         if (elapsed > time_us)
             return false;
 
