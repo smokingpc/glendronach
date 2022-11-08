@@ -10,7 +10,7 @@ typedef struct _SPCNVME_DEVEXT
     CNvmeDevice *NvmeDev;
     CNvmeQueuePair *AdminQueue;
     CNvmeQueuePair *IoQueue[MAX_IO_QUEUE_COUNT];
-
+    ULONG IoQueueCount = 0;
     BOOLEAN IsReady;
     STOR_DPC NvmeDPC;      //DPC for MSIX interrupt which triggerred from NVMe Device
     NVME_IDENTIFY_CONTROLLER_DATA IdentData;

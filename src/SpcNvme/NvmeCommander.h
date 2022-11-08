@@ -8,9 +8,8 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait = true);
 NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait = true);
 NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait = true);
 
-NTSTATUS IdentifyController(PSPCNVME_DEVEXT devext, bool wait = true);
-NTSTATUS IdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait = true);
-NTSTATUS RegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS NvmeRegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait = true);
+NTSTATUS NvmeUnregisterIoQueues(PSPCNVME_DEVEXT devext, bool wait = true);
 
 NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait = true);
 NTSTATUS NvmeGetFeatures(PSPCNVME_DEVEXT devext, bool wait = true);

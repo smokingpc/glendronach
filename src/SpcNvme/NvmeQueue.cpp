@@ -44,6 +44,35 @@ void CNvmeQueuePair::Teardown()
     History.Teardown();
     Doorbell.Teardown();
 }
+
+bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, CMD_CTX_TYPE type)
+{
+    CSpinLock lock(&SubLock);
+    if (!this->IsReady)
+        return false;
+
+    //submit command are called from StartIo so I use StorportSpinLock(StartIoLock)
+    ULONG sub_tail = Doorbell.GetSubTail();
+
+    CID++;
+    cmd->CDW0.CID = CID;
+
+    if (NULL != context)
+    {
+        if (false == History.Push(sub_tail, type, cmd, context))
+            return false;
+    }
+
+    SubQ.Submit(sub_tail, cmd);
+    Doorbell.UpdateSubTail();
+    return true;
+}
+
+bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type)
+{
+}
+
+#if 0
 bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self)
 {
     CSpinLock lock(&SubLock);
@@ -91,6 +120,8 @@ bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID *context)
 
     return false;
 }
+#endif
+
 void CNvmeQueuePair::GetQueueAddrVA(PVOID* subq, PVOID* cplq)
 {  
     if(subq != NULL)
@@ -398,7 +429,7 @@ void CCmdHistory::Teardown()
     this->RawBuffer = NULL;
     this->History = NULL;
 }
-bool CCmdHistory::Push(ULONG index, NVME_CMD_TYPE type, NVME_COMMAND *cmd, PVOID context)
+bool CCmdHistory::Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND *cmd, PVOID context)
 {
     USE_STATE old_state = (USE_STATE)InterlockedCompareExchange(
                                 (volatile long*)&History[index].InUsed, 
@@ -409,7 +440,7 @@ bool CCmdHistory::Push(ULONG index, NVME_CMD_TYPE type, NVME_COMMAND *cmd, PVOID
     PCMD_INFO entry = &History[index];
     entry->CID = cmd->CDW0.CID;
     entry->Context = context;
-    entry->Type = type;
+    entry->CtxType = type;
     return true;
 }
 bool CCmdHistory::Pop(ULONG index, PCMD_INFO result)

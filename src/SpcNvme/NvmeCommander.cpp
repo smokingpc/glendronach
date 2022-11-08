@@ -137,27 +137,20 @@ NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait)
     return STATUS_NOT_IMPLEMENTED;
 }
 
-NTSTATUS IdentifyController(PSPCNVME_DEVEXT devext, bool wait)
+NTSTATUS NvmeRegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
+{
+
+    
+
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS NvmeUnregisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
     return STATUS_NOT_IMPLEMENTED;
 }
-
-NTSTATUS IdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
-    return STATUS_NOT_IMPLEMENTED;
-}
-
-NTSTATUS RegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
-    return STATUS_NOT_IMPLEMENTED;
-}
-
 
 NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 {

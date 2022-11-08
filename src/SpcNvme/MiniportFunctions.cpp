@@ -21,6 +21,36 @@ static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
     }
 }
 
+static void CreateIoQueues(PSPCNVME_DEVEXT devext)
+{
+    devext->IoQueueCount = NVME_CONST::IO_QUEUE_COUNT;
+    for(int i=0; i<devext->IoQueueCount; i++)
+    {
+        QUEUE_PAIR_CONFIG qcfg = {
+            .DevExt = devext,
+            .QID = i+1, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
+            .Depth = NVME_CONST::IO_QUEUE_DEPTH,
+            .Type = QUEUE_TYPE::IO_QUEUE,
+        };
+        devext->IoQueue[i] = new CNvmeQueuePair(&qcfg);
+    }
+}
+
+static void DeleteIoQueues(PSPCNVME_DEVEXT devext)
+{
+    for (int i = devext->IoQueueCount; i > 0; i--)
+    {
+        QUEUE_PAIR_CONFIG qcfg = {
+            .DevExt = devext,
+            .QID = i, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
+            .Depth = NVME_CONST::IO_QUEUE_DEPTH,
+            .Type = QUEUE_TYPE::IO_QUEUE,
+        };
+        delete devext->IoQueue[i-1];
+        devext->IoQueue[i - 1] = nullptr;
+    }
+    devext->IoQueueCount = 0;
+}
 
 static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION portcfg)
 {
@@ -34,6 +64,8 @@ static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PP
     devext->CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
 
     CreateAdminQueue(devext);
+    CreateIoQueues(devext);
+
     //prepare DPC for MSIX interrupt
     StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
     
@@ -194,7 +226,11 @@ BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
 {
     //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+
+    NvmeRegisterIoQueues(devext);
+    STORAGE_REQUEST_BLOCK srb = {0};
+
     //INITIALIZE driver contexts
     //TODO: register IoQueues
 

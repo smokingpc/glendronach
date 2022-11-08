@@ -14,7 +14,8 @@ typedef struct _QUEUE_PAIR_CONFIG {
 typedef struct _CMD_INFO
 {
     volatile USE_STATE InUsed = USE_STATE::FREE;
-    NVME_CMD_TYPE Type = NVME_CMD_TYPE::UNKNOWN_CMD;
+    //NVME_CMD_TYPE Type = NVME_CMD_TYPE::UNKNOWN_CMD;
+    CMD_CTX_TYPE CtxType = CMD_CTX_TYPE::SRB;
     PVOID Context = NULL;           //SRBEXT of original request
     USHORT CID = NVME_INVALID_CID;   //CmdID in SubQ which submit this request.
 }CMD_INFO, *PCMD_INFO;
@@ -126,7 +127,7 @@ public:
 
     bool Setup(class CNvmeQueuePair*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
     void Teardown();
-    bool Push(ULONG index, NVME_CMD_TYPE type, NVME_COMMAND* cmd, PVOID context);
+    bool Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND* cmd, PVOID context);
     bool Pop(ULONG index, PCMD_INFO result);
 private:
     PVOID DevExt = NULL;
@@ -152,8 +153,10 @@ public:
     bool Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
     
-    bool SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self = false);
-    bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID *context);
+    //bool SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self = false);
+    //bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID &context);
+    bool SubmitCmd(PNVME_COMMAND cmd, PVOID context, CMD_CTX_TYPE type);
+    bool CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID &context, CMD_CTX_TYPE &type);
 
     void GetQueueAddrVA(PVOID *subq, PVOID* cplq);
     void GetQueueAddrPA(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);

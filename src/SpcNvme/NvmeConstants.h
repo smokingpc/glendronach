@@ -7,10 +7,14 @@ struct NVME_CONST{
     static const ULONG DEFAULT_NSID = 1;
     static const UCHAR MAX_TARGETS = 1;
     static const UCHAR MAX_LU = 1;
-    static const ULONG MAX_IO_PER_LU = 1024;
+    static const ULONG MAX_IO_PER_LU = 4096;
     static const UCHAR IOSQES = 6; //sizeof(NVME_COMMAND)==64 == 2^6, so IOSQES== 6.
     static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
     static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?
+    
+    static const UCHAR IO_QUEUE_COUNT = 4;
+    static const UCHAR IO_QUEUE_DEPTH = 128;
+
     static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
 

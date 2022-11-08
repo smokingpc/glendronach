@@ -13,8 +13,16 @@ typedef enum _NVME_CMD_TYPE
     UNKNOWN_CMD = 0,
     ADM_CMD = 1,
     IO_CMD = 2,
+//    SRB_CMD = 0x00001000,           //this command use SRB , no wait event. using regular SRB handling
+//    WAIT_CMD = 0x00002000,          //this command is internal cmd and waiting for event signal
     SELF_ISSUED = 0x80000000,           //this command issued by SpcNvme.sys myself.
 }NVME_CMD_TYPE;
+
+typedef enum _CMD_CTX_TYPE
+{
+    WAIT_EVENT = 0,
+    SRB = 1
+}CMD_CTX_TYPE;
 
 typedef enum _USE_STATE
 {
