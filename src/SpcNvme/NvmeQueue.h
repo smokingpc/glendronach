@@ -107,10 +107,9 @@ private:
     PNVME_COMPLETION_ENTRY Entries = NULL;  //Cast of RawBuffer
     USHORT Depth = 0;                       //how many items in this->Entries ?
 
-    struct {
-        USHORT Tag : 1;
-        USHORT Reserved : 15;
-    }Phase;
+    //NVMe device will set cpl->DW3.Status.P to 1 in 1st rount , set to 0 in 2nd round, and so on.
+    //Refer to NVMe spec 1.3 , section 4.6 , Figure 28: Completion Queue Entry: DW 3
+    USHORT PhaseTag = NVME_CONST::CPL_INIT_PHASETAG;
 
     class CNvmeQueuePair* Parent = NULL;
 };

@@ -12,6 +12,7 @@ struct NVME_CONST{
     static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
     static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?
     
+    static const USHORT CPL_INIT_PHASETAG = 1;  //CompletionQueue phase tag init value;
     static const UCHAR IO_QUEUE_COUNT = 4;
     static const UCHAR IO_QUEUE_DEPTH = 128;
 

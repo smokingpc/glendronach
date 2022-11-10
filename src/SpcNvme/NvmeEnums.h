@@ -20,8 +20,9 @@ typedef enum _NVME_CMD_TYPE
 
 typedef enum _CMD_CTX_TYPE
 {
-    WAIT_EVENT = 0,
-    SRB = 1
+    UNKNOWN = 0,
+    WAIT_EVENT = 1,
+    SRB = 2
 }CMD_CTX_TYPE;
 
 typedef enum _USE_STATE

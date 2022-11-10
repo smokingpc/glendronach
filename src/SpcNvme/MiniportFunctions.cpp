@@ -227,14 +227,12 @@ BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
     //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
     PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    NvmeRegisterIoQueues(devext);
-    STORAGE_REQUEST_BLOCK srb = {0};
-
-    //INITIALIZE driver contexts
-    //TODO: register IoQueues
-
-    return FALSE;
+    status = NvmeRegisterIoQueues(devext);
+    if(!NT_SUCCESS(status))
+        return FALSE;
+    return TRUE;
 }
 
 _Use_decl_annotations_

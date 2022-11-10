@@ -47,3 +47,4 @@ protected:
     PVOID DevExt = NULL;
     STOR_LOCK_HANDLE Handle = {DpcLock, 0};
 };
+

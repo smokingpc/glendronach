@@ -1,17 +1,25 @@
 #include "pch.h"
 
-inline NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPCNVME_DEVEXT devext, CNvmeQueuePair *qp, PNVME_COMMAND cmd)
+NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPCNVME_DEVEXT devext, CNvmeQueuePair *qp, PNVME_COMMAND cmd)
 {
-    UNREFERENCED_PARAMETER(devext);
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     //wait loop to poll completion
     NVME_COMPLETION_ENTRY cqe = { 0 };        //cqe => completion queue entry
     int wait_loop = 5;
-    bool ok = qp->CompleteCmd(&cqe, NULL);
+    PVOID ctx = NULL;
+    CMD_CTX_TYPE ctx_type;
+
+    bool ok = qp->CompleteCmd(&cqe, ctx, ctx_type);
     while (!ok && wait_loop > 0)
     {
         wait_loop--;
         StorPortStallExecution(NVME_CONST::SLEEP_TIME_US);
-        ok = qp->CompleteCmd(&cqe, NULL);
+        PVOID ctx = NULL;
+        CMD_CTX_TYPE ctx_type;
+        ok = qp->CompleteCmd(&cqe, ctx, ctx_type);
     }
 
     if (!ok)
@@ -34,6 +42,10 @@ inline NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPC
 
 NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 {
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     NVME_COMMAND cmd = {0};
     cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
     cmd.NSID = NVME_CONST::DEFAULT_NSID;
@@ -57,6 +69,10 @@ NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 
 NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
 {
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     NVME_COMMAND cmd = { 0 };
     cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
     cmd.NSID = NVME_CONST::DEFAULT_NSID;
@@ -82,6 +98,10 @@ NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
 
 NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 {
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
     LARGE_INTEGER systime = { 0 };
     KeQuerySystemTime(&systime);
@@ -125,38 +145,47 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 
 NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait)
 {
-    UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
 
 NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait)
 {
-    UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
 
 NTSTATUS NvmeRegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 {
-
-    
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
 
     return STATUS_NOT_IMPLEMENTED;
 }
 
 NTSTATUS NvmeUnregisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 {
-    UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
 
 NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 {
-    UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
 
     //status = SetFeature_InterruptCoalescing(devext, wait);
     //status = SetFeature_Arbitration(devext, wait);
@@ -168,8 +197,10 @@ NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 
 NTSTATUS NvmeGetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 {
-    UNREFERENCED_PARAMETER(devext);
     UNREFERENCED_PARAMETER(wait);
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -178,6 +209,10 @@ NTSTATUS NvmeIdentifyController(PSPCNVME_DEVEXT devext, bool wait)
     NVME_COMMAND cmd = { 0 };
     PVOID buffer = NULL;
     ULONG size = PAGE_SIZE;
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     cmd.CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
     cmd.NSID = 0;
     cmd.u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_CONTROLLER;
@@ -215,6 +250,10 @@ NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
     NVME_COMMAND cmd = { 0 };
     PVOID buffer = NULL;
     ULONG size = PAGE_SIZE;
+    KIRQL irql;
+    StorPortGetCurrentIrql((PVOID)devext, &irql);
+    ASSERT(irql == PASSIVE_LEVEL);
+
     cmd.CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
     //each namespace map to one LUN. each namespace replied data should save to one LunExt.
     //Now It only support 1 namespace on NVMe so I hardcode the LunExt array here.

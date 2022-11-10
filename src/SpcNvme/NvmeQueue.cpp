@@ -70,6 +70,28 @@ bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, CMD_CTX_TYPE ty
 
 bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type)
 {
+    //Cmd Completion is always called from DPC routine, which triggered by Interrupt or Timer.
+    CSpinLock lock(&CplLock);
+    ULONG cpl_head = Doorbell.GetCplHead();
+    bool ok = CplQ.PopCplEntry(&cpl_head, result);
+    if (ok)
+    {
+        USHORT sub_head = result->DW2.SQHD;
+        USHORT sub_cid = result->DW3.CID;
+        Doorbell.UpdateSubQHead(sub_head);
+
+        CMD_INFO info;
+        type = CMD_CTX_TYPE::UNKNOWN;
+        if (true == History.Pop(sub_cid, &info))
+        {
+            context = (PSPCNVME_SRBEXT)info.Context;
+            type = info.CtxType;
+        }
+        Doorbell.UpdateCplHead();
+        return true;
+    }
+
+    return false;
 }
 
 #if 0
@@ -344,7 +366,7 @@ bool CNvmeCompleteQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID
     ULONG mapped_size = 0;
     this->Parent = parent;
     this->Depth = depth;
-    this->Phase.Tag = 0;
+    this->PhaseTag = NVME_CONST::CPL_INIT_PHASETAG;
     this->RawBuffer = buffer;
     this->RawBufferSize = size;
     RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
@@ -374,13 +396,13 @@ bool CNvmeCompleteQueue::PopCplEntry(ULONG *cpl_head, PNVME_COMPLETION_ENTRY ent
     //NVMe device will set cpl->DW3.Status.P to 1 in 1st rount , set to 0 in 2nd round, and so on.
     //Host driver should check phase to make sure "is this entry a new completed entry?".
     //Refer to NVMe spec 1.3 , section 4.6 , Figure 28: Completion Queue Entry: DW 3
-    if(this->Phase.Tag == cpl->DW3.Status.P)
+    if(PhaseTag != cpl->DW3.Status.P)
         return false;
     
     StorPortCopyMemory(entry, cpl, sizeof(NVME_COMPLETION_ENTRY));
     *cpl_head = (*cpl_head + 1) % this->Depth;
     if(0 == *cpl_head)
-        this->Phase.Tag = !this->Phase.Tag;
+        PhaseTag = !PhaseTag;
     
     return true;
 }

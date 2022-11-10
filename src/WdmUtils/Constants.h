@@ -8,3 +8,7 @@
 #define DBG_FILTER          0x00000888
 
 #define CALLINOUT_TAG       (ULONG)'TUOC'
+
+#define DBGMSG_LEVEL       0x00001000
+
+#define KPRINTF(x)  DbgPrintEx(DPFLTR_IHVDRIVER_ID,DBGMSG_LEVEL,x);
