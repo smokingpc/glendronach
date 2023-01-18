@@ -13,3 +13,11 @@ BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
     return FALSE;
 }
+
+
+BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
+{
+
+//always return FALSE. This event only handled in BuildIo.
+    return FALSE;
+}

@@ -125,8 +125,10 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 
     cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, timestamp, &size).QuadPart;
 
+    //implement wait
+    return STATUS_INTERNAL_ERROR;
     //submit command
-    bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, true);
+    bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, CMD_CTX_TYPE::WAIT_EVENT);
     if (!ok)
         return STATUS_INTERNAL_ERROR;
 

@@ -46,6 +46,10 @@ PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
     if(NULL == srbext)
         return NULL;
 
+    //already init in BuildIo, no need to init again in StartIo
+    if(srbext->InitOK)
+        return srbext;
+
     RtlZeroMemory(srbext, sizeof(SPCNVME_SRBEXT));
     srbext->DevExt = (PSPCNVME_DEVEXT)devext;
     srbext->Srb = srb;
@@ -65,6 +69,8 @@ PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
     srbext->DataBuf = SrbGetDataBuffer(srb);
     if(NULL != srbext->DataBuf)
         srbext->DataBufLen = SrbGetDataTransferLength(srb);
+    srbext->InitOK = TRUE;
+
     return srbext;
 }
 void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)

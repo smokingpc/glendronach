@@ -22,9 +22,6 @@
     <Filter Include="SCSI_Handlers">
       <UniqueIdentifier>{abf383f4-256a-42b7-a3fa-be1767784a3a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="SRB_Utils">
-      <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DriverMain">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
@@ -34,6 +31,9 @@
     </Filter>
     <Filter Include="Nvme_Handlers">
       <UniqueIdentifier>{e936662c-51e4-464a-979b-f74a7f4c0686}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SRB_Handlers">
+      <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -55,7 +55,7 @@
       <Filter>Classes</Filter>
     </ClCompile>
     <ClCompile Include="Srb_Utils.cpp">
-      <Filter>SRB_Utils</Filter>
+      <Filter>SRB_Handlers</Filter>
     </ClCompile>
     <ClCompile Include="ScsiHandler_CDB6.cpp">
       <Filter>SCSI_Handlers</Filter>
@@ -111,7 +111,7 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Srb_Utils.h">
-      <Filter>SRB_Utils</Filter>
+      <Filter>SRB_Handlers</Filter>
     </ClInclude>
     <ClInclude Include="BuildIo_Handlers.h">
       <Filter>BuildIo_Handlers</Filter>

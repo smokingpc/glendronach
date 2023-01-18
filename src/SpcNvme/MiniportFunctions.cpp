@@ -106,7 +106,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
 
     //Dump is not supported now. Will be supported in future.
     portcfg->RequestedDumpBufferSize = 0;
-    portcfg->DumpMode = DUMP_MODE_CRASH;
+    portcfg->DumpMode = 0;//DUMP_MODE_CRASH;
     portcfg->DumpRegion.VirtualBase = NULL;
     portcfg->DumpRegion.PhysicalBase.QuadPart = NULL;
     portcfg->DumpRegion.Length = 0;
@@ -204,7 +204,7 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
             write_data.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
             write_data.ConcurrentChannels = devext->CpuCount;
         }
-        if (read_data.Flags & STOR_PERF_NO_SGL)
+        if (read_data.Flags & STOR_PERF_NO_SGL)     //I don't use SGL...
             write_data.Flags |= STOR_PERF_NO_SGL;
         if (read_data.Flags & STOR_PERF_DPC_REDIRECTION)
             write_data.Flags |= STOR_PERF_DPC_REDIRECTION;
@@ -247,18 +247,31 @@ BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
         //case SRB_FUNCTION_ABORT_COMMAND:
     //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
     //case SRB_FUNCTION_RESET_DEVICE:
-    //case SRB_FUNCTION_RESET_BUS:
+    case SRB_FUNCTION_RESET_BUS:
+    //MSDN said : it is possible for the HwScsiStartIo routine to be called 
+    //              with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
+    //              if a NT-based operating system storage class driver requests this operation. 
+    //              The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
+    //              to satisfy an incoming bus-reset request.
+    //But, I don't understand the difference.... Current Windows family are all NT-based system :p
+        SrbSetSrbStatus(Srb, SRB_STATUS_INVALID_REQUEST);
+        need_startio = FALSE;
+        break;
     //case SRB_FUNCTION_WMI:
-    //case SRB_FUNCTION_POWER:
-    //    srb_status = DefaultCmdHandler(srb, srbext);
-    //    break;
+
+    case SRB_FUNCTION_POWER:
+        BuildIo_SrbPowerHandler(srbext);
+        need_startio = FALSE;
+        break;
     case SRB_FUNCTION_EXECUTE_SCSI:
         need_startio = BuildIo_ScsiHandler(srbext);
         break;
     case SRB_FUNCTION_IO_CONTROL:
+        //should check signature to determine incoming IOCTL
+        break;
     case SRB_FUNCTION_PNP:
-        //pnp handlers
-        //scsi handlers
+        //should handle PNP remove adapter
+        break;
     default:
         need_startio = BuildIo_DefaultHandler(srbext);
         break;

@@ -21,6 +21,7 @@ typedef struct _SPCNVME_SRBEXT
 {
     PSPCNVME_DEVEXT DevExt;
     PSTORAGE_REQUEST_BLOCK Srb;
+    BOOLEAN InitOK;
     ULONG FuncCode;         //SRB Function Code
     PCDB Cdb;
     UCHAR CdbLen;
