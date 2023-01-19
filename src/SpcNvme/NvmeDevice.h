@@ -14,6 +14,15 @@ typedef struct _SPCNVME_CONFIG {
     ULONG SlotNumber = NVME_INVALID_ID;
     ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = {0};         //AccessRange from miniport HwFindAdapter.
     ULONG AccessRangeCount = 0;
+
+    _SPCNVME_CONFIG(){}
+    _SPCNVME_CONFIG(ULONG bus, ULONG slot, ACCESS_RANGE buffer[], ULONG range_count)
+    {
+        BusNumber = bus;
+        SlotNumber = slot;
+        SetAccessRanges(buffer, range_count);
+    }
+
     bool SetAccessRanges(ACCESS_RANGE buffer[], ULONG count)
     {
         if(count > ACCESS_RANGE_COUNT)

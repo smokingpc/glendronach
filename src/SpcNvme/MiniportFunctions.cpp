@@ -129,17 +129,19 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
 
-    SPCNVME_CONFIG nvmecfg;
-    nvmecfg.BusNumber = ConfigInfo->SystemIoBusNumber;
-    nvmecfg.SlotNumber = ConfigInfo->SlotNumber;
+    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
+    CNvmeDevice* nvme = NULL;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    SPCNVME_CONFIG nvmecfg(
+                        ConfigInfo->SystemIoBusNumber, 
+                        ConfigInfo->SlotNumber,
+                        *(ConfigInfo->AccessRanges), 
+                        ConfigInfo->NumberOfAccessRanges);
 
     //PCI bus related initialize
     FillPortConfiguration(ConfigInfo, &nvmecfg);
-
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
-    CNvmeDevice* nvme = devext->NvmeDev;
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-    nvmecfg.SetAccessRanges(*(ConfigInfo->AccessRanges), ConfigInfo->NumberOfAccessRanges);
+    nvme = new CNvmeDevice(devext, &nvmecfg);
+    devext->NvmeDev = nvme;
     if (false == SetupDeviceExtension(devext, &nvmecfg, ConfigInfo))
         goto error;
 
