@@ -353,20 +353,71 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     }
     case ScsiStopAdapter:
     {
+    //Device "entering" D1 / D2 / D3 from D0
+    //**running at DIRQL
         //shutdown HBA, this is post event of DeviceRemove 
         //status = HandleScsiStopAdapter(DeviceExtension);
         break;
     }
     case ScsiRestartAdapter:
     {
+    //Device "entering" D0 state from D1 D2 D3 state
+    //**running at DIRQL
         //status = HandleScsiRestartAdapter();
         break;
     }
-    case ScsiSetRunningConfig:
+
+    case ScsiAdapterSurpriseRemoval:
     {
-        //status = HandleScsiSetRunningConfig();
+    //**running < DISPATCH_LEVEL
+    //Device is surprise removed.
+    //**Is still SRB_PNP_xxx fired if this control code supported/implemented?
         break;
     }
+
+#pragma region === Some explain of un-implemented control codes ===
+    //If STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER is set in HW_INITIALIZATION_DATA of DriverEntry,
+    // storport will fire this control code when handling IRP_MN_FILTER_RESOURCE_REQUIREMENTS.
+    // **In this control code, DeviceExtension is STILL NOT initialized because HwFindAdapter not called yet.
+    //case ScsiAdapterFilterResourceRequirements:
+    //{
+    //  //**running < DISPATCH_LEVEL
+    //  STOR_FILTER_RESOURCE_REQUIREMENTS* filter = (STOR_FILTER_RESOURCE_REQUIREMENTS*)Parameters;
+    //    break;
+    //}
+
+    //storport call this control code before  ScsiRestartAdapter.
+    // interrupt is NOT connected yet here.
+    // If HBA need restore config and resource via StorPortGetBusData() 
+    // or StorPortSetBusDataByOffset(), we should implement this control code.
+    // ** this means if you need re-touch PCIe resource and reconfig 
+    //    runtime config(remap io space...etc), you'll need this control code.
+    //case ScsiSetRunningConfig:
+    //{
+    //     //**running at PASSIVE_LEVEL
+    //    //status = HandleScsiSetRunningConfig();
+    //    break;
+    //}
+
+    //Valid since Win8. If this control enabled, storport will notify 
+    //miniport when power plan changed.
+    //case ScsiPowerSettingNotification:
+    //{
+    // //**running at PASSIVE_LEVEL
+    // STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) Parameters;
+    //    break;
+    //}
+
+    //Valid since Win8. If this control enabled, miniport won't receive
+    // SRB_FUNCTION_POWER in BuildIo and no ScsiStopAdapter in AdapterControl
+    //case ScsiAdapterPower:
+    //{
+    // //**running <= DISPATCH_LEVEL
+    //  STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)Parameters;
+    //  break;
+    //}
+#pragma endregion
+
     default:
         status = ScsiAdapterControlUnsuccessful;
     }
@@ -379,6 +430,9 @@ void HwProcessServiceRequest(
     PVOID Irp
 )
 {
+    //If there are DeviceIoControl use IOCTL_MINIPORT_PROCESS_SERVICE_IRP, 
+    //we should implement this callback.
+    
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(DeviceExtension);
     UNREFERENCED_PARAMETER(Irp);
@@ -393,6 +447,14 @@ void HwProcessServiceRequest(
 _Use_decl_annotations_
 void HwCompleteServiceIrp(PVOID DeviceExtension)
 {
+    //If HwProcessServiceRequest()is implemented, this HwCompleteServiceIrp 
+    // wiill be called before stop to retrieve any new IOCTL_MINIPORT_PROCESS_SERVICE_IRP requests.
+    //This callback give us a chance to cleanup requests.
+
+    //example: if IOCTL_MINIPORT_PROCESS_SERVICE_IRP handler send IRP to 
+    //          another device and waiting result, we should cancel waiting 
+    //          and cleanup that IRP in this callback.
+
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(DeviceExtension);
     //if any async request in HwProcessServiceRequest, 
@@ -414,6 +476,15 @@ SCSI_UNIT_CONTROL_STATUS HwUnitControl(
     UNREFERENCED_PARAMETER(ControlType);
     UNREFERENCED_PARAMETER(Parameters);
 
+    //UnitControl is very similar as AdapterControl.
+    //First call will query "ScsiQuerySupportedControlTypes", then 
+    //miniport need fill corresponding element to report.
+
+    //ScsiUnitStart => a unit is starting up (disk spin up?)
+    //ScsiUnitPower => unit power on or off, [Parameters] arg is STOR_UNIT_CONTROL_POWER*
+    //ScsiUnitRemove => DeviceRemove post event of Unit
+    //ScsiUnitSurpriseRemoval => SurpriseRemoved event of Unit
+    
     //UnitControl should handle events of LU:
     //1.Power States
     //2.Device Start
