@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ntddk.h>
 #include <wdm.h>
 #include <nvme.h>
 #include <ntifs.h>

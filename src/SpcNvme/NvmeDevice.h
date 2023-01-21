@@ -67,10 +67,10 @@ public:
     bool GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL* cpldbl);
 
     //void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
-    bool RegisterAdminQueuePair(CNvmeQueuePair* qp);
+    bool RegisterAdminQueuePair(CNvmeQueue* qp);
     bool UnregisterAdminQueuePair();
-    bool RegisterIoQueuePair(CNvmeQueuePair* qp);
-    bool UnregisterIoQueuePair(CNvmeQueuePair* qp);
+    bool RegisterIoQueuePair(CNvmeQueue* qp);
+    bool UnregisterIoQueuePair(CNvmeQueue* qp);
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
@@ -87,8 +87,8 @@ private:
 
     ULONG CtrlerTimeout = 2000 * NVME_CONST::STALL_INTERVAL_US;        //should be updated by CAP, unit in micro-seconds
     ULONG StallDelay = NVME_CONST::SLEEP_TIME_US;
-    CNvmeQueuePair  AdminQueue;
-    CNvmeQueuePair  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
+    CNvmeQueue  AdminQueue;
+    CNvmeQueue  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
 
     SPCNVME_CONFIG  Cfg;
     USHORT  VendorID;

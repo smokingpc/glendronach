@@ -195,7 +195,7 @@ bool CNvmeDevice::GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* s
     return true;
 }
 
-bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueuePair* qp)
+bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueue* qp)
 {
     if(IsControllerEnabled())
     {
@@ -236,12 +236,12 @@ bool CNvmeDevice::UnregisterAdminQueuePair()
     WriteNvmeRegister(aqa, asq, acq);
     return true;
 }
-bool CNvmeDevice::RegisterIoQueuePair(CNvmeQueuePair* qp)
+bool CNvmeDevice::RegisterIoQueuePair(CNvmeQueue* qp)
 {
     UNREFERENCED_PARAMETER(qp);
     return false;
 }
-bool CNvmeDevice::UnregisterIoQueuePair(CNvmeQueuePair* qp)
+bool CNvmeDevice::UnregisterIoQueuePair(CNvmeQueue* qp)
 {
     UNREFERENCED_PARAMETER(qp);
     return false;

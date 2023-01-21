@@ -8,8 +8,8 @@ typedef struct _SPCNVME_DEVEXT
     ULONG CpuCount;
     NVME_STATE State;
     CNvmeDevice *NvmeDev;
-    CNvmeQueuePair *AdminQueue;
-    CNvmeQueuePair *IoQueue[MAX_IO_QUEUE_COUNT];
+    CNvmeQueue *AdminQueue;
+    CNvmeQueue *IoQueue[MAX_IO_QUEUE_COUNT];
     ULONG IoQueueCount = 0;
     BOOLEAN IsReady;
     STOR_DPC NvmeDPC;      //DPC for MSIX interrupt which triggerred from NVMe Device

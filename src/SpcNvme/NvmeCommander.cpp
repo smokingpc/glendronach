@@ -1,6 +1,6 @@
 #include "pch.h"
 
-NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPCNVME_DEVEXT devext, CNvmeQueuePair *qp, PNVME_COMMAND cmd)
+NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPCNVME_DEVEXT devext, CNvmeQueue *qp, PNVME_COMMAND cmd)
 {
     KIRQL irql;
     StorPortGetCurrentIrql((PVOID)devext, &irql);

@@ -21,11 +21,15 @@ public:
 
 class CSpinLock{
 public:
-    CSpinLock(KSPIN_LOCK* lock);
+    CSpinLock(KSPIN_LOCK* lock, bool acquire = true);
     ~CSpinLock();
+
+    void DoAcquire();
+    void DoRelease();
 protected:
     KSPIN_LOCK* Lock = NULL;
     KIRQL OldIrql = PASSIVE_LEVEL;
+    bool IsAcquired = false;
 };
 
 //StorSpinLock stands for "StorPort SpinLock".

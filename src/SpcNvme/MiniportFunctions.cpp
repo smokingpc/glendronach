@@ -9,7 +9,7 @@ static void CreateAdminQueue(PSPCNVME_DEVEXT devext)
         .Type = QUEUE_TYPE::ADM_QUEUE,
     };
     devext->NvmeDev->GetAdmDoorbell(&qcfg.SubDbl, &qcfg.CplDbl);
-    devext->AdminQueue = new CNvmeQueuePair(&qcfg);
+    devext->AdminQueue = new CNvmeQueue(&qcfg);
 }
 static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
 {
@@ -32,7 +32,7 @@ static void CreateIoQueues(PSPCNVME_DEVEXT devext)
             .Depth = NVME_CONST::IO_QUEUE_DEPTH,
             .Type = QUEUE_TYPE::IO_QUEUE,
         };
-        devext->IoQueue[i] = new CNvmeQueuePair(&qcfg);
+        devext->IoQueue[i] = new CNvmeQueue(&qcfg);
     }
 }
 
@@ -138,6 +138,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
                         *(ConfigInfo->AccessRanges), 
                         ConfigInfo->NumberOfAccessRanges);
 
+    if (!nvme->DisableController())
+        goto error;
+
     //PCI bus related initialize
     FillPortConfiguration(ConfigInfo, &nvmecfg);
     nvme = new CNvmeDevice(devext, &nvmecfg);
@@ -145,8 +148,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (false == SetupDeviceExtension(devext, &nvmecfg, ConfigInfo))
         goto error;
 
-    if (!nvme->DisableController())
-        goto error;
 
     if(!nvme->RegisterAdminQueuePair(devext->AdminQueue))
         goto error;

@@ -1,311 +1,268 @@
 #include "pch.h"
 
-#pragma region ======== class CNvmeQueuePair ========
-CNvmeQueuePair::CNvmeQueuePair()
+static inline ULONG ReadDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl)
+{
+    MemoryBarrier();
+    return StorPortReadRegisterUlong(devext, &dbl->AsUlong);
+}
+static inline ULONG ReadDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl)
+{
+    MemoryBarrier();
+    return StorPortReadRegisterUlong(devext, &dbl->AsUlong);
+}
+static inline void WriteDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl, ULONG value)
+{
+    MemoryBarrier();
+    StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
+}
+static inline void WriteDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl, ULONG value)
+{
+    MemoryBarrier();
+    StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
+}
+
+static inline bool IsValidQid(ULONG qid)
+{
+    return (qid != NVME_INVALID_QID);
+}
+
+#pragma region ======== class CNvmeQueue ========
+CNvmeQueue::CNvmeQueue()
 {
     KeInitializeSpinLock(&SubLock);
     KeInitializeSpinLock(&CplLock);
 }
-CNvmeQueuePair::CNvmeQueuePair(QUEUE_PAIR_CONFIG* config)
-    : CNvmeQueuePair()
+CNvmeQueue::CNvmeQueue(QUEUE_PAIR_CONFIG* config)
+    : CNvmeQueue()
 {
     Setup(config);
 }
-CNvmeQueuePair::~CNvmeQueuePair()
+CNvmeQueue::~CNvmeQueue()
 {
     Teardown();
 }
-bool CNvmeQueuePair::Setup(QUEUE_PAIR_CONFIG* config)
+NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
 {
-    this->DevExt = config->DevExt;
-    this->QueueID = config->QID;
-    this->Depth = config->Depth;
-    this->NumaNode = config->NumaNode;
-    this->Type = config->Type;
-    this->Buffer = config->PreAllocBuffer;
-    bool ok = this->SetupQueueBuffer();
+    bool ok = false;
+    NTSTATUS status = STATUS_SUCCESS;
 
-    if(ok)
+    DevExt = config->DevExt;
+    QueueID = config->QID;
+    Depth = config->Depth;
+    NumaNode = config->NumaNode;
+    Type = config->Type;
+    Buffer = config->PreAllocBuffer;
+    BufferSize = config->PreAllocBufSize;
+    SubDbl = config->SubDbl;
+    CplDbl = config->CplDbl;
+    CID = 0;
+    
+    if(NULL == Buffer)
     {
-        ok = ok && Doorbell.Setup(this, this->DevExt, config->SubDbl, config->CplDbl);
-        ok = ok && SubQ.Setup(this, this->Depth, this->SubQBuffer, this->SubQBufferSize);
-        ok = ok && CplQ.Setup(this, this->Depth, this->CplQBuffer, this->CplQBufferSize);
-        ok = ok && History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+        ok = AllocQueueBuffer();
+        if(!ok)
+        {
+            status = STATUS_MEMORY_NOT_ALLOCATED;
+            goto ERROR;
+        }
     }
-    this->IsReady = ok;
+    else
+        UseExtBuffer = true;
 
-    return IsReady;
+    ok = InitQueueBuffer();
+    if(!ok)
+    {
+        status = STATUS_INTERNAL_ERROR;
+        goto ERROR;
+    }
+
+    ok = History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+    if (!ok)
+    {
+        status = STATUS_INTERNAL_ERROR;
+        goto ERROR;
+    }
+
+    IsReady = true;
+    return STATUS_SUCCESS;
+ERROR:
+    Teardown();
+    return status;
 }
-void CNvmeQueuePair::Teardown()
+void CNvmeQueue::Teardown()
 {
     this->IsReady = false;
-    SubQ.Teardown();
-    CplQ.Teardown();
+    DeallocQueueBuffer();
     History.Teardown();
-    Doorbell.Teardown();
 }
 
-bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, CMD_CTX_TYPE type)
+NTSTATUS CNvmeQueue::SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, PVOID context, CMD_CTX_TYPE type)
 {
     CSpinLock lock(&SubLock);
+    NTSTATUS status = STATUS_SUCCESS;
     if (!this->IsReady)
-        return false;
+        return STATUS_DEVICE_NOT_READY;
 
-    //submit command are called from StartIo so I use StorportSpinLock(StartIoLock)
-    ULONG sub_tail = Doorbell.GetSubTail();
-
+    PNVME_COMMAND cmd = &SubQ_VA[SubTail];
     CID++;
-    cmd->CDW0.CID = CID;
-
-    if (NULL != context)
+    src_cmd->CDW0.CID = CID;
+    status = History.Push(CID, type, cmd, context);
+    if(!NT_SUCCESS(status))
     {
-        if (false == History.Push(sub_tail, type, cmd, context))
-            return false;
+        //old cmd is timed out, release it...
     }
 
-    SubQ.Submit(sub_tail, cmd);
-    Doorbell.UpdateSubTail();
-    return true;
+    RtlCopyMemory(cmd, src_cmd, sizeof(NVME_COMMAND));
+    SubTail++;
+    WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
+
+    return STATUS_SUCCESS;
 }
 
-bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type)
+NTSTATUS CNvmeQueue::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type)
 {
-    //Cmd Completion is always called from DPC routine, which triggered by Interrupt or Timer.
     CSpinLock lock(&CplLock);
-    ULONG cpl_head = Doorbell.GetCplHead();
-    bool ok = CplQ.PopCplEntry(&cpl_head, result);
-    if (ok)
-    {
-        USHORT sub_head = result->DW2.SQHD;
-        USHORT sub_cid = result->DW3.CID;
-        Doorbell.UpdateSubQHead(sub_head);
+    NTSTATUS status = STATUS_SUCCESS;    
+    PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
+    if(entry->DW3.Status.P == PhaseTag)
+        return STATUS_NOT_FOUND;
 
-        CMD_INFO info;
-        type = CMD_CTX_TYPE::UNKNOWN;
-        if (true == History.Pop(sub_cid, &info))
-        {
-            context = (PSPCNVME_SRBEXT)info.Context;
-            type = info.CtxType;
-        }
-        Doorbell.UpdateCplHead();
-        return true;
-    }
+    USHORT cid = entry->DW3.CID;
+    CMD_INFO info = {0};
+    status = History.Pop(cid, &info);
+    //TODO: if pop failed?
 
-    return false;
+    context = info.Context;
+    type = info.CtxType;
+    RtlCopyMemory(result, entry, sizeof(NVME_COMPLETION_ENTRY));
+    SubHead = entry->DW2.SQHD;
+    CplHead++;
+    WriteDbl(this->DevExt, this->CplDbl, this->CplHead);
+
+    return STATUS_SUCCESS;
 }
 
-#if 0
-bool CNvmeQueuePair::SubmitCmd(PNVME_COMMAND cmd, PVOID context, bool self)
+void CNvmeQueue::GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa)
 {
-    CSpinLock lock(&SubLock);
-    if (!this->IsReady)
-        return false;
-    
-    //submit command are called from StartIo so I use StorportSpinLock(StartIoLock)
-    ULONG sub_tail = Doorbell.GetSubTail();
-
-    CID++;
-    cmd->CDW0.CID = CID;
-
-    if(NULL != context)
-    {
-        NVME_CMD_TYPE type = (this->Type == QUEUE_TYPE::ADM_QUEUE)? NVME_CMD_TYPE::ADM_CMD : NVME_CMD_TYPE::IO_CMD;
-        if(self)
-            type = (NVME_CMD_TYPE)(type | NVME_CMD_TYPE::SELF_ISSUED);
-        if(false == History.Push(sub_tail, type, cmd, context))
-            return false;
-    }
-
-    SubQ.Submit(sub_tail, cmd);
-    Doorbell.UpdateSubTail();
-    return true;
+    GetQueueAddr(subva, cplva);
+    GetQueueAddr(subpa, cplpa);
 }
-bool CNvmeQueuePair::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID *context)
-{
-    //Cmd Completion is always called from DPC routine, which triggered by Interrupt or Timer.
-    CSpinLock lock(&CplLock);
-    ULONG cpl_head = Doorbell.GetCplHead();
-    bool ok = CplQ.PopCplEntry(&cpl_head, result);
-    if(ok)
-    {
-        USHORT sub_head = result->DW2.SQHD;
-        USHORT sub_old_tail = result->DW3.CID;
-        Doorbell.UpdateSubQHead(sub_head);
-
-        CMD_INFO info = { USE_STATE::FREE, NVME_CMD_TYPE::UNKNOWN_CMD};
-        if(NULL != context && true == History.Pop(sub_old_tail, &info))
-            *context = (PSPCNVME_SRBEXT)info.Context;
-
-        Doorbell.UpdateCplHead();
-        return true;
-    }
-
-    return false;
-}
-#endif
-
-void CNvmeQueuePair::GetQueueAddrVA(PVOID* subq, PVOID* cplq)
+void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  
     if(subq != NULL)
-        *subq = SubQBuffer;
+        *subq = SubQ_VA;
 
     if (cplq != NULL)
-        *cplq = CplQBuffer;
+        *cplq = CplQ_VA;
 }
-void CNvmeQueuePair::GetQueueAddrPA(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq)
+void CNvmeQueue::GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq)
 {
     if (subq != NULL)
-        subq->QuadPart = SubQBufferPA.QuadPart;
+        subq->QuadPart = SubQ_PA.QuadPart;
 
     if (cplq != NULL)
-        cplq->QuadPart = CplQBufferPA.QuadPart;
+        cplq->QuadPart = CplQ_PA.QuadPart;
 }
-bool CNvmeQueuePair::AllocQueueBuffer()
+
+ULONG CNvmeQueue::ReadSubTail()
 {
-    PHYSICAL_ADDRESS low = { 0 };
+    if (IsValidQid(QueueID) && NULL != SubDbl)
+        return ReadDbl(DevExt, SubDbl);
+    KdBreakPoint();
+    return INVALID_DBL_VALUE;
+}
+void CNvmeQueue::WriteSubTail(ULONG value)
+{
+    if (IsValidQid(QueueID) && NULL != SubDbl)
+        return WriteDbl(DevExt, SubDbl, value);
+    KdBreakPoint();
+}
+ULONG CNvmeQueue::ReadCplHead()
+{
+    if (IsValidQid(QueueID) && NULL != CplDbl)
+        return ReadDbl(DevExt, CplDbl);
+    KdBreakPoint();
+    return INVALID_DBL_VALUE;
+}
+void CNvmeQueue::WriteCplHead(ULONG value)
+{
+    if (IsValidQid(QueueID) && NULL != CplDbl)
+        return WriteDbl(DevExt, CplDbl, value);
+    KdBreakPoint();
+}
+
+bool CNvmeQueue::AllocQueueBuffer()
+{
+    PHYSICAL_ADDRESS low = { .HighPart = 0X000000001 }; //I want to allocate it above 4G...
     PHYSICAL_ADDRESS high = { .QuadPart = (LONGLONG)-1 };
     PHYSICAL_ADDRESS align = { 0 };
 
-    //Queue buffer doesn't need cache. Cache could cause read coherence issue and bother cpu cache performance.
-    ULONG spstatus = StorPortAllocateDmaMemory(
+    //I am too lazy to check if NVMe device request continuous page or not, so.... 
+    //Allocate SubQ and CplQ together into a continuous physical memory block.
+    ULONG status = StorPortAllocateContiguousMemorySpecifyCacheNode(
         this->DevExt, this->BufferSize,
         low, high, align,
-        MmWriteCombined, this->NumaNode,
-        &this->Buffer, &this->BufferPA);
-    if (STOR_STATUS_SUCCESS == spstatus)
-        return this->BindQueueBuffer();
-    else if (STOR_STATUS_NOT_IMPLEMENTED == spstatus)
-        KeBugCheckEx(MANUALLY_INITIATED_CRASH1, 0, 0, 0, 0);
+        this->CacheType, this->NumaNode,
+        &this->Buffer);
 
     //todo: log 
-    return false;
-}
-bool CNvmeQueuePair::BindQueueBuffer()
-{
-    if(0 == this->BufferPA.QuadPart)
+    if(STOR_STATUS_SUCCESS != status)
     {
-        ULONG mapped_size = 0;
-        this->BufferPA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->Buffer, &mapped_size);
-        if(mapped_size != this->BufferSize)
-            return false;       //todo: log
+        KdBreakPoint();
+        return false;
     }
-
-    RtlZeroMemory(this->Buffer, this->BufferSize);
-    this->SubQBuffer = this->Buffer;
-    this->SubQBufferPA.QuadPart = this->BufferPA.QuadPart;
-
-    this->CplQBuffer = (PVOID)(((PCHAR)this->SubQBuffer) + this->SubQBufferSize);
-    this->CplQBufferPA.QuadPart = this->SubQBufferPA.QuadPart + this->SubQBufferSize;
     return true;
 }
-bool CNvmeQueuePair::SetupQueueBuffer()
+bool CNvmeQueue::InitQueueBuffer()
 {
     //SubQ and CplQ should be placed on same continuous memory block.
     //1.Calculate total block size. 
-    //2.Split total size to SubQ size and CplQ size. NOTE: both of them should be PAGE_ALIGNED
-    this->SubQBufferSize = this->Depth * sizeof(NVME_COMMAND);
-    this->SubQBufferSize = ROUND_TO_PAGES(this->SubQBufferSize);
+    //2.Split total size to SubQ size and CplQ size. 
+    //NOTE: both of them should be PAGE_ALIGNED
+    this->SubQ_Size = this->Depth * sizeof(NVME_COMMAND);
+    this->CplQ_Size = this->Depth * sizeof(NVME_COMPLETION_ENTRY);
 
-    this->CplQBufferSize = this->Depth * sizeof(NVME_COMPLETION_ENTRY);
-    this->CplQBufferSize = ROUND_TO_PAGES(this->CplQBufferSize);
+    PUCHAR cursor = (PUCHAR) this->Buffer;
+    this->SubQ_VA = (PNVME_COMMAND)ROUND_TO_PAGES(cursor);
+    cursor += this->SubQ_Size;
+    this->CplQ_VA = (PNVME_COMPLETION_ENTRY)ROUND_TO_PAGES(cursor);
 
-    this->BufferSize = this->SubQBufferSize + this->CplQBufferSize;
-    if(NULL == this->Buffer)
-        return this->AllocQueueBuffer();
-    else
-        return this->BindQueueBuffer();
-}
-#pragma endregion
+    //this->BufferSize = this->SubQ_Size + this->CplQ_Size;
+    //Because Align to Page could cause extra waste space in memory.
+    //So should check if CplQ exceeds total buffer length...
+    if((cursor + this->CplQ_Size) > ((PUCHAR)this->Buffer + this->BufferSize))
+        goto ERROR; //todo: log
 
-#pragma region ======== class CNvmeQueuePair ========
-inline void CNvmeDoorbell::WriteSubDbl(ULONG new_value)
-{
-    MemoryBarrier();
-    StorPortWriteRegisterUlong(DevExt, &SubDbl->AsUlong, new_value);
-}
-inline void CNvmeDoorbell::WriteCplDbl(ULONG new_value)
-{
-    MemoryBarrier();
-    StorPortWriteRegisterUlong(DevExt, &CplDbl->AsUlong, new_value);
-}
-
-CNvmeDoorbell::CNvmeDoorbell()
-{}
-CNvmeDoorbell::CNvmeDoorbell(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl)
-    :CNvmeDoorbell()
-{   Setup(parent, devext, subdbl, cpldbl);  }
-CNvmeDoorbell::~CNvmeDoorbell()
-{   Teardown(); }
-bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, ULONG* subdbl, ULONG *cpldbl)
-{
-    return Setup(parent, devext, (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)subdbl, (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)cpldbl);
-}
-bool CNvmeDoorbell::Setup(class CNvmeQueuePair* parent, PVOID devext, 
-                        PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL subdbl, 
-                        PNVME_COMPLETION_QUEUE_HEAD_DOORBELL cpldbl)
-{
-    this->Parent = parent;
-    this->DevExt = devext;
-    this->SubDbl = subdbl;
-    this->CplDbl = cpldbl;
+    RtlZeroMemory(this->Buffer, this->BufferSize);
+    this->SubQ_PA = MmGetPhysicalAddress(this->SubQ_VA);
+    this->CplQ_PA = MmGetPhysicalAddress(this->CplQ_VA);
     return true;
-}
-void CNvmeDoorbell::Teardown()
-{
-}
-void CNvmeDoorbell::UpdateSubQHead(USHORT new_head)
-{
-    if(new_head != this->SubHead)
-        this->SubHead = new_head;
-}
 
-void CNvmeDoorbell::UpdateSubTail()
-{
-    SubTail++;
-    WriteSubDbl(SubTail);
+ERROR:
+    this->SubQ_Size = 0;
+    this->SubQ_VA = NULL;
+    this->CplQ_Size = 0;
+    this->CplQ_VA = NULL;
+    return false;
 }
-void CNvmeDoorbell::UpdateCplHead()
+void CNvmeQueue::DeallocQueueBuffer()
 {
-    CplHead++;
-    WriteCplDbl(CplHead);
-}
+    if(UseExtBuffer)
+        return;
 
-//USHORT CNvmeDoorbell::GetNextSubTail()
-//{
-//    USHORT new_tail = ((this->SubTail + 1) % this->Depth);
-//    if(new_tail == this->SubHead)
-//        return INVALID_DBL_TAIL;
-//    return new_tail;
-//}
-//USHORT CNvmeDoorbell::ReadSubTail()
-//{
-//    return this->SubTail;
-//}
-//
-//void CNvmeDoorbell::WriteSubTail(USHORT new_value)
-//{
-//    if(this->SubTail == new_value)
-//        return;
-//    this->SubTail = new_value;
-//    StorPortWriteRegisterUlong(this->DevExt, &this->SubDbl->AsUlong, new_value);
-//}
-//USHORT CNvmeDoorbell::ReadCplHead()
-//{
-//    return this->CplHead;
-//}
-//void CNvmeDoorbell::WriteCplHead(USHORT new_value)
-//{
-//    if(this->CplHead == new_value)
-//        return;
-//    this->CplHead = new_value;
-//    StorPortWriteRegisterUlong(this->DevExt, &this->CplDbl->AsUlong, new_value);
-//}
+    StorPortFreeContiguousMemorySpecifyCache(
+            DevExt, this->Buffer, this->BufferSize, this->CacheType);
+
+    this->Buffer = NULL;
+    this->BufferSize = 0;
+}
 #pragma endregion
 
+#if 0
 #pragma region ======== class CNvmeSubmitQueue ========
 CNvmeSubmitQueue::CNvmeSubmitQueue()
 {}
-CNvmeSubmitQueue::CNvmeSubmitQueue(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+CNvmeSubmitQueue::CNvmeSubmitQueue(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
     :CNvmeSubmitQueue()
 {
     Setup(parent, depth, buffer, size);
@@ -314,7 +271,7 @@ CNvmeSubmitQueue::~CNvmeSubmitQueue()
 {
     Teardown();
 }
-bool CNvmeSubmitQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+bool CNvmeSubmitQueue::Setup(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
 {
     ULONG mapped_size = 0;
     this->Parent = parent;
@@ -347,12 +304,10 @@ bool CNvmeSubmitQueue::Submit(ULONG sub_tail, PNVME_COMMAND new_cmd)
     return true;
 }
 #pragma endregion
-
-
 #pragma region ======== class CNvmeCompleteQueue ========
 CNvmeCompleteQueue::CNvmeCompleteQueue()
 {}
-CNvmeCompleteQueue::CNvmeCompleteQueue(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+CNvmeCompleteQueue::CNvmeCompleteQueue(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
     :CNvmeCompleteQueue()
 {
     Setup(parent, depth, buffer, size);
@@ -361,7 +316,7 @@ CNvmeCompleteQueue::~CNvmeCompleteQueue()
 {
     Teardown();
 }
-bool CNvmeCompleteQueue::Setup(class CNvmeQueuePair* parent, USHORT depth, PVOID buffer, size_t size)
+bool CNvmeCompleteQueue::Setup(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
 {
     ULONG mapped_size = 0;
     this->Parent = parent;
@@ -407,71 +362,76 @@ bool CNvmeCompleteQueue::PopCplEntry(ULONG *cpl_head, PNVME_COMPLETION_ENTRY ent
     return true;
 }
 #pragma endregion
+#endif
 
-
-#pragma region ======== class CNvmeSrbExtHistory ========
+#pragma region ======== class CCmdHistory ========
 CCmdHistory::CCmdHistory()
-{}
-CCmdHistory::CCmdHistory(class CNvmeQueuePair* parent, PVOID devext, USHORT depth, ULONG numa_node)
+{
+    KeInitializeSpinLock(&CmdLock);
+}
+CCmdHistory::CCmdHistory(class CNvmeQueue* parent, PVOID devext, USHORT depth, ULONG numa_node)
         : CCmdHistory()
 {   Setup(parent, devext, depth, numa_node);    }
 CCmdHistory::~CCmdHistory()
 {
     Teardown();
 }
-bool CCmdHistory::Setup(class CNvmeQueuePair* parent, PVOID devext, USHORT depth, ULONG numa_node)
+NTSTATUS CCmdHistory::Setup(class CNvmeQueue* parent, PVOID devext, USHORT depth, ULONG numa_node)
 {
     this->Parent = parent;
     this->NumaNode = numa_node;
     this->Depth = depth;
     this->DevExt = devext;
-    this->RawBufferSize = depth * sizeof(CMD_INFO);
+    this->BufferSize = depth * sizeof(CMD_INFO);
 
-    PHYSICAL_ADDRESS low = {0};
-    PHYSICAL_ADDRESS high = { .QuadPart = (LONGLONG)-1 };
-    PHYSICAL_ADDRESS align = {0};
-    ULONG spstatus = StorPortAllocatePool(devext, (ULONG)this->RawBufferSize, this->BufferTag, &this->RawBuffer);
+    ULONG status = StorPortAllocatePool(devext, (ULONG)this->BufferSize, this->BufferTag, &this->Buffer);
+    if(STOR_STATUS_SUCCESS == status)
+        return STATUS_MEMORY_NOT_ALLOCATED;
 
-    if(STOR_STATUS_SUCCESS == spstatus)
-    {
-        RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
-        this->History = (PCMD_INFO)this->RawBuffer;
-        return true;
-    }
-
-    return false;
+    RtlZeroMemory(this->Buffer, this->BufferSize);
+    this->History = (PCMD_INFO)this->Buffer;
+    return STATUS_SUCCESS;
 }
 void CCmdHistory::Teardown()
 {
     //todo: complete all remained SRBEXT
 
-    if(NULL != this->RawBuffer)
-        StorPortFreePool(this->DevExt, this->RawBuffer);
+    if(NULL != this->Buffer)
+        StorPortFreePool(this->DevExt, this->Buffer);
 
-    this->RawBuffer = NULL;
+    this->Buffer = NULL;
     this->History = NULL;
 }
-bool CCmdHistory::Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND *cmd, PVOID context)
+NTSTATUS CCmdHistory::Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND *cmd, PVOID context, bool do_lock)
 {
-    USE_STATE old_state = (USE_STATE)InterlockedCompareExchange(
-                                (volatile long*)&History[index].InUsed, 
-                                USE_STATE::USED, USE_STATE::FREE);
-    if(USE_STATE::FREE != old_state)
-        return false;
+    CSpinLock lock(&CmdLock, false);
+
+    if(do_lock)
+        lock.DoAcquire();
 
     PCMD_INFO entry = &History[index];
+    if(entry->InUsed)
+        return STATUS_INVALID_DEVICE_STATE;
+
     entry->CID = cmd->CDW0.CID;
     entry->Context = context;
     entry->CtxType = type;
-    return true;
+    entry->InUsed = true;
+    return STATUS_SUCCESS;
 }
-bool CCmdHistory::Pop(ULONG index, PCMD_INFO result)
+NTSTATUS CCmdHistory::Pop(ULONG index, PCMD_INFO result, bool do_lock)
 {
-    if(History[index].InUsed == USE_STATE::FREE)
-        return false;
+    CSpinLock lock(&CmdLock, false);
+
+    if (do_lock)
+        lock.DoAcquire();
+
+    PCMD_INFO entry = &History[index];
+    if (!entry->InUsed)
+        return STATUS_INVALID_DEVICE_STATE;
 
     RtlCopyMemory(result, &History[index], sizeof(CMD_INFO));
-    History[index].InUsed = USE_STATE::FREE;
+    entry->InUsed = false;
     return true;
 }
 #pragma endregion

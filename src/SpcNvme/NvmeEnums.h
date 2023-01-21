@@ -25,8 +25,8 @@ typedef enum _CMD_CTX_TYPE
     SRB = 2
 }CMD_CTX_TYPE;
 
-typedef enum _USE_STATE
-{
-    FREE = 0,
-    USED = 1,
-}USE_STATE;
+//typedef enum _USE_STATE
+//{
+//    FREE = 0,
+//    USED = 1,
+//}USE_STATE;
