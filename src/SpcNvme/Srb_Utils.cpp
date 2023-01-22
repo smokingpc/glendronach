@@ -36,19 +36,28 @@ static UCHAR SetScsiSenseData(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 }
 #endif
 
-PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
+void InitInternalSrbExt(PVOID devext, PSPCNVME_SRBEXT srbext)
 {
-    if(NULL == srb)
-        return NULL;
+    if (srbext->InitOK)
+        return;
+    RtlZeroMemory(srbext, sizeof(SPCNVME_SRBEXT));
 
-    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
+    srbext->DevExt = (PSPCNVME_DEVEXT)devext;
+    srbext->Srb = NULL;
+    srbext->FuncCode = SRB_FUNCTION_SPC_INTERNAL;
+    srbext->SrbStatus = SRB_STATUS_PENDING;
+    srbext->PathID = INVALID_PATH_ID;
+    srbext->TargetID = INVALID_TARGET_ID;
+    srbext->Lun = INVALID_LUN_ID;
+    srbext->ScsiQTag = INVALID_SRB_QUEUETAG;
+    srbext->InitOK = true;
+}
 
-    if(NULL == srbext)
-        return NULL;
-
+void InitSrbExt(PVOID devext, PSPCNVME_SRBEXT srbext, PSTORAGE_REQUEST_BLOCK srb)
+{
     //already init in BuildIo, no need to init again in StartIo
-    if(srbext->InitOK)
-        return srbext;
+    if (srbext->InitOK)
+        return;
 
     RtlZeroMemory(srbext, sizeof(SPCNVME_SRBEXT));
     srbext->DevExt = (PSPCNVME_DEVEXT)devext;
@@ -59,17 +68,28 @@ PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 
     srbext->Cdb = (PCDB)SrbGetCdb((PVOID)srb);
     srbext->CdbLen = (SrbGetCdbLength((PVOID)srb));
-    srbext->TargetID = (SrbGetTargetId((PVOID)srb));
-    srbext->Lun = (SrbGetLun((PVOID)srb));
-    srbext->DataBuf = (SrbGetDataBuffer((PVOID)srb));
-    srbext->DataBufLen = (SrbGetDataTransferLength((PVOID)srb));
+    srbext->PathID = (SrbGetPathId((PVOID)srb));
     srbext->TargetID = (SrbGetTargetId((PVOID)srb));
     srbext->Lun = (SrbGetLun((PVOID)srb));
 
     srbext->DataBuf = SrbGetDataBuffer(srb);
-    if(NULL != srbext->DataBuf)
+    if (NULL != srbext->DataBuf)
         srbext->DataBufLen = SrbGetDataTransferLength(srb);
+    else
+        srbext->DataBufLen = 0;
     srbext->InitOK = TRUE;
+
+    srbext->SrbStatus = SRB_STATUS_PENDING;
+    srbext->ScsiQTag = SrbGetQueueTag(srb);
+}
+PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
+{
+    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
+
+    if(NULL == srbext)
+        return NULL;
+
+    InitSrbExt(devext, srbext, srb);
 
     return srbext;
 }
@@ -140,6 +160,25 @@ void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 end:
     SrbSetScsiStatus(srb, scsi_status);
     SrbSetSrbStatus(srb, srb_status | SRB_STATUS_AUTOSENSE_VALID);
+}
+
+UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status)
+{
+//this is most frequently passed condition, so pull it out here.
+//It make common route won't consume callstack too deep.
+    if(0 == status.SCT && 0 == status.SC)
+        return SRB_STATUS_SUCCESS;
+
+    switch(status.SCT)
+    {
+    case NVME_STATUS_TYPE_GENERIC_COMMAND:
+        return NvmeGenericToSrbStatus(status);
+    case NVME_STATUS_TYPE_COMMAND_SPECIFIC:
+        return NvmeCmdSpecificToSrbStatus(status);
+    case NVME_STATUS_TYPE_MEDIA_ERROR:
+        return NvmeMediaErrorToSrbStatus(status);
+    }
+    return SRB_STATUS_INTERNAL_ERROR;
 }
 
 //void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, USHORT nvme_sc)

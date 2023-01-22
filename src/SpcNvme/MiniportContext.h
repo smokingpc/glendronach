@@ -1,6 +1,7 @@
 #pragma once
 
 class CNvmeDevice;
+class CNvmeQueue;
 typedef struct _SPCNVME_DEVEXT
 {
     //todo: runtime allocate a memory here... no hardcode....
@@ -21,12 +22,16 @@ typedef struct _SPCNVME_SRBEXT
 {
     PSPCNVME_DEVEXT DevExt;
     PSTORAGE_REQUEST_BLOCK Srb;
+    UCHAR SrbStatus;
     BOOLEAN InitOK;
+    NVME_COMMAND SrcCmd;
     ULONG FuncCode;         //SRB Function Code
+    ULONG ScsiQTag;
     PCDB Cdb;
     UCHAR CdbLen;
-    ULONG Lun;
-    ULONG TargetID;
+    UCHAR PathID;           //SCSI Path (bus) ID
+    UCHAR TargetID;         //SCSI Dvice ID
+    UCHAR Lun;              //SCSI Logical UNit ID
     PVOID DataBuf;
     ULONG DataBufLen;
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;

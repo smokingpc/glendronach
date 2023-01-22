@@ -42,22 +42,22 @@ namespace SPC
     };
 
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = SpcCppDeleter<_Ty, _PoolType, _PoolTag>>
-    class CUniquePtr
+    class CAutoPtr
         {
         public:
             using DataType = _Ty;
             using DeleterType = _Dx;
 
-            CUniquePtr(DataType* ptr = nullptr) noexcept {
+            CAutoPtr(DataType* ptr = nullptr) noexcept {
                 this->Ptr = ptr;
             }
 
-            ~CUniquePtr() noexcept {
+            virtual ~CAutoPtr() noexcept {
                 if (nullptr != this->Ptr)
                     this->Deleter(this->Ptr);
             }
 
-            CUniquePtr& operator=(CUniquePtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
+            CAutoPtr& operator=(CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
             {
                 Reset(_Right.release());
                 return *this;
@@ -102,13 +102,13 @@ namespace SPC
             DataType* Ptr = nullptr;
             DeleterType Deleter;
 
-            friend class CUniquePtr;
+            friend class CAutoPtr;
         };
 
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = WinKernelDeleter<_Ty, _PoolType, _PoolTag>>
-        class CWinUniquePtr : CUniquePtr<_Ty, _PoolType, _PoolTag>
+        class CWinAutoPtr : CAutoPtr<_Ty, _PoolType, _PoolTag>
         {
         protected:
-            friend class CWinUniquePtr;
+            friend class CWinAutoPtr;
         };
 }

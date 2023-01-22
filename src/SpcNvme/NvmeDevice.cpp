@@ -214,7 +214,7 @@ bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueue* qp)
 
     PHYSICAL_ADDRESS subq_pa = { 0 };
     PHYSICAL_ADDRESS cplq_pa = { 0 };
-    qp->GetQueueAddrPA(&subq_pa, &cplq_pa);
+    qp->GetQueueAddr(&subq_pa, &cplq_pa);
     asq.AsUlonglong = subq_pa.QuadPart;
     acq.AsUlonglong = cplq_pa.QuadPart;
 

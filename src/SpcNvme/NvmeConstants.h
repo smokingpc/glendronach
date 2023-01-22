@@ -19,8 +19,8 @@ struct NVME_CONST{
     static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
 
-    static const ULONG STALL_INTERVAL_US = 50;  //in micro-seconds
-    static const ULONG SLEEP_TIME_US = STALL_INTERVAL_US*10;    //in micro-seconds
+    static const ULONG STALL_TIME_US = 50;  //in micro-seconds
+    static const ULONG SLEEP_TIME_US = STALL_TIME_US*10;    //in micro-seconds
 
     #pragma region ======== SetFeature default values ========
     static const UCHAR INTCOAL_TIME = 8;   //Interrupt Coalescing time threshold in 100us unit.

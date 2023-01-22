@@ -22,7 +22,8 @@ typedef enum _CMD_CTX_TYPE
 {
     UNKNOWN = 0,
     WAIT_EVENT = 1,
-    SRB = 2
+    LOCAL_ADM_CMD = 2,
+    SRBEXT = 3
 }CMD_CTX_TYPE;
 
 //typedef enum _USE_STATE

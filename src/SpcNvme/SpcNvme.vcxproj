@@ -256,6 +256,7 @@
     <ClCompile Include="ScsiHandler_CDB12.cpp" />
     <ClCompile Include="ScsiHandler_CDB16.cpp" />
     <ClCompile Include="ScsiHandler_CDB6.cpp" />
+    <ClCompile Include="SrbStatus_Translator.cpp" />
     <ClCompile Include="Srb_Utils.cpp" />
     <ClCompile Include="DriverEntry.cpp" />
     <ClCompile Include="MiniportFunctions.cpp" />

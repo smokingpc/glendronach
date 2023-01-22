@@ -17,6 +17,8 @@ BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 
 BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 {
+    SetScsiSenseBySrbStatus(srbext->Srb, SRB_STATUS_INVALID_REQUEST);
+    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
 
 //always return FALSE. This event only handled in BuildIo.
     return FALSE;

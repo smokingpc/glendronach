@@ -81,6 +81,9 @@
     <ClCompile Include="NvmeCommander.cpp">
       <Filter>Nvme_Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="SrbStatus_Translator.cpp">
+      <Filter>SRB_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MiniportFunctions.h">

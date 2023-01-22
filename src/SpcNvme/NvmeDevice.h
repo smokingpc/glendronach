@@ -85,7 +85,7 @@ private:
     PVOID DevExt = NULL;      //StorPort Device Extension 
     ULONG MaxDblCount = 0;
 
-    ULONG CtrlerTimeout = 2000 * NVME_CONST::STALL_INTERVAL_US;        //should be updated by CAP, unit in micro-seconds
+    ULONG CtrlerTimeout = 2000 * NVME_CONST::STALL_TIME_US;        //should be updated by CAP, unit in micro-seconds
     ULONG StallDelay = NVME_CONST::SLEEP_TIME_US;
     CNvmeQueue  AdminQueue;
     CNvmeQueue  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};

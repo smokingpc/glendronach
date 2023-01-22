@@ -1,7 +1,7 @@
 #pragma once
 
 #define NVME_INVALID_ID     ((ULONG)-1)
-#define NVME_INVALID_CID    ((USHORT)-1)
+#define NVME_INVALID_CID    ((USHORT)-1)        //should align to NVME CID size
 #define NVME_INVALID_QID    ((USHORT)-1)
 //#define INVALID_DBL_TAIL    ((USHORT)-1)
 //#define INVALID_DBL_HEAD    INVALID_DBL_TAIL
@@ -18,6 +18,14 @@
 
 #define ACCESS_RANGE_COUNT  2
 
+#pragma region  ======== SCSI and SRB RELATED ========
+#define SRB_FUNCTION_SPC_INTERNAL   0xFF
+#define INVALID_PATH_ID      ((UCHAR)~0)
+#define INVALID_TARGET_ID    ((UCHAR)~0)
+#define INVALID_LUN_ID       ((UCHAR)~0)
+#define INVALID_SRB_QUEUETAG ((ULONG)~0)
+#pragma endregion
 
 #pragma region  ======== NVME_RELATED ========
 #pragma endregion
+

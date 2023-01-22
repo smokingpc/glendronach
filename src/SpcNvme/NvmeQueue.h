@@ -12,15 +12,16 @@ typedef struct _QUEUE_PAIR_CONFIG {
     size_t PreAllocBufSize = 0; 
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
-typedef struct _CMD_INFO
-{
-    //volatile USE_STATE InUsed = USE_STATE::FREE;
-    bool InUsed = false;
-    CMD_CTX_TYPE CtxType = CMD_CTX_TYPE::SRB;
-    PVOID Context = NULL;           //SRBEXT of original request
-    USHORT CID = NVME_INVALID_CID;  //CmdID in SubQ which submit this request.
-    USHORT Tag = NVME_INVALID_CID;  //SCSI queue tag from miniport
-}CMD_INFO, *PCMD_INFO;
+//typedef struct _CMD_INFO
+//{
+//    //volatile USE_STATE InUsed = USE_STATE::FREE;
+//    bool InUsed = false;
+//    PSPCNVME_SRBEXT SrbExt;
+//    //CMD_CTX_TYPE CtxType = CMD_CTX_TYPE::SRBEXT;
+//    //PVOID Context = NULL;             //SRBEXT of original request
+//    ULONG Index = ;    //CmdID in SubQ which submit this request.
+//    //USHORT Tag = INVALID_QI;      //SCSI queue tag from miniport
+//}CMD_INFO, *PCMD_INFO;
 
 class CCmdHistory
 {
@@ -34,14 +35,15 @@ public:
 
     NTSTATUS Setup(class CNvmeQueue*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
     void Teardown();
-    NTSTATUS Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND* cmd, PVOID context, bool do_lock = false);
-    NTSTATUS Pop(ULONG index, PCMD_INFO result, bool do_lock = false);
+    NTSTATUS Push(ULONG index, PSPCNVME_SRBEXT srbext);
+    NTSTATUS Pop(ULONG index, PSPCNVME_SRBEXT &srbext);
 
 private:
     PVOID DevExt = NULL;
     PVOID Buffer = NULL;
     size_t BufferSize = 0;
-    PCMD_INFO History = NULL;     //Cast of RawBuffer
+    //PCMD_INFO History = NULL;     //Cast of RawBuffer
+    PSPCNVME_SRBEXT *History = NULL; //Cast of RawBuffer
     ULONG Depth = 0;                   //how many items in this->History ?
     USHORT QueueID = NVME_INVALID_QID;
     ULONG NumaNode = MM_ANY_NODE_OK;
@@ -62,11 +64,13 @@ public:
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
     
-    NTSTATUS SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, SPCNVME_SRBEXT *srbext);
-    NTSTATUS SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag,  KEVENT *wait_event);
-    //NTSTATUS SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, PVOID context, CMD_CTX_TYPE type);
-
-    NTSTATUS CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID &context, CMD_CTX_TYPE &type);
+    //NTSTATUS SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, SPCNVME_SRBEXT *srbext);
+    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext);
+    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us);
+    //NTSTATUS SubmitCmdWithWait(PNVME_COMMAND src_cmd, ULONG tag, ULONG wait_us);
+    //NTSTATUS SubmitCmdWithWait(, ULONG wait_us);
+    NTSTATUS CompleteCmd(ULONG max_count, ULONG & done_count);
+    //NTSTATUS CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type);
 
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);

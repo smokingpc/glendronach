@@ -1,9 +1,8 @@
 #pragma once
 
-#include <ntddk.h>
+#include <ntifs.h>
 #include <wdm.h>
 #include <nvme.h>
-#include <ntifs.h>
 
 EXTERN_C_START
 #include <storport.h>
@@ -11,16 +10,16 @@ EXTERN_C_START
 EXTERN_C_END
 
 #include "..\WdmUtils\WdmUtils.h"
-#include "..\WdmUtils\UniquePtr.hpp"
+#include "..\WdmUtils\AutoPtr.hpp"
 #include "PoolTags.h"
 #include "Constants.h"
 #include "Inline_Utils.h"
 #include "StateMachine.h"
 #include "NvmeConstants.h"
 #include "NvmeEnums.h"
+#include "MiniportContext.h"
 #include "NvmeQueue.h"
 #include "NvmeDevice.h"
-#include "MiniportContext.h"
 #include "MiniportFunctions.h"
 #include "NvmeCommander.h"
 
@@ -35,3 +34,4 @@ EXTERN_C_END
 #include "ScsiHandler_InlineUtils.h"
 #include "MSIX_and_DPC.h"
 
+using SPC::CAutoPtr;

@@ -96,7 +96,39 @@ void CNvmeQueue::Teardown()
     History.Teardown();
 }
 
-NTSTATUS CNvmeQueue::SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, PVOID context, CMD_CTX_TYPE type)
+//this method is used for internal command
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    status = SubmitCmd(srbext);
+    if(!NT_SUCCESS(status))
+    {
+        //todo: log
+        return status;
+    }
+
+    //wait
+    ULONG interval = NVME_CONST::STALL_TIME_US;; //in micro-seconds
+    int loop = wait_us / NVME_CONST::STALL_TIME_US;
+    if ((wait_us % NVME_CONST::STALL_TIME_US) > 0)
+        loop++;
+
+    while(loop >= 0)
+    {
+        StorPortStallExecution(interval);
+        if(srbext->SrbStatus != SRB_STATUS_PENDING)
+            return STATUS_SUCCESS;
+        loop--;
+    }
+
+    if (srbext->SrbStatus != SRB_STATUS_PENDING)
+        return STATUS_SUCCESS;
+
+    return STATUS_TIMEOUT;
+}
+
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
 {
     CSpinLock lock(&SubLock);
     NTSTATUS status = STATUS_SUCCESS;
@@ -104,12 +136,20 @@ NTSTATUS CNvmeQueue::SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, PVOID context, 
         return STATUS_DEVICE_NOT_READY;
 
     PNVME_COMMAND cmd = &SubQ_VA[SubTail];
+    PNVME_COMMAND src_cmd = &srbext->SrcCmd;
     CID++;
     src_cmd->CDW0.CID = CID;
-    status = History.Push(CID, type, cmd, context);
+    status = History.Push(CID, srbext);
     if(!NT_SUCCESS(status))
     {
         //old cmd is timed out, release it...
+        PSPCNVME_SRBEXT old_srbext = NULL;
+        History.Pop(CID, old_srbext);
+        SrbSetSrbStatus(old_srbext->Srb, SRB_STATUS_TIMEOUT);
+        StorPortNotification(RequestComplete, old_srbext->DevExt, old_srbext->Srb);
+
+        //after release old cmd, push current cmd again...
+        History.Push(CID, srbext);
     }
 
     RtlCopyMemory(cmd, src_cmd, sizeof(NVME_COMMAND));
@@ -118,34 +158,45 @@ NTSTATUS CNvmeQueue::SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, PVOID context, 
 
     return STATUS_SUCCESS;
 }
-
-NTSTATUS CNvmeQueue::CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type)
+NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
 {
+    //max_count : max cmd completion done in this round in CompleteCmd().
+    //cpl_count : how mant cmd completion done in this round?
+
+    NTSTATUS status = STATUS_SUCCESS;
     CSpinLock lock(&CplLock);
-    NTSTATUS status = STATUS_SUCCESS;    
-    PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
-    if(entry->DW3.Status.P == PhaseTag)
-        return STATUS_NOT_FOUND;
+    done_count = 0;
+    while(max_count > 0)
+    {
+        PSPCNVME_SRBEXT srbext = NULL;
+        PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
+        if (entry->DW3.Status.P == PhaseTag)
+            break;
 
-    USHORT cid = entry->DW3.CID;
-    CMD_INFO info = {0};
-    status = History.Pop(cid, &info);
-    //TODO: if pop failed?
+        USHORT cid = entry->DW3.CID;
+        status = History.Pop(cid, srbext);
+    
+        //if pop failed, previously saved SrbExt could be released by CID collision cmd.
+        //skip it and process next completion.
+        if(NT_SUCCESS(status))
+        {
+            UCHAR srbstatus = ToSrbStatus(entry->DW3.Status);
+            srbext->SrbStatus = srbstatus;
+            if(NULL != srbext->Srb)
+            {
+                SrbSetSrbStatus(srbext->Srb, srbstatus);
+                StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+            }
+        }
+        SubHead = entry->DW2.SQHD;
+        done_count++;
+        CplHead++;
+    }
 
-    context = info.Context;
-    type = info.CtxType;
-    RtlCopyMemory(result, entry, sizeof(NVME_COMPLETION_ENTRY));
-    SubHead = entry->DW2.SQHD;
-    CplHead++;
-    WriteDbl(this->DevExt, this->CplDbl, this->CplHead);
+    if(done_count > 0)
+        WriteDbl(this->DevExt, this->CplDbl, this->CplHead);
 
     return STATUS_SUCCESS;
-}
-
-void CNvmeQueue::GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa)
-{
-    GetQueueAddr(subva, cplva);
-    GetQueueAddr(subpa, cplpa);
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  
@@ -154,6 +205,11 @@ void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 
     if (cplq != NULL)
         *cplq = CplQ_VA;
+}
+void CNvmeQueue::GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa)
+{
+    GetQueueAddr(subva, cplva);
+    GetQueueAddr(subpa, cplpa);
 }
 void CNvmeQueue::GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq)
 {
@@ -382,14 +438,14 @@ NTSTATUS CCmdHistory::Setup(class CNvmeQueue* parent, PVOID devext, USHORT depth
     this->NumaNode = numa_node;
     this->Depth = depth;
     this->DevExt = devext;
-    this->BufferSize = depth * sizeof(CMD_INFO);
+    this->BufferSize = depth * sizeof(PSPCNVME_SRBEXT);
 
     ULONG status = StorPortAllocatePool(devext, (ULONG)this->BufferSize, this->BufferTag, &this->Buffer);
     if(STOR_STATUS_SUCCESS == status)
         return STATUS_MEMORY_NOT_ALLOCATED;
 
     RtlZeroMemory(this->Buffer, this->BufferSize);
-    this->History = (PCMD_INFO)this->Buffer;
+    this->History = (PSPCNVME_SRBEXT *)this->Buffer;
     return STATUS_SUCCESS;
 }
 void CCmdHistory::Teardown()
@@ -400,38 +456,22 @@ void CCmdHistory::Teardown()
         StorPortFreePool(this->DevExt, this->Buffer);
 
     this->Buffer = NULL;
-    this->History = NULL;
 }
-NTSTATUS CCmdHistory::Push(ULONG index, CMD_CTX_TYPE type, NVME_COMMAND *cmd, PVOID context, bool do_lock)
+NTSTATUS CCmdHistory::Push(ULONG index, PSPCNVME_SRBEXT srbext)
 {
-    CSpinLock lock(&CmdLock, false);
+    PVOID old_ptr = InterlockedCompareExchangePointer(
+                        (volatile PVOID*)&History[index], srbext, NULL);
 
-    if(do_lock)
-        lock.DoAcquire();
+    if(NULL != old_ptr)
+        return STATUS_DEVICE_BUSY;
 
-    PCMD_INFO entry = &History[index];
-    if(entry->InUsed)
-        return STATUS_INVALID_DEVICE_STATE;
-
-    entry->CID = cmd->CDW0.CID;
-    entry->Context = context;
-    entry->CtxType = type;
-    entry->InUsed = true;
     return STATUS_SUCCESS;
 }
-NTSTATUS CCmdHistory::Pop(ULONG index, PCMD_INFO result, bool do_lock)
+NTSTATUS CCmdHistory::Pop(ULONG index, PSPCNVME_SRBEXT& srbext)
 {
-    CSpinLock lock(&CmdLock, false);
-
-    if (do_lock)
-        lock.DoAcquire();
-
-    PCMD_INFO entry = &History[index];
-    if (!entry->InUsed)
+    srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer((volatile PVOID*)&History[index], NULL);
+    if(NULL == srbext)
         return STATUS_INVALID_DEVICE_STATE;
-
-    RtlCopyMemory(result, &History[index], sizeof(CMD_INFO));
-    entry->InUsed = false;
-    return true;
+    return STATUS_SUCCESS;
 }
 #pragma endregion

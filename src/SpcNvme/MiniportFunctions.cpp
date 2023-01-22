@@ -24,11 +24,11 @@ static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
 static void CreateIoQueues(PSPCNVME_DEVEXT devext)
 {
     devext->IoQueueCount = NVME_CONST::IO_QUEUE_COUNT;
-    for(int i=0; i<devext->IoQueueCount; i++)
+    for(ULONG i=0; i<devext->IoQueueCount; i++)
     {
         QUEUE_PAIR_CONFIG qcfg = {
             .DevExt = devext,
-            .QID = i+1, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
+            .QID = (USHORT) (i+1), //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
             .Depth = NVME_CONST::IO_QUEUE_DEPTH,
             .Type = QUEUE_TYPE::IO_QUEUE,
         };
@@ -42,7 +42,7 @@ static void DeleteIoQueues(PSPCNVME_DEVEXT devext)
     {
         QUEUE_PAIR_CONFIG qcfg = {
             .DevExt = devext,
-            .QID = i, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
+            .QID = (USHORT)i, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
             .Depth = NVME_CONST::IO_QUEUE_DEPTH,
             .Type = QUEUE_TYPE::IO_QUEUE,
         };
