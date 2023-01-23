@@ -64,13 +64,9 @@ public:
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
     
-    //NTSTATUS SubmitCmd(PNVME_COMMAND src_cmd, ULONG tag, SPCNVME_SRBEXT *srbext);
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext);
-    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us);
-    //NTSTATUS SubmitCmdWithWait(PNVME_COMMAND src_cmd, ULONG tag, ULONG wait_us);
-    //NTSTATUS SubmitCmdWithWait(, ULONG wait_us);
+    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl = true);
     NTSTATUS CompleteCmd(ULONG max_count, ULONG & done_count);
-    //NTSTATUS CompleteCmd(PNVME_COMPLETION_ENTRY result, PVOID& context, CMD_CTX_TYPE& type);
 
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);

@@ -16,7 +16,7 @@
 //#define MAX_TX_SIZE         (PAGE_SIZE * MAX_TX_PAGES)
 #define MAX_CONCURRENT_IO   4096
 
-#define ACCESS_RANGE_COUNT  2
+#define ACCESS_RANGE_COUNT  8
 
 #pragma region  ======== SCSI and SRB RELATED ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF

@@ -250,7 +250,8 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MSIX_and_DPC.cpp" />
+    <ClCompile Include="ISR_and_DPC.cpp" />
+    <ClCompile Include="SrbExt.cpp" />
     <ClCompile Include="NvmeCommander.cpp" />
     <ClCompile Include="ScsiHandler_CDB10.cpp" />
     <ClCompile Include="ScsiHandler_CDB12.cpp" />
@@ -267,7 +268,7 @@
   <ItemGroup>
     <ClCompile Include="BuildIo_Handler.cpp" />
     <ClInclude Include="BuildIo_Handlers.h" />
-    <ClInclude Include="MSIX_and_DPC.h" />
+    <ClInclude Include="ISR_and_DPC.h" />
     <ClInclude Include="NvmeCommander.h" />
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
@@ -279,7 +280,7 @@
     <ClInclude Include="Srb_Utils.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />
-    <ClInclude Include="MiniportContext.h" />
+    <ClInclude Include="SrbExt.h" />
     <ClInclude Include="MiniportFunctions.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="NvmeDevice.h" />

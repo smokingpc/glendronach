@@ -97,10 +97,14 @@ void CNvmeQueue::Teardown()
 }
 
 //this method is used for internal command
-NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us)
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl)
 {
     NTSTATUS status = STATUS_SUCCESS;
-
+    //TODO: 
+    //1. disable Interrupt by modifying VectorControl register in pCtrlRegister+0x2000
+    // (4th DWORD of each entry, bit 0?)
+    //2. process completion queue in loop
+    //3. after desired result comes back, enable msix interrupt again.
     status = SubmitCmd(srbext);
     if(!NT_SUCCESS(status))
     {
@@ -116,7 +120,11 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us)
 
     while(loop >= 0)
     {
+        ULONG polled = 0;
         StorPortStallExecution(interval);
+        if(poll_cpl)
+            CompleteCmd(0, polled);
+
         if(srbext->SrbStatus != SRB_STATUS_PENDING)
             return STATUS_SUCCESS;
         loop--;
@@ -191,6 +199,9 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
         SubHead = entry->DW2.SQHD;
         done_count++;
         CplHead++;
+
+        if(max_count > 0 && done_count >= max_count)
+            break;
     }
 
     if(done_count > 0)

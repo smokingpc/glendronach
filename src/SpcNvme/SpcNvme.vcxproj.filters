@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
     <Filter Include="Driver Files">
       <UniqueIdentifier>{8E41214B-6785-4CFE-B992-037D68949A14}</UniqueIdentifier>
       <Extensions>inf;inv;inx;mof;mc;</Extensions>
@@ -18,22 +14,18 @@
     <Filter Include="SCSI_Handlers">
       <UniqueIdentifier>{abf383f4-256a-42b7-a3fa-be1767784a3a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DriverMain">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="ISR_and_DPC">
       <UniqueIdentifier>{241797aa-4e4a-4272-8b64-edace1d2dcb0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Nvme_Handlers">
-      <UniqueIdentifier>{e936662c-51e4-464a-979b-f74a7f4c0686}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="SRB_Handlers">
-      <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Nvme_Device">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="PCIe_and_MSIX">
+      <UniqueIdentifier>{9a6ce39c-0377-45b8-9cbf-1c868437b57d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SRB_and_SRBEXT">
+      <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -42,12 +34,6 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DriverEntry.cpp">
-      <Filter>DriverMain</Filter>
-    </ClCompile>
-    <ClCompile Include="MiniportFunctions.cpp">
-      <Filter>DriverMain</Filter>
-    </ClCompile>
     <ClCompile Include="NvmeDevice.cpp">
       <Filter>Nvme_Device</Filter>
     </ClCompile>
@@ -55,7 +41,7 @@
       <Filter>Nvme_Device</Filter>
     </ClCompile>
     <ClCompile Include="Srb_Utils.cpp">
-      <Filter>SRB_Handlers</Filter>
+      <Filter>SRB_and_SRBEXT</Filter>
     </ClCompile>
     <ClCompile Include="ScsiHandler_CDB6.cpp">
       <Filter>SCSI_Handlers</Filter>
@@ -69,7 +55,7 @@
     <ClCompile Include="ScsiHandler_CDB16.cpp">
       <Filter>SCSI_Handlers</Filter>
     </ClCompile>
-    <ClCompile Include="MSIX_and_DPC.cpp">
+    <ClCompile Include="ISR_and_DPC.cpp">
       <Filter>ISR_and_DPC</Filter>
     </ClCompile>
     <ClCompile Include="BuildIo_Handler.cpp">
@@ -78,43 +64,27 @@
     <ClCompile Include="StartIo_Handler.cpp">
       <Filter>StartIo_Handlers</Filter>
     </ClCompile>
-    <ClCompile Include="NvmeCommander.cpp">
-      <Filter>Nvme_Handlers</Filter>
-    </ClCompile>
     <ClCompile Include="SrbStatus_Translator.cpp">
-      <Filter>SRB_Handlers</Filter>
+      <Filter>SRB_and_SRBEXT</Filter>
+    </ClCompile>
+    <ClCompile Include="NvmeCommander.cpp">
+      <Filter>Nvme_Device</Filter>
+    </ClCompile>
+    <ClCompile Include="DriverEntry.cpp" />
+    <ClCompile Include="MiniportFunctions.cpp" />
+    <ClCompile Include="SrbExt.cpp">
+      <Filter>SRB_and_SRBEXT</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MiniportFunctions.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Constants.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="StateMachine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MiniportContext.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Inline_Utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="NvmeDevice.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
     <ClInclude Include="NvmeQueue.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
-    <ClInclude Include="PoolTags.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Srb_Utils.h">
-      <Filter>SRB_Handlers</Filter>
+      <Filter>SRB_and_SRBEXT</Filter>
     </ClInclude>
     <ClInclude Include="BuildIo_Handlers.h">
       <Filter>BuildIo_Handlers</Filter>
@@ -134,20 +104,29 @@
     <ClInclude Include="ScsiHandler_InlineUtils.h">
       <Filter>SCSI_Handlers</Filter>
     </ClInclude>
-    <ClInclude Include="MSIX_and_DPC.h">
+    <ClInclude Include="ISR_and_DPC.h">
       <Filter>ISR_and_DPC</Filter>
     </ClInclude>
     <ClInclude Include="StartIo_Handler.h">
       <Filter>StartIo_Handlers</Filter>
-    </ClInclude>
-    <ClInclude Include="NvmeCommander.h">
-      <Filter>Nvme_Handlers</Filter>
     </ClInclude>
     <ClInclude Include="NvmeConstants.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
     <ClInclude Include="NvmeEnums.h">
       <Filter>Nvme_Device</Filter>
+    </ClInclude>
+    <ClInclude Include="NvmeCommander.h">
+      <Filter>Nvme_Device</Filter>
+    </ClInclude>
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="Inline_Utils.h" />
+    <ClInclude Include="MiniportFunctions.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="PoolTags.h" />
+    <ClInclude Include="StateMachine.h" />
+    <ClInclude Include="SrbExt.h">
+      <Filter>SRB_and_SRBEXT</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

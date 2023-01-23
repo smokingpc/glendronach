@@ -1,56 +1,42 @@
 #include "pch.h"
 
-#pragma region ======== CSpcNvmeDevice Factory Methods ======== 
-CNvmeDevice *CNvmeDevice::Create(PVOID devext, PSPCNVME_CONFIG cfg)
-{
-    CNvmeDevice *ret = new CNvmeDevice(devext, cfg);
-
-    return ret;
-}
-void CNvmeDevice::Delete(CNvmeDevice* ptr)
-{
-    ptr->Teardown();
-    delete ptr;
-}
-#pragma endregion
-
 #pragma region ======== class CSpcNvmeDevice ======== 
 
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
     if(barrier)
         MemoryBarrier();
-    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
+    cc.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->CC.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
+    csts.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->CSTS.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_VERSION& ver, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    ver.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->VS.AsUlong);
+    ver.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->VS.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CAPABILITIES& cap, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    cap.AsUlonglong = StorPortReadRegisterUlong64(DevExt, &CtrlReg->CAP.AsUlonglong);
+    cap.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->CAP.AsUlonglong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
+    StorPortWriteRegisterUlong(this, &CtrlReg->CC.AsUlong, cc.AsUlong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong, csts.AsUlong);
+    StorPortWriteRegisterUlong(this, &CtrlReg->CSTS.AsUlong, csts.AsUlong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS& asq,
@@ -60,9 +46,9 @@ inline void CNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     if (barrier)
         MemoryBarrier();
 
-    StorPortWriteRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
-    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
-    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
+    StorPortWriteRegisterUlong(this, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
+    StorPortWriteRegisterUlong64(this, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
+    StorPortWriteRegisterUlong64(this, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
 }
 
 inline BOOLEAN CNvmeDevice::IsControllerEnabled(bool barrier)
@@ -75,54 +61,37 @@ inline BOOLEAN CNvmeDevice::IsControllerReady(bool barrier)
 {
     NVME_CONTROLLER_STATUS csts = { 0 };
     ReadNvmeRegister(csts, barrier);
-    return (TRUE == csts.RDY)?TRUE:FALSE;
+    return (TRUE == csts.RDY && FALSE == csts.CFS) ? TRUE : FALSE;
 }
-
-CNvmeDevice::CNvmeDevice(){}
-CNvmeDevice::CNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg) 
-    : CNvmeDevice()
+NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
-    Setup(devext, cfg);
-}
-CNvmeDevice::~CNvmeDevice()
-{
-    Teardown();
-}
+    InitVars();
+    LoadRegistry();
+    GetPciBusData();
 
-void CNvmeDevice::Setup(PVOID devext, PSPCNVME_CONFIG cfg)
-{
-    bool map_ok = false;
+    PortCfg = pci;
+    AccessRangeCount = min(ACCESS_RANGE_COUNT, PortCfg->NumberOfAccessRanges);
+    RtlCopyMemory(AccessRanges, PortCfg->AccessRanges, 
+            sizeof(ACCESS_RANGE) * AccessRangeCount);
+    if(!MapCtrlRegisters())
+        return STATUS_NOT_MAPPED_DATA;
 
-    if(IsReady)
-        return;
-
-    DevExt = devext;
-    RtlCopyMemory(&Cfg, cfg, sizeof(SPCNVME_CONFIG));
-    PCI_COMMON_HEADER header = { 0 };
-    if (GetPciBusData(header))
-    {
-        map_ok = MapControllerRegisters(header);
-    }
-
-    if(map_ok)
-        ReadCtrlCapAndInfo();
-
-    IsReady = map_ok;
+    ReadCtrlCap();
+    IsReady = true;
+    return STATUS_SUCCESS;
 }
 void CNvmeDevice::Teardown()
 {
     if(!IsReady)
-        return ;
-
-    DisableController();
+        return;
     IsReady = false;
 }
 
-bool CNvmeDevice::EnableController()
+NTSTATUS CNvmeDevice::EnableController()
 {
     //if set CC.EN = 1 WHEN CSTS.RDY == 1 and CC.EN == 0, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 0 and CSTS.RDY == 0).
-    bool ok = WaitForCtrlerState(CtrlerTimeout, FALSE, FALSE);
+    bool ok = WaitForCtrlerState(DeviceTimeout, FALSE, FALSE);
     if (!ok)
         KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
 
@@ -143,36 +112,20 @@ bool CNvmeDevice::EnableController()
     cc.EN = 1;
     WriteNvmeRegister(cc);
 
-    return WaitForCtrlerState(CtrlerTimeout, 1);
+    ok = WaitForCtrlerState(DeviceTimeout, TRUE);
+
+    if(!ok)
+        return STATUS_INTERNAL_ERROR;
+    return STATUS_SUCCESS;
 }
-bool CNvmeDevice::DisableController()
+NTSTATUS CNvmeDevice::DisableController()
 {
     NVME_CONTROLLER_STATUS csts = { 0 };
     NVME_CONTROLLER_CONFIGURATION cc = { 0 };
 
-#if 0
-    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
-    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
-
-    if (csts.RDY == 0 && cc.EN == 0)
-        return;
-
-    //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
-    if (0 == csts.RDY && 1 == cc.EN)
-    {
-        //stall and wait our desired state become the correct value we want.
-        bool ok = WaitForCtrlerState(CtrlerTimeout, 0, 0);
-        //cc and csts not meet our desired state, the controller could have problem.
-        if (!ok)
-            KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)&cc, (ULONG_PTR)&csts, 0);
-    }
-    else if (1 == csts.RDY && 0 == cc.EN)   //abnormal state...
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)&cc, (ULONG_PTR)&csts, 0);
-#endif
-
     //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 1 and CSTS.RDY == 1).
-    bool ok = WaitForCtrlerState(CtrlerTimeout, 1, 1);
+    bool ok = WaitForCtrlerState(DeviceTimeout, 1, 1);
     if (!ok)
         KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
 
@@ -181,73 +134,13 @@ bool CNvmeDevice::DisableController()
     cc.SHN = NVME_CSTS_SHST_NO_SHUTDOWN;
     WriteNvmeRegister(cc);
 
-    return WaitForCtrlerState(CtrlerTimeout, 0);
+    ok = WaitForCtrlerState(DeviceTimeout, 0);
+    if (!ok)
+        return STATUS_INTERNAL_ERROR;
+    return STATUS_SUCCESS;
 }
 
-bool CNvmeDevice::GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* subdbl, 
-                                        PNVME_COMPLETION_QUEUE_HEAD_DOORBELL* cpldbl)
-{
-    if(qid >= MaxDblCount)
-        return false;
-
-    *subdbl = &Doorbells[qid].SubTail;
-    *cpldbl = &Doorbells[qid].CplHead;
-    return true;
-}
-
-bool CNvmeDevice::RegisterAdminQueuePair(CNvmeQueue* qp)
-{
-    if(IsControllerEnabled())
-    {
-        if(false == WaitForCtrlerState(CtrlerTimeout, FALSE, FALSE))
-            return false;
-    }
-
-    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
-    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
-    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
-
-    //tell controller: how many entries in my Admin Sub and Cpl Queue?
-    //these attributes should be write to controller ONLY WHEN CC.EN == 0.
-    aqa.ASQS = NVME_CONST::ADMIN_QUEUE_DEPTH;
-    aqa.ACQS = NVME_CONST::ADMIN_QUEUE_DEPTH;
-
-    PHYSICAL_ADDRESS subq_pa = { 0 };
-    PHYSICAL_ADDRESS cplq_pa = { 0 };
-    qp->GetQueueAddr(&subq_pa, &cplq_pa);
-    asq.AsUlonglong = subq_pa.QuadPart;
-    acq.AsUlonglong = cplq_pa.QuadPart;
-
-    WriteNvmeRegister(aqa, asq, acq);
-    return true;
-}
-bool CNvmeDevice::UnregisterAdminQueuePair()
-{
-    if (IsControllerEnabled())
-    {
-        if (false == WaitForCtrlerState(CtrlerTimeout, FALSE, FALSE))
-            return false;
-    }
-
-    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
-    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
-    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
-
-    WriteNvmeRegister(aqa, asq, acq);
-    return true;
-}
-bool CNvmeDevice::RegisterIoQueuePair(CNvmeQueue* qp)
-{
-    UNREFERENCED_PARAMETER(qp);
-    return false;
-}
-bool CNvmeDevice::UnregisterIoQueuePair(CNvmeQueue* qp)
-{
-    UNREFERENCED_PARAMETER(qp);
-    return false;
-}
-
-void CNvmeDevice::ReadCtrlCapAndInfo()
+void CNvmeDevice::ReadCtrlCap()
 {
     //CtrlReg->CAP.TO is timeout value in 500 ms.
     //It indicates the timeout worst case of Enabling/Disabling Controller.
@@ -255,43 +148,36 @@ void CNvmeDevice::ReadCtrlCapAndInfo()
     //We should convert it to micro-seconds for StorPortStallExecution() using.
     
     ReadNvmeRegister(NvmeVer);
-    ReadNvmeRegister(NvmeCap);
-    CtrlerTimeout = ((UCHAR)NvmeCap.TO) * (500 * 1000);
+    ReadNvmeRegister(CtrlCap);
+    DeviceTimeout = ((UCHAR)CtrlCap.TO) * (500 * 1000);
 
 }
-bool CNvmeDevice::MapControllerRegisters(PCI_COMMON_HEADER &header)
+bool CNvmeDevice::MapCtrlRegisters()
 {
-    if(NULL == DevExt)
-        return false;
-
     BOOLEAN in_iospace = FALSE;
-
     STOR_PHYSICAL_ADDRESS bar0 = { 0 };
-    CtrlReg = NULL;
-    Doorbells = NULL;
-    
-    //todo: use correct structure to parse and convert this physical address
-
+    PACCESS_RANGE range = AccessRanges;
+    INTERFACE_TYPE type = PortCfg->AdapterInterfaceType;
     //I got this mapping method by cracking stornvme.sys.
-    bar0.LowPart = (header.u.type0.BaseAddresses[0] & 0xFFFFC000);
-    bar0.HighPart = header.u.type0.BaseAddresses[1];
+    bar0.LowPart = (PciCfg.u.type0.BaseAddresses[0] & 0xFFFFC000);
+    bar0.HighPart = PciCfg.u.type0.BaseAddresses[1];
 
-    PACCESS_RANGE range = Cfg.AccessRanges;
-    for (ULONG i = 0; i < Cfg.AccessRangeCount; i++)
+    for (ULONG i = 0; i < AccessRangeCount; i++)
     {
         if(true == IsAddrEqual(range->RangeStart, bar0))
         {
             in_iospace = !range->RangeInMemory;
             PUCHAR addr = (PUCHAR)StorPortGetDeviceBase(
-                                    DevExt, PCIBus, 
-                                    Cfg.BusNumber, bar0, 
+                                    this, type, 
+                                    PortCfg->SystemIoBusNumber, bar0, 
                                     range->RangeLength, in_iospace);
             if (NULL != addr)
             {
-                CtrlReg = (PNVME_CONTROLLER_REGISTERS) addr;
-                Doorbells = (PDOORBELL_PAIR)(addr + 0x1000);
-                //todo: support more queues.
-                MaxDblCount = PAGE_SIZE / sizeof(DOORBELL_PAIR);
+                CtrlReg = (PNVME_CONTROLLER_REGISTERS)addr;
+                Bar0Size = range->RangeLength;
+                Doorbells = CtrlReg->Doorbells;
+                if(Bar0Size > PAGE_SIZE*2)
+                    PcieMsixTable = addr + (PAGE_SIZE * 2);
                 return true;
             }
         }
@@ -299,18 +185,18 @@ bool CNvmeDevice::MapControllerRegisters(PCI_COMMON_HEADER &header)
 
     return false;
 }
-bool CNvmeDevice::GetPciBusData(PCI_COMMON_HEADER& header)
+bool CNvmeDevice::GetPciBusData()
 {
-    ULONG size = sizeof(PCI_COMMON_HEADER);
-    ULONG status = StorPortGetBusData(DevExt, Cfg.InterfaceType,
-        Cfg.BusNumber, Cfg.SlotNumber, &header, size);
+    ULONG size = sizeof(PciCfg);
+    ULONG status = StorPortGetBusData(this, PortCfg->AdapterInterfaceType,
+        PortCfg->SystemIoBusNumber, PortCfg->SlotNumber, &PciCfg, size);
 
     //refer to MSDN StorPortGetBusData() to check why 2==status is error.
     if (2 == status || status != size)
         return false;
 
-    VendorID = header.VendorID;
-    DeviceID = header.DeviceID;
+    VendorID = PciCfg.VendorID;
+    DeviceID = PciCfg.DeviceID;
     return true;
 }
 
@@ -349,6 +235,48 @@ bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc
     }
 
     return true;
+}
+
+void CNvmeDevice::InitVars()
+{
+    CtrlReg = NULL;
+    PortCfg = NULL;
+    Doorbells = NULL;
+
+    VendorID = 0;
+    DeviceID = 0;
+    IsReady = FALSE;
+    State = NVME_STATE::STOP;
+    CpuCount = 0;
+    TotalNumaNodes = 0;
+    RegisteredIoQ = 0;
+    DesiredIoQ = 0;
+    DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;        //should be updated by CAP, unit in micro-seconds
+    StallDelay = NVME_CONST::SLEEP_TIME_US;
+
+    AccessRangeCount = 0;
+    RtlZeroMemory(AccessRanges, sizeof(ACCESS_RANGE)* ACCESS_RANGE_COUNT);
+
+    MaxTxSize = NVME_CONST::TX_SIZE;
+    MaxTxPages = NVME_CONST::TX_PAGES;
+    MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
+    MaxTargets = NVME_CONST::MAX_TARGETS;
+    MaxLu = NVME_CONST::MAX_LU;
+    MaxIoPerLU = NVME_CONST::MAX_IO_PER_LU;
+    MaxTotalIo = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
+
+    AdmQ = NULL;
+    RtlZeroMemory(IoQueue, sizeof(CNvmeQueue)* MAX_IO_QUEUE_COUNT);
+
+    RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
+    RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
+    RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
+    RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+    RtlZeroMemory(&NsData, sizeof(NVME_IDENTIFY_NAMESPACE_DATA)* NVME_CONST::SUPPORT_NAMESPACES);
+}
+void CNvmeDevice::LoadRegistry()
+{
+    //not implemented
 }
 
 #pragma endregion

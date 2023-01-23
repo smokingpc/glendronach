@@ -41,63 +41,101 @@ typedef struct _DOORBELL_PAIR{
 }DOORBELL_PAIR, *PDOORBELL_PAIR;
 
 
+//Using this class represents the DeviceExtension.
+//Because memory allocation in kernel is still C style,
+//the constructor and destructor are useless. They won't be called.
+//So using Setup() and Teardown() to replace them.
 class CNvmeDevice {
 public:
     static const ULONG BUGCHECK_BASE = 0x85157300;
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE+1;
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE+2;
 
-    static CNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
-    static void Delete(CNvmeDevice* ptr);
+    //static CNvmeDevice* Create(PVOID devext, PSPCNVME_CONFIG cfg);
+    //static void Delete(CNvmeDevice* ptr);
 
 public:
-    CNvmeDevice();
-    CNvmeDevice(PVOID devext, PSPCNVME_CONFIG cfg);
-    ~CNvmeDevice();
-
-    void Setup(PVOID devext, PSPCNVME_CONFIG cfg);
+    NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     void Teardown();
 
-    bool EnableController();
-    bool DisableController();
+    NTSTATUS EnableController();
+    NTSTATUS DisableController();
 
-    inline bool GetAdmDoorbell(PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL *subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL *cpldbl)
-    { return GetDoorbell(0, subdbl, cpldbl); }
-    //qid == 0 is always AdminQ. IoQueue QID is 1 based.
-    bool GetDoorbell(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL* subdbl, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL* cpldbl);
+    NTSTATUS InitController();      //for FindAdapter
+    NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
-    //void UpdateIdentifyData(PNVME_IDENTIFY_CONTROLLER_DATA data);
-    bool RegisterAdminQueuePair(CNvmeQueue* qp);
-    bool UnregisterAdminQueuePair();
-    bool RegisterIoQueuePair(CNvmeQueue* qp);
-    bool UnregisterIoQueuePair(CNvmeQueue* qp);
+    NTSTATUS RegisterIoQueue();
+    NTSTATUS UnregisterIoQueue();
 
+    NTSTATUS IdentifyController();
+    NTSTATUS IdentifyNamespace();
+
+    NTSTATUS SetInterruptCoalescing();
+    NTSTATUS SetAsyncEvent();
+    NTSTATUS SetArbitration();
+    NTSTATUS SetSyncHostTime();
+    NTSTATUS SetPowerManagement();
+
+    NTSTATUS RegisterAdmQ();
+    NTSTATUS UnregisterAdmQ();
+    NTSTATUS AddIoQ();      //create one more IO queue and register it
+    NTSTATUS RegisterIoQ();
+    NTSTATUS UnregisterIoQ();
+    NTSTATUS RemoveIoQ();   //unregister and delete one IO queue.
 private:
-    PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
-    NVME_VERSION NvmeVer = {0};
-    NVME_CONTROLLER_CAPABILITIES NvmeCap = {0};
-    //NVME_IDENTIFY_CONTROLLER_DATA       IdentData = { 0 };
-    PDOORBELL_PAIR                      Doorbells = NULL;
+    PNVME_CONTROLLER_REGISTERS          CtrlReg;
+    PPORT_CONFIGURATION_INFORMATION     PortCfg;
+    ULONG *Doorbells;
+    PVOID PcieMsixTable;
+    CNvmeQueue* AdmQ;
+    CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
 
-    ULONG BusNumber = NVME_INVALID_ID;
-    ULONG SlotNumber = NVME_INVALID_ID;
-    
-    PVOID DevExt = NULL;      //StorPort Device Extension 
-    ULONG MaxDblCount = 0;
-
-    ULONG CtrlerTimeout = 2000 * NVME_CONST::STALL_TIME_US;        //should be updated by CAP, unit in micro-seconds
-    ULONG StallDelay = NVME_CONST::SLEEP_TIME_US;
-    CNvmeQueue  AdminQueue;
-    CNvmeQueue  *IoQueue[MAX_IO_QUEUE_COUNT] = {NULL};
-
-    SPCNVME_CONFIG  Cfg;
     USHORT  VendorID;
     USHORT  DeviceID;
-    bool IsReady = false;
-    
-    void ReadCtrlCapAndInfo();      //load capability and informations AFTER register address mapped.
-    bool MapControllerRegisters(PCI_COMMON_HEADER& header);
-    bool GetPciBusData(PCI_COMMON_HEADER& header);
+    BOOLEAN IsReady = FALSE;
+    NVME_STATE State;
+    ULONG CpuCount;
+    ULONG TotalNumaNodes;
+    ULONG RegisteredIoQ = 0;
+    ULONG DesiredIoQ = 0;
+    ULONG DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;        //should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay = NVME_CONST::SLEEP_TIME_US;
+
+    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];         //AccessRange from miniport HwFindAdapter.
+    ULONG AccessRangeCount;
+    ULONG Bar0Size;
+    ULONG MaxTxSize;
+    ULONG MaxTxPages;
+    UCHAR MaxNamespaces;
+    UCHAR MaxTargets;
+    UCHAR MaxLu;
+    ULONG MaxIoPerLU;
+    ULONG MaxTotalIo;
+
+    //Following are huge data.
+    //for more convenient windbg debugging, I put them on tail of class data.
+    PCI_COMMON_CONFIG                   PciCfg;
+    NVME_VERSION                        NvmeVer;
+    NVME_CONTROLLER_CAPABILITIES        CtrlCap;
+    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
+    NVME_IDENTIFY_NAMESPACE_DATA NsData[NVME_CONST::SUPPORT_NAMESPACES];
+
+    void InitVars();
+    void LoadRegistry();
+
+    NTSTATUS CreateAdmQ();
+    NTSTATUS RegisterAdmQ();
+    NTSTATUS UnregisterAdmQ();
+    NTSTATUS DeleteAdmQ();
+
+    NTSTATUS AddIoQ();      //create one more IO queue
+    NTSTATUS RegisterIoQ();
+    NTSTATUS UnregisterIoQ();
+    NTSTATUS RemoveIoQ();   //delete last one IO queue. If it's still registered this function return fail.
+
+    void ReadCtrlCap();      //load capability and informations AFTER register address mapped.
+    bool MapCtrlRegisters();
+    bool GetPciBusData();
 
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy);
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc_en);

@@ -53,7 +53,7 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.FeatureSupport = STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES | STOR_FEATURE_NVME;
 
     /* Set required extension sizes. */
-    init_data.DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
+    init_data.DeviceExtensionSize = sizeof(CNvmeDevice);
     init_data.SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
 
     // Call StorPortInitialize to register with HwInitData

@@ -34,7 +34,6 @@ static UCHAR SetScsiSenseData(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 
     return SCSISTAT_CONDITION_MET;
 }
-#endif
 
 void InitInternalSrbExt(PVOID devext, PSPCNVME_SRBEXT srbext)
 {
@@ -52,7 +51,6 @@ void InitInternalSrbExt(PVOID devext, PSPCNVME_SRBEXT srbext)
     srbext->ScsiQTag = INVALID_SRB_QUEUETAG;
     srbext->InitOK = true;
 }
-
 void InitSrbExt(PVOID devext, PSPCNVME_SRBEXT srbext, PSTORAGE_REQUEST_BLOCK srb)
 {
     //already init in BuildIo, no need to init again in StartIo
@@ -93,6 +91,7 @@ PSPCNVME_SRBEXT InitAndGetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 
     return srbext;
 }
+
 void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status)
 {
     UCHAR scsi_status = SCSISTAT_GOOD;
@@ -161,6 +160,7 @@ end:
     SrbSetScsiStatus(srb, scsi_status);
     SrbSetSrbStatus(srb, srb_status | SRB_STATUS_AUTOSENSE_VALID);
 }
+#endif
 
 UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status)
 {

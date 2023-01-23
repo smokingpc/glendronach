@@ -1,26 +1,20 @@
 #include "pch.h"
 
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS status)
-{}
+{
+    return SRB_STATUS_INVALID_REQUEST;
+}
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS status)
-{}
+{
+    return SRB_STATUS_INVALID_REQUEST;
+}
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS status)
-{}
+{
+    return SRB_STATUS_INVALID_REQUEST;
+}
 
 
 #if 0
-
-//
-//  Status Code Type (SCT)
-//
-typedef enum {
-
-    NVME_STATUS_TYPE_GENERIC_COMMAND = 0,
-    NVME_STATUS_TYPE_COMMAND_SPECIFIC = 1,
-    NVME_STATUS_TYPE_MEDIA_ERROR = 2,
-    NVME_STATUS_TYPE_VENDOR_SPECIFIC = 7,
-
-} NVME_STATUS_TYPES;
 
 //
 //  Status Code (SC) of NVME_STATUS_TYPE_GENERIC_COMMAND
