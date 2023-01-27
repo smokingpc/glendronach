@@ -67,13 +67,16 @@
     <ClCompile Include="SrbStatus_Translator.cpp">
       <Filter>SRB_and_SRBEXT</Filter>
     </ClCompile>
-    <ClCompile Include="NvmeCommander.cpp">
+    <ClCompile Include="NvmeCmdBuilder.cpp">
       <Filter>Nvme_Device</Filter>
     </ClCompile>
     <ClCompile Include="DriverEntry.cpp" />
     <ClCompile Include="MiniportFunctions.cpp" />
     <ClCompile Include="SrbExt.cpp">
       <Filter>SRB_and_SRBEXT</Filter>
+    </ClCompile>
+    <ClCompile Include="NvmePrpBuilder.cpp">
+      <Filter>Nvme_Device</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -116,7 +119,7 @@
     <ClInclude Include="NvmeEnums.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
-    <ClInclude Include="NvmeCommander.h">
+    <ClInclude Include="NvmeCmdBuilder.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
     <ClInclude Include="Constants.h" />
@@ -127,6 +130,9 @@
     <ClInclude Include="StateMachine.h" />
     <ClInclude Include="SrbExt.h">
       <Filter>SRB_and_SRBEXT</Filter>
+    </ClInclude>
+    <ClInclude Include="NvmePrpBuilder.h">
+      <Filter>Nvme_Device</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

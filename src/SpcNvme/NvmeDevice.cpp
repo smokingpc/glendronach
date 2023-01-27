@@ -26,6 +26,18 @@ inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CAPABILITIES& cap, boo
         MemoryBarrier();
     cap.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->CAP.AsUlonglong);
 }
+inline void CNvmeDevice::ReadNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS& asq,
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS& acq,
+    bool barrier)
+{
+    if (barrier)
+        MemoryBarrier();
+
+    aqa.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->AQA.AsUlong);
+    asq.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->ASQ.AsUlonglong);
+    acq.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->ACQ.AsUlonglong);
+}
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
     if (barrier)
@@ -63,6 +75,18 @@ inline BOOLEAN CNvmeDevice::IsControllerReady(bool barrier)
     ReadNvmeRegister(csts, barrier);
     return (TRUE == csts.RDY && FALSE == csts.CFS) ? TRUE : FALSE;
 }
+inline void CNvmeDevice::GetAdmQueueDbl(PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL& sub, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL& cpl)
+{
+    if(NULL == Doorbells)
+    {
+        sub = NULL;
+        cpl = NULL;
+        return;
+    }
+    sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[0];
+    cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[1];
+}
+
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     InitVars();
@@ -139,6 +163,104 @@ NTSTATUS CNvmeDevice::DisableController()
         return STATUS_INTERNAL_ERROR;
     return STATUS_SUCCESS;
 }
+NTSTATUS CNvmeDevice::InitController(bool wait)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    status = DisableController();
+    if(!NT_SUCCESS(status))
+        return status;
+    status = CreateAdmQ();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = RegisterAdmQ();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = EnableController();
+
+    return status;
+}
+NTSTATUS CNvmeDevice::RestartController()
+{
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
+{
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT temp = srbext;
+    if(NULL == srbext)
+    {
+        temp = new SPCNVME_SRBEXT();
+        temp->Init(this, NULL);
+        srbext_ptr.Reset(temp);
+    }
+
+
+}
+
+NTSTATUS CNvmeDevice::CreateAdmQ()
+{
+    if(NULL != AdmQueue)
+        return STATUS_ALREADY_INITIALIZED;
+
+    QUEUE_PAIR_CONFIG cfg = {0};
+    cfg.Depth = AdmDepth;
+    cfg.QID = 0;
+    cfg.DevExt = this;
+    cfg.NumaNode = MM_ANY_NODE_OK;
+    cfg.Type = QUEUE_TYPE::ADM_QUEUE;
+    GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
+    AdmQueue = new CNvmeQueue(&cfg);
+}
+NTSTATUS CNvmeDevice::RegisterAdmQ()
+{
+//register AdminQueue should be done in csts.RDY==0(cc.EN == 0)
+    if(IsControllerReady() || NULL == AdmQueue)
+    {
+        NVME_CONTROLLER_STATUS csts = { 0 };
+        ReadNvmeRegister(csts, true);
+        KeBugCheckEx(BUGCHECK_INVALID_STATE, (ULONG_PTR) this, 0, 0, 0);
+    }
+
+    PHYSICAL_ADDRESS subq = { 0 };
+    PHYSICAL_ADDRESS cplq = { 0 };
+    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
+    AdmQueue->GetQueueAddr(&subq, &cplq);
+
+    aqa.ASQS = AdmDepth - 1;
+    aqa.ACQS = AdmDepth - 1;
+    asq.ASQB = subq.QuadPart;
+    acq.ACQB = cplq.QuadPart;
+    WriteNvmeRegister(aqa, asq, acq);
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::UnregisterAdmQ()
+{
+    if (IsControllerReady())
+    {
+        NVME_CONTROLLER_STATUS csts = { 0 };
+        ReadNvmeRegister(csts, true);
+        KeBugCheckEx(BUGCHECK_INVALID_STATE, (ULONG_PTR)this, 0, 0, 0);
+    }
+
+    NVME_ADMIN_QUEUE_ATTRIBUTES aqa = { 0 };
+    NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS asq = { 0 };
+    NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
+    WriteNvmeRegister(aqa, asq, acq);
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::DeleteAdmQ()
+{
+    if(NULL == AdmQueue)
+        return STATUS_MEMORY_NOT_ALLOCATED;
+
+    AdmQueue->Teardown();
+    delete AdmQueue;
+    AdmQueue = NULL;
+    return STATUS_SUCCESS;
+}
 
 void CNvmeDevice::ReadCtrlCap()
 {
@@ -177,7 +299,7 @@ bool CNvmeDevice::MapCtrlRegisters()
                 Bar0Size = range->RangeLength;
                 Doorbells = CtrlReg->Doorbells;
                 if(Bar0Size > PAGE_SIZE*2)
-                    PcieMsixTable = addr + (PAGE_SIZE * 2);
+                    MsixVectors = (MsixVector*)(addr + (PAGE_SIZE * 2));
                 return true;
             }
         }
@@ -199,7 +321,6 @@ bool CNvmeDevice::GetPciBusData()
     DeviceID = PciCfg.DeviceID;
     return true;
 }
-
 bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
 {
     ULONG elapsed = 0;
@@ -236,7 +357,6 @@ bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc
 
     return true;
 }
-
 void CNvmeDevice::InitVars()
 {
     CtrlReg = NULL;
@@ -264,8 +384,9 @@ void CNvmeDevice::InitVars()
     MaxLu = NVME_CONST::MAX_LU;
     MaxIoPerLU = NVME_CONST::MAX_IO_PER_LU;
     MaxTotalIo = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
-
-    AdmQ = NULL;
+    AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
+    AdmQueue = NULL;
     RtlZeroMemory(IoQueue, sizeof(CNvmeQueue)* MAX_IO_QUEUE_COUNT);
 
     RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));

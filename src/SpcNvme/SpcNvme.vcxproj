@@ -251,8 +251,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ISR_and_DPC.cpp" />
+    <ClCompile Include="NvmePrpBuilder.cpp" />
     <ClCompile Include="SrbExt.cpp" />
-    <ClCompile Include="NvmeCommander.cpp" />
+    <ClCompile Include="NvmeCmdBuilder.cpp" />
     <ClCompile Include="ScsiHandler_CDB10.cpp" />
     <ClCompile Include="ScsiHandler_CDB12.cpp" />
     <ClCompile Include="ScsiHandler_CDB16.cpp" />
@@ -269,9 +270,10 @@
     <ClCompile Include="BuildIo_Handler.cpp" />
     <ClInclude Include="BuildIo_Handlers.h" />
     <ClInclude Include="ISR_and_DPC.h" />
-    <ClInclude Include="NvmeCommander.h" />
+    <ClInclude Include="NvmeCmdBuilder.h" />
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
+    <ClInclude Include="NvmePrpBuilder.h" />
     <ClInclude Include="ScsiHandler_CDB10.h" />
     <ClInclude Include="ScsiHandler_CDB12.h" />
     <ClInclude Include="ScsiHandler_CDB16.h" />

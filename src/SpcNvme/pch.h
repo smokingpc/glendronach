@@ -21,7 +21,8 @@ EXTERN_C_END
 #include "NvmeQueue.h"
 #include "NvmeDevice.h"
 #include "MiniportFunctions.h"
-#include "NvmeCommander.h"
+#include "NvmePrpBuilder.h"
+#include "NvmeCmdBuilder.h"
 
 #include "BuildIo_Handlers.h"
 #include "StartIo_Handler.h"

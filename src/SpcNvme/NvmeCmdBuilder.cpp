@@ -1,45 +1,18 @@
 #include "pch.h"
-#if 0
-NTSTATUS WaitAndPollCompletion(OUT NVME_COMMAND_STATUS &nvme_status, PSPCNVME_DEVEXT devext, CNvmeQueue *qp, PNVME_COMMAND cmd)
+
+//to build NVME_COMMAND for IdentifyController command
+void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, USHORT cid, PNVME_IDENTIFY_CONTROLLER_DATA data)
 {
-    KIRQL irql;
-    StorPortGetCurrentIrql((PVOID)devext, &irql);
-    ASSERT(irql == PASSIVE_LEVEL);
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
+    cmd->CDW0.CID = cid;
+    cmd->NSID = 1;
+    cmd->u.IDENTIFY.CDW10.CNS = IDENTIFY_CNS::IDENT_CONTROLLER;
+    cmd->u.IDENTIFY.CDW10.CNTID = 0;
 
-    //wait loop to poll completion
-    NVME_COMPLETION_ENTRY cqe = { 0 };        //cqe => completion queue entry
-    int wait_loop = 5;
-    PVOID ctx = NULL;
-    CMD_CTX_TYPE ctx_type;
-
-    bool ok = qp->CompleteCmd(&cqe, ctx, ctx_type);
-    while (!ok && wait_loop > 0)
-    {
-        wait_loop--;
-        StorPortStallExecution(NVME_CONST::SLEEP_TIME_US);
-        PVOID ctx = NULL;
-        CMD_CTX_TYPE ctx_type;
-        ok = qp->CompleteCmd(&cqe, ctx, ctx_type);
-    }
-
-    if (!ok)
-        return STATUS_TIMEOUT;
-
-    //after submit cmd, NVME_COMMAND::CDW0::CID is updated in CNvmeQueuePair.
-    //so use it to identify completion entry.
-    if(cmd->CDW0.CID == cqe.DW3.CID)
-    {
-        nvme_status = cqe.DW3.Status;
-        return STATUS_SUCCESS;
-    }
-    else
-    {
-        nvme_status.SC = NVME_STATUS_RESERVED;
-        nvme_status.SCT = NVME_STATUS_TYPE_GENERIC_COMMAND;
-        return STATUS_UNSUCCESSFUL;
-    }
+    BuildPrp(cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
 }
-#endif
+
+#if 0
 NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -70,7 +43,6 @@ NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 //    NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
 //    return status;
 }
-
 NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -102,7 +74,6 @@ NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
     //NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
     //return status;
 }
-
 NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -154,7 +125,6 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 
     //return status;
 }
-
 NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(wait);
@@ -163,7 +133,6 @@ NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait)
     ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(wait);
@@ -172,7 +141,6 @@ NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait)
     ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS NvmeRegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -183,7 +151,6 @@ NTSTATUS NvmeRegisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS NvmeUnregisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(wait);
@@ -192,7 +159,6 @@ NTSTATUS NvmeUnregisterIoQueues(PSPCNVME_DEVEXT devext, bool wait)
     ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(wait);
@@ -208,7 +174,6 @@ NTSTATUS NvmeSetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS NvmeGetFeatures(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(wait);
@@ -217,7 +182,6 @@ NTSTATUS NvmeGetFeatures(PSPCNVME_DEVEXT devext, bool wait)
     ASSERT(irql == PASSIVE_LEVEL);
     return STATUS_NOT_IMPLEMENTED;
 }
-
 NTSTATUS NvmeIdentifyController(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -261,7 +225,6 @@ NTSTATUS NvmeIdentifyController(PSPCNVME_DEVEXT devext, bool wait)
 
     //return status;
 }
-
 NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
 {
     UNREFERENCED_PARAMETER(devext);
@@ -305,3 +268,4 @@ NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
 
     //return status;
 }
+#endif

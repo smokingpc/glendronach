@@ -26,6 +26,12 @@ typedef enum _CMD_CTX_TYPE
     SRBEXT = 3
 }CMD_CTX_TYPE;
 
+typedef enum IDENTIFY_CNS : UCHAR
+{
+    IDENT_NAMESPACE = 0,
+    IDENT_CONTROLLER = 1,
+
+};
 //typedef enum _USE_STATE
 //{
 //    FREE = 0,
