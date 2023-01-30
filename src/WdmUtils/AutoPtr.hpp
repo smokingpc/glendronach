@@ -88,7 +88,7 @@ namespace SPC
 
                 if (old_ptr)
                 {
-                    this->Deleter()(old_ptr);
+                    this->Deleter(old_ptr);
                 }
             }
 

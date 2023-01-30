@@ -274,6 +274,7 @@
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
     <ClInclude Include="NvmePrpBuilder.h" />
+    <ClInclude Include="PCIe_Msix.h" />
     <ClInclude Include="ScsiHandler_CDB10.h" />
     <ClInclude Include="ScsiHandler_CDB12.h" />
     <ClInclude Include="ScsiHandler_CDB16.h" />

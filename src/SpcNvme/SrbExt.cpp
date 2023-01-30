@@ -12,7 +12,7 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     DevExt = (CNvmeDevice*)devext;
     Srb = srb;
     SrbStatus = SRB_STATUS_SUCCESS;
-    RtlZeroMemory(&SrcCmd, sizeof(NVME_COMMAND));
+    RtlZeroMemory(&NvmeCmd, sizeof(NVME_COMMAND));
 
     if(NULL != srb)
     {

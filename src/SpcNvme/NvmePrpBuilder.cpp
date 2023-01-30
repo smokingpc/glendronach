@@ -2,6 +2,10 @@
 
 bool BuildPrp(PNVME_COMMAND cmd, PVOID buffer, size_t buf_size)
 {
+    UNREFERENCED_PARAMETER(cmd);
+    UNREFERENCED_PARAMETER(buffer);
+    UNREFERENCED_PARAMETER(buf_size);
+
     //refer to NVMe 1.3 chapter 4.3
     //Physical Region Page Entry and List
     //The PBAO of PRP entry should align to DWORD.
@@ -16,5 +20,5 @@ bool BuildPrp(PNVME_COMMAND cmd, PVOID buffer, size_t buf_size)
     //      fill PRP1 with 1st part, and fill PRP2 with 2nd part which align to next page.
     //  else if buffer cross 2 PAGE boundary and above, then
     //      fill PRP1, fill PRP2 as PRPList(2 addr)
-
+    return false;
 }

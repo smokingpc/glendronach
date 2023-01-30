@@ -134,5 +134,8 @@
     <ClInclude Include="NvmePrpBuilder.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
+    <ClInclude Include="PCIe_Msix.h">
+      <Filter>PCIe_and_MSIX</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

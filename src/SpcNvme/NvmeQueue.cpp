@@ -20,12 +20,10 @@ static inline void WriteDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL d
     MemoryBarrier();
     StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
 }
-
 static inline bool IsValidQid(ULONG qid)
 {
     return (qid != NVME_INVALID_QID);
 }
-
 #pragma region ======== class CNvmeQueue ========
 CNvmeQueue::CNvmeQueue()
 {
@@ -95,46 +93,47 @@ void CNvmeQueue::Teardown()
     DeallocQueueBuffer();
     History.Teardown();
 }
-
+USHORT CNvmeQueue::GetQueueID(){return QueueID;}
+USHORT CNvmeQueue::GetQueueDepth(){return this->Depth;}
 //this method is used for internal command
-NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl)
-{
-    NTSTATUS status = STATUS_SUCCESS;
-    //TODO: 
-    //1. disable Interrupt by modifying VectorControl register in pCtrlRegister+0x2000
-    // (4th DWORD of each entry, bit 0?)
-    //2. process completion queue in loop
-    //3. after desired result comes back, enable msix interrupt again.
-    status = SubmitCmd(srbext);
-    if(!NT_SUCCESS(status))
-    {
-        //todo: log
-        return status;
-    }
-
-    //wait
-    ULONG interval = NVME_CONST::STALL_TIME_US;; //in micro-seconds
-    int loop = wait_us / NVME_CONST::STALL_TIME_US;
-    if ((wait_us % NVME_CONST::STALL_TIME_US) > 0)
-        loop++;
-
-    while(loop >= 0)
-    {
-        ULONG polled = 0;
-        StorPortStallExecution(interval);
-        if(poll_cpl)
-            CompleteCmd(0, polled);
-
-        if(srbext->SrbStatus != SRB_STATUS_PENDING)
-            return STATUS_SUCCESS;
-        loop--;
-    }
-
-    if (srbext->SrbStatus != SRB_STATUS_PENDING)
-        return STATUS_SUCCESS;
-
-    return STATUS_TIMEOUT;
-}
+//NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl)
+//{
+//    NTSTATUS status = STATUS_SUCCESS;
+//    //TODO: 
+//    //1. disable Interrupt by modifying VectorControl register in pCtrlRegister+0x2000
+//    // (4th DWORD of each entry, bit 0?)
+//    //2. process completion queue in loop
+//    //3. after desired result comes back, enable msix interrupt again.
+//    status = SubmitCmd(srbext);
+//    if(!NT_SUCCESS(status))
+//    {
+//        //todo: log
+//        return status;
+//    }
+//
+//    //wait
+//    ULONG interval = NVME_CONST::STALL_TIME_US;; //in micro-seconds
+//    int loop = wait_us / NVME_CONST::STALL_TIME_US;
+//    if ((wait_us % NVME_CONST::STALL_TIME_US) > 0)
+//        loop++;
+//
+//    while(loop >= 0)
+//    {
+//        ULONG polled = 0;
+//        StorPortStallExecution(interval);
+//        if(poll_cpl)
+//            CompleteCmd(0, polled);
+//
+//        if(srbext->SrbStatus != SRB_STATUS_PENDING)
+//            return STATUS_SUCCESS;
+//        loop--;
+//    }
+//
+//    if (srbext->SrbStatus != SRB_STATUS_PENDING)
+//        return STATUS_SUCCESS;
+//
+//    return STATUS_TIMEOUT;
+//}
 
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
 {
@@ -144,7 +143,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
         return STATUS_DEVICE_NOT_READY;
 
     PNVME_COMMAND cmd = &SubQ_VA[SubTail];
-    PNVME_COMMAND src_cmd = &srbext->SrcCmd;
+    PNVME_COMMAND src_cmd = &srbext->NvmeCmd;
     CID++;
     src_cmd->CDW0.CID = CID;
     status = History.Push(CID, srbext);
@@ -324,112 +323,6 @@ void CNvmeQueue::DeallocQueueBuffer()
     this->BufferSize = 0;
 }
 #pragma endregion
-
-#if 0
-#pragma region ======== class CNvmeSubmitQueue ========
-CNvmeSubmitQueue::CNvmeSubmitQueue()
-{}
-CNvmeSubmitQueue::CNvmeSubmitQueue(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
-    :CNvmeSubmitQueue()
-{
-    Setup(parent, depth, buffer, size);
-}
-CNvmeSubmitQueue::~CNvmeSubmitQueue()
-{
-    Teardown();
-}
-bool CNvmeSubmitQueue::Setup(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
-{
-    ULONG mapped_size = 0;
-    this->Parent = parent;
-    this->Depth = depth;
-    this->RawBuffer = buffer;
-    this->RawBufferSize = size;
-    RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
-    this->QueuePA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->RawBuffer, &mapped_size);
-    this->Cmds = (PNVME_COMMAND)this->RawBuffer;
-
-    return true;
-}
-void CNvmeSubmitQueue::Teardown()
-{
-    if (NULL != this->RawBuffer)
-        StorPortFreeContiguousMemorySpecifyCache(this->DevExt, this->RawBuffer, this->RawBufferSize, MmCached);
-
-    this->RawBuffer = NULL;
-    this->Cmds = NULL;
-    this->QueuePA.QuadPart = 0;
-}
-CNvmeSubmitQueue::operator STOR_PHYSICAL_ADDRESS() const
-{
-    return this->QueuePA;
-}
-bool CNvmeSubmitQueue::Submit(ULONG sub_tail, PNVME_COMMAND new_cmd)
-{
-    NVME_COMMAND* cmd_slot = &Cmds[sub_tail];
-    StorPortCopyMemory((PVOID)cmd_slot, new_cmd, sizeof(NVME_COMMAND));
-    return true;
-}
-#pragma endregion
-#pragma region ======== class CNvmeCompleteQueue ========
-CNvmeCompleteQueue::CNvmeCompleteQueue()
-{}
-CNvmeCompleteQueue::CNvmeCompleteQueue(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
-    :CNvmeCompleteQueue()
-{
-    Setup(parent, depth, buffer, size);
-}
-CNvmeCompleteQueue::~CNvmeCompleteQueue()
-{
-    Teardown();
-}
-bool CNvmeCompleteQueue::Setup(class CNvmeQueue* parent, USHORT depth, PVOID buffer, size_t size)
-{
-    ULONG mapped_size = 0;
-    this->Parent = parent;
-    this->Depth = depth;
-    this->PhaseTag = NVME_CONST::CPL_INIT_PHASETAG;
-    this->RawBuffer = buffer;
-    this->RawBufferSize = size;
-    RtlZeroMemory(this->RawBuffer, this->RawBufferSize);
-    this->QueuePA = StorPortGetPhysicalAddress(this->DevExt, NULL, this->RawBuffer, &mapped_size);
-    this->Entries = (PNVME_COMPLETION_ENTRY)this->RawBuffer;
-    return true;
-}
-void CNvmeCompleteQueue::Teardown()
-{
-    if (NULL != this->RawBuffer)
-        StorPortFreeContiguousMemorySpecifyCache(this->DevExt, this->RawBuffer, this->RawBufferSize, MmCached);
-
-    this->RawBuffer = NULL;
-    this->Entries = NULL;
-    this->QueuePA.QuadPart = 0;
-}
-CNvmeCompleteQueue::operator STOR_PHYSICAL_ADDRESS() const
-{
-    return this->QueuePA;
-}
-bool CNvmeCompleteQueue::PopCplEntry(ULONG *cpl_head, PNVME_COMPLETION_ENTRY entry)
-{
-    PNVME_COMPLETION_ENTRY cpl = &this->Entries[*cpl_head];
-
-    //Each round(visit all entries in queue) of traversing entire CplQ, 
-    //the phase tag will be changed by NVMe device.
-    //NVMe device will set cpl->DW3.Status.P to 1 in 1st rount , set to 0 in 2nd round, and so on.
-    //Host driver should check phase to make sure "is this entry a new completed entry?".
-    //Refer to NVMe spec 1.3 , section 4.6 , Figure 28: Completion Queue Entry: DW 3
-    if(PhaseTag != cpl->DW3.Status.P)
-        return false;
-    
-    StorPortCopyMemory(entry, cpl, sizeof(NVME_COMPLETION_ENTRY));
-    *cpl_head = (*cpl_head + 1) % this->Depth;
-    if(0 == *cpl_head)
-        PhaseTag = !PhaseTag;
-    
-    return true;
-}
-#pragma endregion
-#endif
 
 #pragma region ======== class CCmdHistory ========
 CCmdHistory::CCmdHistory()

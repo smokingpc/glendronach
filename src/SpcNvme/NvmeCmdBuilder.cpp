@@ -1,17 +1,36 @@
 #include "pch.h"
 
 //to build NVME_COMMAND for IdentifyController command
-void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, USHORT cid, PNVME_IDENTIFY_CONTROLLER_DATA data)
+void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, PNVME_IDENTIFY_CONTROLLER_DATA data)
 {
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    cmd->CDW0.CID = cid;
+    cmd->CDW0.CID = 0;
     cmd->NSID = 1;
     cmd->u.IDENTIFY.CDW10.CNS = IDENTIFY_CNS::IDENT_CONTROLLER;
     cmd->u.IDENTIFY.CDW10.CNTID = 0;
 
     BuildPrp(cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
 }
+void BuildCmd_RegisterIoSubQ(PNVME_COMMAND cmd, CNvmeQueue *queue)
+{
+    PHYSICAL_ADDRESS addr1 = {0};
+    PHYSICAL_ADDRESS addr2 = { 0 };
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    queue->GetQueueAddr(&addr1, &addr2);
 
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_CREATE_IO_SQ;
+    cmd->PRP1 = (ULONGLONG)addr1.QuadPart;
+    cmd->u.CREATEIOSQ.CDW10.QID = queue->GetQueueID();
+    cmd->u.CREATEIOSQ.CDW10.QSIZE = queue->GetQueueDepth();
+    cmd->u.CREATEIOSQ.CDW11.CQID = queue->GetQueueID();
+    cmd->u.CREATEIOSQ.CDW11.PC = 1;
+}
+void BuildCmd_RegisterIoCplQ(PNVME_COMMAND cmd, CNvmeQueue* queue)
+{}
+void BuildCmd_UnRegisterIoSubQ(PNVME_COMMAND cmd, CNvmeQueue* queue)
+{}
+void BuildCmd_UnRegisterIoCplQ(PNVME_COMMAND cmd, CNvmeQueue* queue)
+{}
 #if 0
 NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 {

@@ -17,6 +17,7 @@ EXTERN_C_END
 #include "StateMachine.h"
 #include "NvmeConstants.h"
 #include "NvmeEnums.h"
+#include "PCIe_Msix.h"
 #include "SrbExt.h"
 #include "NvmeQueue.h"
 #include "NvmeDevice.h"

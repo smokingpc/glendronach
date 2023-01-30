@@ -1,15 +1,24 @@
 #include "pch.h"
 
 
-BOOLEAN NvmeMsixISR(IN PVOID dev_ext, IN ULONG msgid)
+BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
 {
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     ULONG irql = 0;
     ULONG status = STOR_STATUS_SUCCESS;
     BOOLEAN ok = FALSE;
-    status = StorPortAcquireMSISpinLock(dev_ext, msgid, &irql);
-    ok = StorPortIssueDpc(dev_ext, &devext->NvmeDPC, NULL, NULL);
-    status = StorPortReleaseMSISpinLock(dev_ext, msgid, irql);
+    status = StorPortAcquireMSISpinLock(devext, msgid, &irql);
+    //todo: log if acquire MSI lock failed.
+
+    ok = StorPortIssueDpc(devext, &nvme->QueueCplDpc, (PVOID) msgid, NULL);
+
+    status = StorPortReleaseMSISpinLock(devext, msgid, irql);
+    //todo: log if release MSI lock failed.
+
+    if (!ok)
+    {
+        //todo: log
+    }
 
     //Todo: add debug print or log if IssueDPC failed.
 
@@ -18,16 +27,16 @@ BOOLEAN NvmeMsixISR(IN PVOID dev_ext, IN ULONG msgid)
 
 VOID NvmeDpcRoutine(
     _In_ PSTOR_DPC dpc,
-    _In_ PVOID dev_ext,
+    _In_ PVOID devext,
     _In_opt_ PVOID sysarg1,
     _In_opt_ PVOID sysarg2
 )
 {
     UNREFERENCED_PARAMETER(dpc);
-    UNREFERENCED_PARAMETER(dev_ext);
-    UNREFERENCED_PARAMETER(sysarg1);
     UNREFERENCED_PARAMETER(sysarg2);
-    //PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
 
-    //process completion of NVMe
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
+    ULONG msgid = PtrToUlong(sysarg1);
+
+    nvme->DoQueueCplByDPC(msgid);
 }

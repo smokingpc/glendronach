@@ -71,7 +71,8 @@ public:
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);
     void GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
-
+    USHORT GetQueueID();
+    USHORT GetQueueDepth();
 private:
     PVOID DevExt = NULL;
     USHORT QueueID = NVME_INVALID_QID;

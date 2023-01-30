@@ -10,7 +10,7 @@ typedef struct _SPCNVME_SRBEXT
     PSTORAGE_REQUEST_BLOCK Srb;
     UCHAR SrbStatus;
     BOOLEAN InitOK;
-    NVME_COMMAND SrcCmd;
+    NVME_COMMAND NvmeCmd;
     ULONG FuncCode;         //SRB Function Code
     ULONG ScsiQTag;
     PCDB Cdb;
@@ -28,3 +28,4 @@ UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status);
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS status);
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS status);
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS status);
+

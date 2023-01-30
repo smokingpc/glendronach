@@ -2,14 +2,17 @@
 
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS status)
 {
+    UNREFERENCED_PARAMETER(status);
     return SRB_STATUS_INVALID_REQUEST;
 }
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS status)
 {
+    UNREFERENCED_PARAMETER(status);
     return SRB_STATUS_INVALID_REQUEST;
 }
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS status)
 {
+    UNREFERENCED_PARAMETER(status);
     return SRB_STATUS_INVALID_REQUEST;
 }
 

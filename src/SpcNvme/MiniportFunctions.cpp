@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#if 0
 static void CreateAdminQueue(PSPCNVME_DEVEXT devext)
 {
     QUEUE_PAIR_CONFIG qcfg = {
@@ -20,7 +21,6 @@ static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
         devext->AdminQueue = nullptr;
     }
 }
-
 static void CreateIoQueues(PSPCNVME_DEVEXT devext)
 {
     devext->IoQueueCount = NVME_CONST::IO_QUEUE_COUNT;
@@ -35,7 +35,6 @@ static void CreateIoQueues(PSPCNVME_DEVEXT devext)
         devext->IoQueue[i] = new CNvmeQueue(&qcfg);
     }
 }
-
 static void DeleteIoQueues(PSPCNVME_DEVEXT devext)
 {
     for (int i = devext->IoQueueCount; i > 0; i--)
@@ -51,7 +50,6 @@ static void DeleteIoQueues(PSPCNVME_DEVEXT devext)
     }
     devext->IoQueueCount = 0;
 }
-
 static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION portcfg)
 {
 //workaround
@@ -71,28 +69,28 @@ static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PP
     
     return true;
 }
-
 static void TeardownDeviceExtension(PSPCNVME_DEVEXT devext)
 {
     //stop msix
     //teardown io queues
     DeleteAdminQueue(devext);
 }
+#endif
 
-static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCNVME_CONFIG nvmecfg)
+static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvmeDevice* nvme)
 {
-    portcfg->MaximumTransferLength = nvmecfg->MaxTxSize;//MAX_TX_SIZE;
-    portcfg->NumberOfPhysicalBreaks = nvmecfg->MaxTxPages;//MAX_TX_PAGES;
+    portcfg->MaximumTransferLength = nvme->MaxTxSize;//MAX_TX_SIZE;
+    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages;//MAX_TX_PAGES;
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
     portcfg->MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS; //specify bounce buffer type?
-    portcfg->MaximumNumberOfTargets = nvmecfg->MaxTargets;
+    portcfg->MaximumNumberOfTargets = NVME_CONST::MAX_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    portcfg->DeviceExtensionSize = sizeof(SPCNVME_DEVEXT);
+    portcfg->DeviceExtensionSize = sizeof(CNvmeDevice);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
-    portcfg->MaximumNumberOfLogicalUnits = nvmecfg->MaxLu;
+    portcfg->MaximumNumberOfLogicalUnits = NVME_CONST::MAX_LU;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = NvmeMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
@@ -101,8 +99,8 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
     portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
-    portcfg->MaxNumberOfIO = nvmecfg->MaxTotalIo;
-    portcfg->MaxIOsPerLun = nvmecfg->MaxIoPerLU;
+    portcfg->MaxNumberOfIO = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
+    portcfg->MaxIOsPerLun = NVME_CONST::MAX_IO_PER_LU;
 
     //Dump is not supported now. Will be supported in future.
     portcfg->RequestedDumpBufferSize = 0;
@@ -114,11 +112,11 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, PSPCN
 
 
 _Use_decl_annotations_ ULONG HwFindAdapter(
-    _In_ PVOID dev_ext,
+    _In_ PVOID devext,
     _In_ PVOID ctx,
     _In_ PVOID businfo,
     _In_z_ PCHAR arg_str,
-    _Inout_ PPORT_CONFIGURATION_INFORMATION ConfigInfo,
+    _Inout_ PPORT_CONFIGURATION_INFORMATION port_cfg,
     _In_ PBOOLEAN Reserved3)
 {
     //Running at PASSIVE_LEVEL!!!!!!!!!
@@ -129,56 +127,36 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
 
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)dev_ext;
-    CNvmeDevice* nvme = NULL;
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    SPCNVME_CONFIG nvmecfg(
-                        ConfigInfo->SystemIoBusNumber, 
-                        ConfigInfo->SlotNumber,
-                        *(ConfigInfo->AccessRanges), 
-                        ConfigInfo->NumberOfAccessRanges);
+    status = nvme->Setup(port_cfg);
+    if (!NT_SUCCESS(status))
+        goto error;
 
-    if (!nvme->DisableController())
+    status = nvme->InitController();
+    if (!NT_SUCCESS(status))
+        goto error;
+
+    status = nvme->IdentifyController(NULL);
+    if (!NT_SUCCESS(status))
         goto error;
 
     //PCI bus related initialize
-    FillPortConfiguration(ConfigInfo, &nvmecfg);
-    nvme = new CNvmeDevice(devext, &nvmecfg);
-    devext->NvmeDev = nvme;
-    if (false == SetupDeviceExtension(devext, &nvmecfg, ConfigInfo))
-        goto error;
+    //this should be called AFTER identify controller , because 
+    //we need identify controller to know MaxTxSize.
+    FillPortConfiguration(port_cfg, nvme);
 
-
-    if(!nvme->RegisterAdminQueuePair(devext->AdminQueue))
-        goto error;
-
-    if (!nvme->EnableController())
-        goto error;
-
-    //TODO: query controller identify, query namespace identify,
-    //      set features, 
-    //because this function is not returned, MSIX won't fire.
-    //so we do some admin commands here...
-    status = NvmeIdentifyController(devext);
-    if (!NT_SUCCESS(status))
-        goto error;
-
-    status = NvmeIdentifyNamespace(devext);
-    if (!NT_SUCCESS(status))
-        goto error;
-
-    status = NvmeSetFeatures(devext);
-    if(!NT_SUCCESS(status))
-        goto error;
+    //register Storport DPC
+    StorPortInitializeDpc(devext, &nvme->QueueCplDpc, NvmeDpcRoutine);
 
     return SP_RETURN_FOUND;
 
 error:
-    TeardownDeviceExtension(devext);
+    nvme->Teardown();
     return SP_RETURN_NOT_FOUND;
 }
 
-_Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
+_Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
 {
 //Running at DIRQL
     CDebugCallInOut inout(__FUNCTION__);
@@ -187,8 +165,6 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
     PERF_CONFIGURATION_DATA write_data = { 0 };
     GROUP_AFFINITY affinity;
     ULONG stor_status;
-
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
 
     memset(&affinity, 0, sizeof(GROUP_AFFINITY));
     read_data.Version = STOR_PERF_VERSION;
@@ -205,7 +181,7 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
         if (read_data.Flags & STOR_PERF_CONCURRENT_CHANNELS)
         {
             write_data.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
-            write_data.ConcurrentChannels = devext->CpuCount;
+            write_data.ConcurrentChannels = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
         }
         if (read_data.Flags & STOR_PERF_NO_SGL)     //I don't use SGL...
             write_data.Flags |= STOR_PERF_NO_SGL;
@@ -220,28 +196,34 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID DeviceExtension)
         ASSERT(STOR_STATUS_SUCCESS == stor_status);
     }
 
-    StorPortEnablePassiveInitialization(DeviceExtension, HwPassiveInitialize);
+    StorPortEnablePassiveInitialization(devext, HwPassiveInitialize);
     return TRUE;
 }
 
 _Use_decl_annotations_
-BOOLEAN HwPassiveInitialize(PVOID DeviceExtension)
+BOOLEAN HwPassiveInitialize(PVOID devext)
 {
     //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
-    PSPCNVME_DEVEXT devext = (PSPCNVME_DEVEXT)DeviceExtension;
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    status = NvmeRegisterIoQueues(devext);
+    nvme->re
+    //todo: 
+    // identify namespace
+    // create io queues
+    // 
+    //status = NvmeRegisterIoQueues(devext);
     if(!NT_SUCCESS(status))
         return FALSE;
     return TRUE;
 }
 
 _Use_decl_annotations_
-BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
+BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 {
-    PSPCNVME_SRBEXT srbext = InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
+    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
+    //InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
     BOOLEAN need_startio = FALSE;
     //UCHAR srb_status = 0;
 
@@ -257,7 +239,7 @@ BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
     //              The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
     //              to satisfy an incoming bus-reset request.
     //But, I don't understand the difference.... Current Windows family are all NT-based system :p
-        SrbSetSrbStatus(Srb, SRB_STATUS_INVALID_REQUEST);
+        SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
         need_startio = FALSE;
         break;
     //case SRB_FUNCTION_WMI:
@@ -284,9 +266,9 @@ BOOLEAN HwBuildIo(_In_ PVOID DevExt,_In_ PSCSI_REQUEST_BLOCK Srb)
 }
 
 _Use_decl_annotations_
-BOOLEAN HwStartIo(PVOID DevExt, PSCSI_REQUEST_BLOCK Srb)
+BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
-    PSPCNVME_SRBEXT srbext = InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
+    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
     BOOLEAN ok = FALSE;
 
     switch (srbext->FuncCode)
