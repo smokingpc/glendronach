@@ -12,3 +12,8 @@ HW_COMPLETE_SERVICE_IRP HwCompleteServiceIrp;
 HW_UNIT_CONTROL HwUnitControl;
 HW_TRACING_ENABLED HwTracingEnabled;
 HW_CLEANUP_TRACING HwCleanupTracing;
+
+
+SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
+    PSCSI_SUPPORTED_CONTROL_TYPE_LIST list);
+SCSI_ADAPTER_CONTROL_STATUS Handle_RestartAdapter(CNvmeDevice* devext);

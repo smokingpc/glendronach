@@ -208,30 +208,50 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    nvme->re
-    //todo: 
-    // identify namespace
-    // create io queues
-    // 
-    //status = NvmeRegisterIoQueues(devext);
-    if(!NT_SUCCESS(status))
+    status = nvme->IdentifyNamespace(NULL);
+    if (!NT_SUCCESS(status))
         return FALSE;
+    status = nvme->SetInterruptCoalescing(NULL);
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    status = nvme->SetArbitration(NULL);
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    status = nvme->SetSyncHostTime(NULL);
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    status = nvme->SetPowerManagement(NULL);
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    status = nvme->SetAsyncEvent(NULL);
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    status = nvme->RegisterIoQ();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
     return TRUE;
 }
 
 _Use_decl_annotations_
 BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 {
+//BuildIo() callback is used to perform "resource preparing" and "jobs DON'T NEED lock".
+//In this callback, also dispatch some behavior which need be handled very fast.
+//some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
+//We can't dispatch such events to StartIo(), that could waste too much time.
+
     PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
-    //InitAndGetSrbExt(DevExt, (PSTORAGE_REQUEST_BLOCK)Srb);
     BOOLEAN need_startio = FALSE;
     //UCHAR srb_status = 0;
 
     switch (srbext->FuncCode)
     {
-        //case SRB_FUNCTION_ABORT_COMMAND:
-    //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
-    //case SRB_FUNCTION_RESET_DEVICE:
+    case SRB_FUNCTION_ABORT_COMMAND:
+    case SRB_FUNCTION_RESET_LOGICAL_UNIT:
+    case SRB_FUNCTION_RESET_DEVICE:
+        //skip these request currently. I didn't get any idea yet to handle them.
+
     case SRB_FUNCTION_RESET_BUS:
     //MSDN said : it is possible for the HwScsiStartIo routine to be called 
     //              with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
@@ -321,41 +341,64 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
 )
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
     UNREFERENCED_PARAMETER(ControlType);
     UNREFERENCED_PARAMETER(Parameters);
     SCSI_ADAPTER_CONTROL_STATUS status = ScsiAdapterControlUnsuccessful;
+    CNvmeDevice *nvme = (CNvmeDevice*)DeviceExtension;
 
     switch (ControlType)
     {
     case ScsiQuerySupportedControlTypes:
     {
-        //PSCSI_SUPPORTED_CONTROL_TYPE_LIST ctl_list = (PSCSI_SUPPORTED_CONTROL_TYPE_LIST)Parameters;
-        //status = HandleQueryControlTypeList(ctl_list);
+        status = Handle_QuerySupportedControlTypes((PSCSI_SUPPORTED_CONTROL_TYPE_LIST)Parameters);
         break;
     }
     case ScsiStopAdapter:
     {
     //Device "entering" D1 / D2 / D3 from D0
     //**running at DIRQL
-        //shutdown HBA, this is post event of DeviceRemove 
-        //status = HandleScsiStopAdapter(DeviceExtension);
+        //this is post event of DeviceRemove. 
+        //In normal procedure of removing device, we don't have to do anything here.
+        //BuildIo SRB_FUNCTION_PNP should handle DEVICE_REMOVE teardown.
+        //ScsiStopAdapter is just a power state handler, we have no idea that
+        //"is this call a device remove? or sleep? or hibernation? or power down?"
+        status = ScsiAdapterControlSuccess;
         break;
     }
     case ScsiRestartAdapter:
     {
     //Device "entering" D0 state from D1 D2 D3 state
     //**running at DIRQL
-        //status = HandleScsiRestartAdapter();
+        status = Handle_RestartAdapter(nvme);
         break;
     }
-
     case ScsiAdapterSurpriseRemoval:
     {
     //**running < DISPATCH_LEVEL
     //Device is surprise removed.
     //**Is still SRB_PNP_xxx fired if this control code supported/implemented?
+    //***SurpriseRemove don't need unregister queues. Only need to delete queues.
+        nvme->Teardown();
         break;
+    }
+    //Valid since Win8. If this control enabled, storport will notify 
+    //miniport when power plan changed.
+    case ScsiPowerSettingNotification:
+    {
+     //**running at PASSIVE_LEVEL
+        STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) Parameters;
+        UNREFERENCED_PARAMETER(info);
+        break;
+    }
+
+    //Valid since Win8. If this control enabled, miniport won't receive
+    //SRB_FUNCTION_POWER in BuildIo and no ScsiStopAdapter in AdapterControl
+    case ScsiAdapterPower:
+    {
+     //**running <= DISPATCH_LEVEL
+      STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)Parameters;
+      UNREFERENCED_PARAMETER(power);
+      break;
     }
 
 #pragma region === Some explain of un-implemented control codes ===
@@ -380,24 +423,6 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     //     //**running at PASSIVE_LEVEL
     //    //status = HandleScsiSetRunningConfig();
     //    break;
-    //}
-
-    //Valid since Win8. If this control enabled, storport will notify 
-    //miniport when power plan changed.
-    //case ScsiPowerSettingNotification:
-    //{
-    // //**running at PASSIVE_LEVEL
-    // STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) Parameters;
-    //    break;
-    //}
-
-    //Valid since Win8. If this control enabled, miniport won't receive
-    // SRB_FUNCTION_POWER in BuildIo and no ScsiStopAdapter in AdapterControl
-    //case ScsiAdapterPower:
-    //{
-    // //**running <= DISPATCH_LEVEL
-    //  STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)Parameters;
-    //  break;
     //}
 #pragma endregion
 

@@ -34,12 +34,12 @@ public:
     NTSTATUS UnregisterIoQ();
 
     NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext);
-    NTSTATUS IdentifyNamespace(bool wait = true);
-    NTSTATUS SetInterruptCoalescing(bool wait = true);
-    NTSTATUS SetAsyncEvent(bool wait = true);
-    NTSTATUS SetArbitration(bool wait = true);
-    NTSTATUS SetSyncHostTime(bool wait = true);
-    NTSTATUS SetPowerManagement(bool wait = true);
+    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetInterruptCoalescing(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetAsyncEvent(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetArbitration(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetPowerManagement(PSPCNVME_SRBEXT srbext);
 
     USHORT  VendorID;
     USHORT  DeviceID;

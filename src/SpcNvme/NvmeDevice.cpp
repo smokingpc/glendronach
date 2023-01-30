@@ -128,8 +128,10 @@ void CNvmeDevice::Teardown()
         return;
     IsReady = false;
 
+    DeleteAdmQ();
+    DeleteIoQ();
 //delete all io queues
-    ShutdownController();
+//    ShutdownController();
 }
 
 void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
@@ -253,19 +255,18 @@ NTSTATUS CNvmeDevice::RestartController()
 NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 {
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
-    PSPCNVME_SRBEXT temp = srbext;
+    PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_SUCCESS;
-    if(NULL == temp)
+    if(NULL == my_srbext)
     {
-        temp = new SPCNVME_SRBEXT();
-        temp->Init(this, NULL);
-        srbext_ptr.Reset(temp);
+        my_srbext = new SPCNVME_SRBEXT();
+        my_srbext->Init(this, NULL);
+        srbext_ptr.Reset(my_srbext);
     }
-    //todo: submit cmd
-    BuildCmd_IdentCtrler(&temp->NvmeCmd, &this->CtrlIdent);
-    status = AdmQueue->SubmitCmd(temp);
+    BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
+    status = AdmQueue->SubmitCmd(my_srbext);
 
-    //from IOCTL?
+    //if(srbext != NULL) means this request comes from StartIo
     if(srbext != NULL || !NT_SUCCESS(status))
         return status;
 
@@ -273,13 +274,44 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
     do
     {
         StorPortStallExecution(StallDelay);
-    }while(SRB_STATUS_PENDING != temp->SrbStatus);
+    }while(SRB_STATUS_PENDING != my_srbext->SrbStatus);
 
-    if(temp->SrbStatus != SRB_STATUS_SUCCESS)
+    if(my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
         return STATUS_REQUEST_NOT_ACCEPTED;
 
     return STATUS_SUCCESS;
 }
+NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
+{
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS CNvmeDevice::RegisterIoQ()
 {
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;

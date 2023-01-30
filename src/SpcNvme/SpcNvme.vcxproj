@@ -250,6 +250,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="HandleAdapterControl.cpp" />
     <ClCompile Include="ISR_and_DPC.cpp" />
     <ClCompile Include="NvmePrpBuilder.cpp" />
     <ClCompile Include="SrbExt.cpp" />

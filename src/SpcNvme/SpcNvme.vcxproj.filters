@@ -27,6 +27,9 @@
     <Filter Include="SRB_and_SRBEXT">
       <UniqueIdentifier>{c4547e9c-1600-4199-8c01-a1c99755a8a0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="MiniportFunction">
+      <UniqueIdentifier>{7995d1bc-393c-44b8-9412-fb68f3328352}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="SpcNvme.inf">
@@ -71,12 +74,17 @@
       <Filter>Nvme_Device</Filter>
     </ClCompile>
     <ClCompile Include="DriverEntry.cpp" />
-    <ClCompile Include="MiniportFunctions.cpp" />
     <ClCompile Include="SrbExt.cpp">
       <Filter>SRB_and_SRBEXT</Filter>
     </ClCompile>
     <ClCompile Include="NvmePrpBuilder.cpp">
       <Filter>Nvme_Device</Filter>
+    </ClCompile>
+    <ClCompile Include="MiniportFunctions.cpp">
+      <Filter>MiniportFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="HandleAdapterControl.cpp">
+      <Filter>MiniportFunction</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -124,7 +132,6 @@
     </ClInclude>
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />
-    <ClInclude Include="MiniportFunctions.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PoolTags.h" />
     <ClInclude Include="StateMachine.h" />
@@ -136,6 +143,9 @@
     </ClInclude>
     <ClInclude Include="PCIe_Msix.h">
       <Filter>PCIe_and_MSIX</Filter>
+    </ClInclude>
+    <ClInclude Include="MiniportFunctions.h">
+      <Filter>MiniportFunction</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
