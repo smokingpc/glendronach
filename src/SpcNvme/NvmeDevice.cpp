@@ -323,19 +323,20 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
     srbext->Init(this, NULL);
     srbext_ptr.Reset(srbext);
 
-    //todo: submit cmd
-    //BuildCmd_IdentCtrler(&srbext->NvmeCmd, &this->CtrlIdent);
-
     for (ULONG i = 0; i < DesiredIoQ; i++)
     {
         if(NULL == IoQueue[i])
             continue;
-        
-        BuildCmd_RegisterIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
+//register IoQueue should register CplQ first, then SubQ.
+//They are "Pair" .
+        BuildCmd_RegIoCplQ(&srbext->NvmeCmd, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(srbext);
+
+        BuildCmd_RegIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
     }
 
-    //wait loop for FindAdapter called IdentifyController
+    //wait loop for
     do
     {
         StorPortStallExecution(StallDelay);
@@ -364,11 +365,11 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
     {
         if (NULL == IoQueue[i])
             continue;
-        BuildCmd_RegisterIoCplQ(&srbext->NvmeCmd, IoQueue[i]);
+        BuildCmd_UnRegIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(srbext);
+        BuildCmd_UnRegIoCplQ(&srbext->NvmeCmd, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
 
-        BuildCmd_RegisterIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext);
     }
 
     //wait loop for FindAdapter called IdentifyController

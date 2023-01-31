@@ -93,47 +93,9 @@ void CNvmeQueue::Teardown()
     DeallocQueueBuffer();
     History.Teardown();
 }
-USHORT CNvmeQueue::GetQueueID(){return QueueID;}
-USHORT CNvmeQueue::GetQueueDepth(){return this->Depth;}
-//this method is used for internal command
-//NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl)
-//{
-//    NTSTATUS status = STATUS_SUCCESS;
-//    //TODO: 
-//    //1. disable Interrupt by modifying VectorControl register in pCtrlRegister+0x2000
-//    // (4th DWORD of each entry, bit 0?)
-//    //2. process completion queue in loop
-//    //3. after desired result comes back, enable msix interrupt again.
-//    status = SubmitCmd(srbext);
-//    if(!NT_SUCCESS(status))
-//    {
-//        //todo: log
-//        return status;
-//    }
-//
-//    //wait
-//    ULONG interval = NVME_CONST::STALL_TIME_US;; //in micro-seconds
-//    int loop = wait_us / NVME_CONST::STALL_TIME_US;
-//    if ((wait_us % NVME_CONST::STALL_TIME_US) > 0)
-//        loop++;
-//
-//    while(loop >= 0)
-//    {
-//        ULONG polled = 0;
-//        StorPortStallExecution(interval);
-//        if(poll_cpl)
-//            CompleteCmd(0, polled);
-//
-//        if(srbext->SrbStatus != SRB_STATUS_PENDING)
-//            return STATUS_SUCCESS;
-//        loop--;
-//    }
-//
-//    if (srbext->SrbStatus != SRB_STATUS_PENDING)
-//        return STATUS_SUCCESS;
-//
-//    return STATUS_TIMEOUT;
-//}
+inline USHORT CNvmeQueue::GetQueueID(){return QueueID;}
+inline USHORT CNvmeQueue::GetQueueDepth(){return this->Depth;}
+inline QUEUE_TYPE CNvmeQueue::GetQueueType(){return this->Type;}
 
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
 {
@@ -223,11 +185,16 @@ void CNvmeQueue::GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplv
 }
 void CNvmeQueue::GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq)
 {
-    if (subq != NULL)
-        subq->QuadPart = SubQ_PA.QuadPart;
-
-    if (cplq != NULL)
-        cplq->QuadPart = CplQ_PA.QuadPart;
+    GetSubQAddr(subq);
+    GetCplQAddr(cplq);
+}
+void CNvmeQueue::GetSubQAddr(PHYSICAL_ADDRESS* subq)
+{
+    subq->QuadPart = SubQ_PA.QuadPart;
+}
+void CNvmeQueue::GetCplQAddr(PHYSICAL_ADDRESS* cplq)
+{
+    cplq->QuadPart = CplQ_PA.QuadPart;
 }
 
 ULONG CNvmeQueue::ReadSubTail()
