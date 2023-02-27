@@ -84,10 +84,7 @@ void BuildCmd_SetArbitration(PNVME_COMMAND cmd)
 }
 void BuildCmd_SyncHostTime(PNVME_COMMAND cmd, LARGE_INTEGER *timestamp)
 {
-    //KIRQL irql;
-    //StorPortGetCurrentIrql((PVOID)devext, &irql);
-    //ASSERT(irql == PASSIVE_LEVEL);
-
+    UNREFERENCED_PARAMETER(timestamp);
     //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
     LARGE_INTEGER systime = { 0 };
     KeQuerySystemTime(&systime);

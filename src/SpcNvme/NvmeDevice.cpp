@@ -95,14 +95,14 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
+    PortCfg = pci;
+
     InitVars();
     LoadRegistry();
-    GetPciBusData();
+    GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
 
     //todo: handle NUMA nodes for each queue
     //KeQueryLogicalProcessorRelationship(&ProcNum, RelationNumaNode, &ProcInfo, &ProcInfoSize);
-
-    PortCfg = pci;
     AccessRangeCount = min(ACCESS_RANGE_COUNT, PortCfg->NumberOfAccessRanges);
     RtlCopyMemory(AccessRanges, PortCfg->AccessRanges, 
             sizeof(ACCESS_RANGE) * AccessRangeCount);
@@ -283,32 +283,38 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 }
 NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
 {
+    UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    UNREFERENCED_PARAMETER(srbext);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetInterruptCoalescing() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    UNREFERENCED_PARAMETER(srbext);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    UNREFERENCED_PARAMETER(srbext);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetArbitration() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    UNREFERENCED_PARAMETER(srbext);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    UNREFERENCED_PARAMETER(srbext);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 
@@ -495,11 +501,10 @@ bool CNvmeDevice::MapCtrlRegisters()
 
     return false;
 }
-bool CNvmeDevice::GetPciBusData()
+bool CNvmeDevice::GetPciBusData(INTERFACE_TYPE type, ULONG bus, ULONG slot)
 {
     ULONG size = sizeof(PciCfg);
-    ULONG status = StorPortGetBusData(this, PortCfg->AdapterInterfaceType,
-        PortCfg->SystemIoBusNumber, PortCfg->SlotNumber, &PciCfg, size);
+    ULONG status = StorPortGetBusData(this, type, bus, slot, &PciCfg, size);
 
     //refer to MSDN StorPortGetBusData() to check why 2==status is error.
     if (2 == status || status != size)
@@ -613,21 +618,26 @@ void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
 NTSTATUS CNvmeDevice::CreateIoQ()
 {
     //TODO: if IoQ already allocated?
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
     QUEUE_PAIR_CONFIG cfg = { 0 };
     cfg.DevExt = this;
     cfg.Depth = IoDepth;
     cfg.NumaNode = 0;
     cfg.Type = QUEUE_TYPE::IO_QUEUE;
 
-    for(ULONG i=0; i<DesiredIoQ; i++)
+    for(USHORT i=0; i<DesiredIoQ; i++)
     {
         CNvmeQueue* queue = new CNvmeQueue();
         this->GetQueueDbl(i, cfg.SubDbl, cfg.CplDbl);
         cfg.QID = i + 1;
-        queue->Setup(&cfg);
+        status = queue->Setup(&cfg);
+        if(!NT_SUCCESS(status))
+            return status;
         IoQueue[i] = queue;
         CreatedIoQ++;
     }
+
+    return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::DeleteIoQ()
 {
@@ -642,6 +652,7 @@ NTSTATUS CNvmeDevice::DeleteIoQ()
     }
 
     RtlZeroMemory(IoQueue, sizeof(CNvmeQueue*) * MAX_IO_QUEUE_COUNT);
+    return STATUS_SUCCESS;
 }
 
 #pragma endregion

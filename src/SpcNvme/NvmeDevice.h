@@ -71,7 +71,7 @@ private:
     ULONG Bar0Size;
     UCHAR MaxNamespaces;
     ULONG AdmDepth;
-    ULONG IoDepth;
+    USHORT IoDepth;
     ULONG TotalNumaNodes;
 
     //Following are huge data.
@@ -95,7 +95,7 @@ private:
 
     void ReadCtrlCap();      //load capability and informations AFTER register address mapped.
     bool MapCtrlRegisters();
-    bool GetPciBusData();
+    bool GetPciBusData(INTERFACE_TYPE type, ULONG bus, ULONG slot);
 
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy);
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy, BOOLEAN cc_en);

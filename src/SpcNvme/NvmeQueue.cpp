@@ -93,9 +93,9 @@ void CNvmeQueue::Teardown()
     DeallocQueueBuffer();
     History.Teardown();
 }
-inline USHORT CNvmeQueue::GetQueueID(){return QueueID;}
-inline USHORT CNvmeQueue::GetQueueDepth(){return this->Depth;}
-inline QUEUE_TYPE CNvmeQueue::GetQueueType(){return this->Type;}
+USHORT CNvmeQueue::GetQueueID(){return QueueID;}
+USHORT CNvmeQueue::GetQueueDepth(){return this->Depth;}
+QUEUE_TYPE CNvmeQueue::GetQueueType(){return this->Type;}
 
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
 {

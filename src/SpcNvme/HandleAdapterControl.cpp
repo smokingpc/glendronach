@@ -1,5 +1,5 @@
 #include "pch.h"
-
+#if 0
 static void Worker_RestartAdapter(
     _In_ PVOID DevExt,
     _In_ PVOID Context,
@@ -14,7 +14,7 @@ static void Worker_RestartAdapter(
 
     StorPortFreeWorker(DevExt, Worker);
 }
-
+#endif
 SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
     PSCSI_SUPPORTED_CONTROL_TYPE_LIST list)
 {
@@ -35,15 +35,19 @@ SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
 
 SCSI_ADAPTER_CONTROL_STATUS Handle_RestartAdapter(CNvmeDevice* devext)
 {
+    UNREFERENCED_PARAMETER(devext);
+    return ScsiAdapterControlUnsuccessful;
+#if 0
     //Device "entering" D0 state from D1 D2 D3 state
     //**ATTENTION: this function run at DIRQL!
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    PVOID worker = NULL;
-    status = devext->EnableController();
+    //PVOID worker = NULL;
+    //status = devext->EnableController();
     if(!NT_SUCCESS(status))
         return ScsiAdapterControlUnsuccessful;
 
     //they are limited IRQL<=DISPATCH_LEVEL, try another way...
     //StorPortInitializeWorker(devext, &worker);
     //StorPortQueueWorkItem(devext, Worker_RestartAdapter, worker, NULL);
+#endif
 }
