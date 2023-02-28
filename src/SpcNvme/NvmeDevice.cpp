@@ -110,6 +110,9 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     if(!MapCtrlRegisters())
         return STATUS_NOT_MAPPED_DATA;
 
+    //if(!GetMsixTable())
+    //    return STATUS_INTERNAL_ERROR;
+
     ReadCtrlCap();
 
     status = CreateAdmQ();
@@ -123,6 +126,13 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     IsReady = true;
     return STATUS_SUCCESS;
 }
+
+#if 0
+bool CNvmeDevice::GetMsixTable()
+{
+}
+#endif 
+
 void CNvmeDevice::Teardown()
 {
     if(!IsReady)
@@ -404,7 +414,8 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     cfg.Type = QUEUE_TYPE::ADM_QUEUE;
     GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
     AdmQueue = new CNvmeQueue(&cfg);
-
+    if(!AdmQueue->IsInitOK())
+        return STATUS_MEMORY_NOT_ALLOCATED;
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RegisterAdmQ()
@@ -424,6 +435,8 @@ NTSTATUS CNvmeDevice::RegisterAdmQ()
     NVME_ADMIN_COMPLETION_QUEUE_BASE_ADDRESS acq = { 0 };
     AdmQueue->GetQueueAddr(&subq, &cplq);
 
+    if(0 == subq.QuadPart || NULL == cplq.QuadPart)
+        return STATUS_MEMORY_NOT_ALLOCATED;
     aqa.ASQS = AdmDepth - 1;    //ASQS and ACQS are zero based index. here we should fill "MAX index" not total count;
     aqa.ACQS = AdmDepth - 1;
     asq.ASQB = subq.QuadPart;
@@ -473,7 +486,6 @@ bool CNvmeDevice::MapCtrlRegisters()
 {
     BOOLEAN in_iospace = FALSE;
     STOR_PHYSICAL_ADDRESS bar0 = { 0 };
-    PACCESS_RANGE range = AccessRanges;
     INTERFACE_TYPE type = PortCfg->AdapterInterfaceType;
     //I got this mapping method by cracking stornvme.sys.
     bar0.LowPart = (PciCfg.u.type0.BaseAddresses[0] & 0xFFFFC000);
@@ -481,6 +493,7 @@ bool CNvmeDevice::MapCtrlRegisters()
 
     for (ULONG i = 0; i < AccessRangeCount; i++)
     {
+        PACCESS_RANGE range = &AccessRanges[i];
         if(true == IsAddrEqual(range->RangeStart, bar0))
         {
             in_iospace = !range->RangeInMemory;
@@ -493,8 +506,8 @@ bool CNvmeDevice::MapCtrlRegisters()
                 CtrlReg = (PNVME_CONTROLLER_REGISTERS)addr;
                 Bar0Size = range->RangeLength;
                 Doorbells = CtrlReg->Doorbells;
-                if(Bar0Size > PAGE_SIZE*2)
-                    MsixVectors = (MsixVector*)(addr + (PAGE_SIZE * 2));
+                //if(Bar0Size > PAGE_SIZE*2)
+                //    MsixVectors = (MsixVector*)(addr + (PAGE_SIZE * 2));
                 return true;
             }
         }

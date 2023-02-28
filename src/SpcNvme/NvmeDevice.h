@@ -53,7 +53,7 @@ private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
     PPORT_CONFIGURATION_INFORMATION     PortCfg;
     ULONG *Doorbells;
-    MsixVector *MsixVectors;
+    PMSIX_TABLE_ENTRY MsixTable;
     CNvmeQueue* AdmQueue;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
 
@@ -70,8 +70,8 @@ private:
     ULONG AccessRangeCount;
     ULONG Bar0Size;
     UCHAR MaxNamespaces;
-    ULONG AdmDepth;
     USHORT IoDepth;
+    ULONG AdmDepth;
     ULONG TotalNumaNodes;
 
     //Following are huge data.
@@ -95,6 +95,7 @@ private:
 
     void ReadCtrlCap();      //load capability and informations AFTER register address mapped.
     bool MapCtrlRegisters();
+    //bool GetMsixTable();
     bool GetPciBusData(INTERFACE_TYPE type, ULONG bus, ULONG slot);
 
     bool WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy);

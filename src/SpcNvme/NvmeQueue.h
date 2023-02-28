@@ -63,6 +63,8 @@ public:
 
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
+
+    inline bool IsInitOK(){return this->IsReady;}
     
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext);
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl = true);

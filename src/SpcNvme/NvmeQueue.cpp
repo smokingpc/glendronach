@@ -1,4 +1,9 @@
 #include "pch.h"
+static inline size_t CalcQueueBufferSize(USHORT depth)
+{
+    return BYTES_TO_PAGES(depth * sizeof(NVME_COMMAND)) +
+            BYTES_TO_PAGES(depth * sizeof(NVME_COMPLETION_ENTRY));
+}
 
 static inline ULONG ReadDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl)
 {
@@ -57,6 +62,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     
     if(NULL == Buffer)
     {
+        BufferSize = CalcQueueBufferSize(Depth);
         ok = AllocQueueBuffer();
         if(!ok)
         {
@@ -65,7 +71,9 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
         }
     }
     else
+    {
         UseExtBuffer = true;
+    }
 
     ok = InitQueueBuffer();
     if(!ok)
@@ -283,8 +291,11 @@ void CNvmeQueue::DeallocQueueBuffer()
     if(UseExtBuffer)
         return;
 
-    StorPortFreeContiguousMemorySpecifyCache(
-            DevExt, this->Buffer, this->BufferSize, this->CacheType);
+    if(NULL != this->Buffer)
+    { 
+        StorPortFreeContiguousMemorySpecifyCache(
+                DevExt, this->Buffer, this->BufferSize, this->CacheType);
+    }
 
     this->Buffer = NULL;
     this->BufferSize = 0;
