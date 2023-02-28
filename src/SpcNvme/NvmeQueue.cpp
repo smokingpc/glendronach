@@ -1,8 +1,9 @@
 #include "pch.h"
 static inline size_t CalcQueueBufferSize(USHORT depth)
 {
-    return BYTES_TO_PAGES(depth * sizeof(NVME_COMMAND)) +
-            BYTES_TO_PAGES(depth * sizeof(NVME_COMPLETION_ENTRY));
+    size_t page_count = BYTES_TO_PAGES(depth * sizeof(NVME_COMMAND)) +
+                    BYTES_TO_PAGES(depth * sizeof(NVME_COMPLETION_ENTRY));
+    return page_count * PAGE_SIZE;
 }
 
 static inline ULONG ReadDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl)
@@ -82,10 +83,10 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
         goto ERROR;
     }
 
-    ok = History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
-    if (!ok)
+    status = History.Setup(this, this->DevExt, this->Depth, this->NumaNode);
+    if (!NT_SUCCESS(status))
     {
-        status = STATUS_INTERNAL_ERROR;
+        //status = STATUS_INTERNAL_ERROR;
         goto ERROR;
     }
 
@@ -323,7 +324,7 @@ NTSTATUS CCmdHistory::Setup(class CNvmeQueue* parent, PVOID devext, USHORT depth
     this->BufferSize = depth * sizeof(PSPCNVME_SRBEXT);
 
     ULONG status = StorPortAllocatePool(devext, (ULONG)this->BufferSize, this->BufferTag, &this->Buffer);
-    if(STOR_STATUS_SUCCESS == status)
+    if(STOR_STATUS_SUCCESS != status)
         return STATUS_MEMORY_NOT_ALLOCATED;
 
     RtlZeroMemory(this->Buffer, this->BufferSize);

@@ -154,7 +154,8 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
 error:
     nvme->Teardown();
-    return SP_RETURN_NOT_FOUND;
+    //SP_RETURN_NOT_FOUND will cause driver installation hanging...?
+    return SP_RETURN_ERROR;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)

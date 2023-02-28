@@ -163,11 +163,15 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 
 NTSTATUS CNvmeDevice::EnableController()
 {
+    if (IsControllerReady())
+        return STATUS_SUCCESS;
+
     //if set CC.EN = 1 WHEN CSTS.RDY == 1 and CC.EN == 0, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 0 and CSTS.RDY == 0).
     bool ok = WaitForCtrlerState(DeviceTimeout, FALSE, FALSE);
     if (!ok)
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
+        return STATUS_INVALID_DEVICE_STATE;
+        //KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
 
     //before Enable, update these basic information to controller.
     //these fields only can be modified when CC.EN == 0. (plz refer to nvme 1.3 spec)
@@ -194,11 +198,15 @@ NTSTATUS CNvmeDevice::EnableController()
 }
 NTSTATUS CNvmeDevice::DisableController()
 {
+    if(!IsControllerReady())
+        return STATUS_SUCCESS;
+
     //if set CC.EN = 1 WHEN CSTS.RDY == 1 and CC.EN == 0, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 0 and CSTS.RDY == 0).
     bool ok = WaitForCtrlerState(DeviceTimeout, TRUE, TRUE);
     if (!ok)
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
+        return STATUS_INVALID_DEVICE_STATE;
+    //        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
 
     //before Enable, update these basic information to controller.
     //these fields only can be modified when CC.EN == 0. (plz refer to nvme 1.3 spec)
