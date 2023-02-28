@@ -95,11 +95,12 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
-    PortCfg = pci;
 
     InitVars();
     LoadRegistry();
     GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
+
+    PortCfg = pci;
 
     //todo: handle NUMA nodes for each queue
     //KeQueryLogicalProcessorRelationship(&ProcNum, RelationNumaNode, &ProcInfo, &ProcInfoSize);

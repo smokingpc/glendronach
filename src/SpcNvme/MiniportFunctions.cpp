@@ -129,6 +129,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto error;
