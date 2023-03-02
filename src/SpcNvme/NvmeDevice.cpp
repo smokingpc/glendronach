@@ -138,7 +138,7 @@ bool CNvmeDevice::GetMsixTable()
 }
 #endif 
 
-void CNvmeDevice::Teardown(bool shutdown)
+void CNvmeDevice::Teardown()
 {
     if (!IsWorking())
         return;
@@ -148,8 +148,8 @@ void CNvmeDevice::Teardown(bool shutdown)
     DeleteIoQ();
     
     State = NVME_STATE::STOP;
-    if(shutdown)
-        ShutdownController();
+    //if(shutdown)
+    //    ShutdownController();
 }
 
 void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
@@ -171,7 +171,7 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 NTSTATUS CNvmeDevice::EnableController()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     if (IsControllerReady())
         return STATUS_SUCCESS;
@@ -209,7 +209,7 @@ NTSTATUS CNvmeDevice::EnableController()
 NTSTATUS CNvmeDevice::DisableController()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     if(!IsControllerReady())
         return STATUS_SUCCESS;
@@ -246,7 +246,7 @@ NTSTATUS CNvmeDevice::DisableController()
 NTSTATUS CNvmeDevice::ShutdownController()
 {
     if (IsStop())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     NVME_CONTROLLER_STATUS csts = { 0 };
     NVME_CONTROLLER_CONFIGURATION cc = { 0 };
@@ -273,7 +273,7 @@ NTSTATUS CNvmeDevice::ShutdownController()
 NTSTATUS CNvmeDevice::InitController()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     NTSTATUS status = STATUS_SUCCESS;
     status = DisableController();
@@ -289,13 +289,13 @@ NTSTATUS CNvmeDevice::InitController()
 NTSTATUS CNvmeDevice::RestartController()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
     return STATUS_NOT_IMPLEMENTED;
 }
 NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
@@ -327,7 +327,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
@@ -336,7 +336,7 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetInterruptCoalescing() still not implemented yet!!\n");
@@ -345,7 +345,7 @@ NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
@@ -354,7 +354,7 @@ NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetArbitration() still not implemented yet!!\n");
@@ -363,7 +363,7 @@ NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() still not implemented yet!!\n");
@@ -372,7 +372,7 @@ NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
@@ -382,7 +382,7 @@ NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
 NTSTATUS CNvmeDevice::RegisterIoQ()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
@@ -420,7 +420,7 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
 NTSTATUS CNvmeDevice::UnregisterIoQ()
 {
     if (!IsWorking())
-        return STATUS_DEVICE_NOT_READY;
+        return STATUS_INVALID_DEVICE_STATE;
 
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();

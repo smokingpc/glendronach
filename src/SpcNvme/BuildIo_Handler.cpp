@@ -46,9 +46,17 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             break;
         case StorRemoveDevice:
             AdapterPnp_RemoveHandler(srbext);
+            NTSTATUS status = srbext->DevExt->ShutdownController();
+            if (!NT_SUCCESS(status))
+            {
+                KdBreakPoint();
+                //todo: log
+            }
+
             break;
         case StorSurpriseRemoval:
-            AdapterPnp_SurpriseRemoveHandler(srbext);
+            AdapterPnp_RemoveHandler(srbext);
+            //surprise remove doesn't need to shutdown controller.
             break;
     }
 

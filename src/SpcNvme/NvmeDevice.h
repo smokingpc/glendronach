@@ -20,7 +20,7 @@ public:
 
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
-    void Teardown(bool shutdown = false);
+    void Teardown();
     void DoQueueCplByDPC(ULONG msix_msgid);
 
     NTSTATUS EnableController();

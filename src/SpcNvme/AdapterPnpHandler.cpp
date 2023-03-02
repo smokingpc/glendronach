@@ -22,11 +22,7 @@ void AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
 
 void AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
 {
-    srbext->DevExt->Teardown(true);
-    srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
-}
-void AdapterPnp_SurpriseRemoveHandler(PSPCNVME_SRBEXT srbext)
-{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
     srbext->DevExt->Teardown();
     srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
 }
