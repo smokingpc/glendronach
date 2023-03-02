@@ -9,12 +9,20 @@ BOOLEAN BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
     return FALSE;
 }
 
+BOOLEAN BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
+{
+    //Handle IOCTL only in StartIo.
+    //I don't like to handle IOCTL in DISPATCH_LEVEL...
+    
+    return TRUE;
+}
+
 BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
     //srbext->Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
     //todo: set log 
     //todo: build prp and dma
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    
     return TRUE;
 }
 

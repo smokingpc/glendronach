@@ -89,6 +89,12 @@
     <ClCompile Include="AdapterPnpHandler.cpp">
       <Filter>BuildIo_Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="IoctlScsiMiniport_Handlers.cpp">
+      <Filter>StartIo_Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="IoctlStorageQuery_Handlers.cpp">
+      <Filter>StartIo_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">
@@ -151,6 +157,12 @@
     </ClInclude>
     <ClInclude Include="AdapterPnpHandler.h">
       <Filter>BuildIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="IoctlScsiMiniport_Handlers.h">
+      <Filter>StartIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="IoctlStorageQuery_Handlers.h">
+      <Filter>StartIo_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

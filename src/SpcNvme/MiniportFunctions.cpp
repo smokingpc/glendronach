@@ -292,6 +292,7 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
     BOOLEAN ok = FALSE;
+    UCHAR srb_status = SRB_STATUS_ERROR;
 
     switch (srbext->FuncCode)
     {
@@ -304,19 +305,26 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
     //    srb_status = DefaultCmdHandler(srb, srbext);
     //    break;
     case SRB_FUNCTION_EXECUTE_SCSI:
-        ok = StartIo_ScsiHandler(srbext);
+        srb_status = StartIo_ScsiHandler(srbext);
         break;
     case SRB_FUNCTION_IO_CONTROL:
-    case SRB_FUNCTION_PNP:
+        srb_status = StartIo_IoctlHandler(srbext);
+        break;
+    //case SRB_FUNCTION_PNP:
         //pnp handlers
         //scsi handlers
     default:
-        ok = StartIo_DefaultHandler(srbext);
+        srb_status = StartIo_DefaultHandler(srbext);
         break;
 
     }
-    //each handler should complete the requests.
-    return ok;
+
+    //todo: handle SCSI status for SRB
+    srbext->Srb->SrbStatus = srb_status;
+    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+
+    //return TRUE indicates that "this driver handled this request, no matter succeed or fail..."
+    return TRUE;
 }
 
 _Use_decl_annotations_

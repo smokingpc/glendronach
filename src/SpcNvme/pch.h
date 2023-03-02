@@ -2,6 +2,8 @@
 
 #include <ntifs.h>
 #include <wdm.h>
+#include <ntddscsi.h>
+#include <ntdddisk.h>
 #include <nvme.h>
 
 EXTERN_C_START
