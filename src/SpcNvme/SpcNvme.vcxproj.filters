@@ -86,6 +86,9 @@
     <ClCompile Include="HandleAdapterControl.cpp">
       <Filter>MiniportFunction</Filter>
     </ClCompile>
+    <ClCompile Include="AdapterPnpHandler.cpp">
+      <Filter>BuildIo_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">
@@ -134,7 +137,6 @@
     <ClInclude Include="Inline_Utils.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PoolTags.h" />
-    <ClInclude Include="StateMachine.h" />
     <ClInclude Include="SrbExt.h">
       <Filter>SRB_and_SRBEXT</Filter>
     </ClInclude>
@@ -146,6 +148,9 @@
     </ClInclude>
     <ClInclude Include="MiniportFunctions.h">
       <Filter>MiniportFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="AdapterPnpHandler.h">
+      <Filter>BuildIo_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

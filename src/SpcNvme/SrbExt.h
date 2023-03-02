@@ -16,7 +16,7 @@ typedef struct _SPCNVME_SRBEXT
     PCDB Cdb;
     UCHAR CdbLen;
     UCHAR PathID;           //SCSI Path (bus) ID
-    UCHAR TargetID;         //SCSI Dvice ID
+    UCHAR TargetID;         //SCSI Device ID
     UCHAR Lun;              //SCSI Logical UNit ID
     PVOID DataBuf;
     ULONG DataBufLen;

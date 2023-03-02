@@ -6,7 +6,7 @@ void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, PNVME_IDENTIFY_CONTROLLER_DATA data
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
     cmd->NSID = NVME_CONST::DEFAULT_NSID;
-    cmd->u.IDENTIFY.CDW10.CNS = IDENTIFY_CNS::IDENT_CONTROLLER;
+    cmd->u.IDENTIFY.CDW10.CNS = (ULONG)IDENTIFY_CNS::IDENT_CONTROLLER;
     cmd->u.IDENTIFY.CDW10.CNTID = 0;
 
     BuildPrp(cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
@@ -25,7 +25,7 @@ void BuildCmd_RegIoSubQ(PNVME_COMMAND cmd, CNvmeQueue *queue)
     cmd->u.CREATEIOSQ.CDW11.CQID = queue->GetQueueID();
     cmd->u.CREATEIOSQ.CDW11.PC = 1;
 
-    if(queue->GetQueueType() == ADM_QUEUE)
+    if(queue->GetQueueType() == QUEUE_TYPE::ADM_QUEUE)
         cmd->u.CREATEIOSQ.CDW11.QPRIO = NVME_NVM_QUEUE_PRIORITY_URGENT;
     else
         cmd->u.CREATEIOSQ.CDW11.QPRIO = NVME_NVM_QUEUE_PRIORITY_HIGH;
@@ -42,7 +42,7 @@ void BuildCmd_RegIoCplQ(PNVME_COMMAND cmd, CNvmeQueue* queue)
     cmd->u.CREATEIOCQ.CDW10.QID = queue->GetQueueID();
     cmd->u.CREATEIOCQ.CDW10.QSIZE = queue->GetQueueDepth();
     cmd->u.CREATEIOCQ.CDW11.IEN = TRUE;
-    cmd->u.CREATEIOCQ.CDW11.IV = (queue->GetQueueType() == ADM_QUEUE ? 0 : 1 );
+    cmd->u.CREATEIOCQ.CDW11.IV = (queue->GetQueueType() == QUEUE_TYPE::ADM_QUEUE ? 0 : 1 );
     cmd->u.CREATEIOCQ.CDW11.PC = TRUE;
 }
 void BuildCmd_UnRegIoSubQ(PNVME_COMMAND cmd, CNvmeQueue* queue)

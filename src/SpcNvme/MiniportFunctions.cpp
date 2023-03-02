@@ -110,7 +110,6 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->DumpRegion.Length = 0;
 }
 
-
 _Use_decl_annotations_ ULONG HwFindAdapter(
     _In_ PVOID devext,
     _In_ PVOID ctx,
@@ -250,7 +249,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     switch (srbext->FuncCode)
     {
     case SRB_FUNCTION_ABORT_COMMAND:
-    case SRB_FUNCTION_RESET_LOGICAL_UNIT:
+    case SRB_FUNCTION_RESET_LOGICAL_UNIT: //handled by HwUnitControl?
     case SRB_FUNCTION_RESET_DEVICE:
         //skip these request currently. I didn't get any idea yet to handle them.
 
@@ -278,6 +277,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         break;
     case SRB_FUNCTION_PNP:
         //should handle PNP remove adapter
+        need_startio = BuildIo_SrbPnpHandler(srbext);
         break;
     default:
         need_startio = BuildIo_DefaultHandler(srbext);

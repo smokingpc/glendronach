@@ -1,4 +1,9 @@
 #include "pch.h"
+#include "ScsiHandler_CDB6.h"
+#include "ScsiHandler_CDB10.h"
+#include "ScsiHandler_CDB12.h"
+#include "ScsiHandler_CDB16.h"
+#include "ScsiHandler_InlineUtils.h"
 
 BOOLEAN StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {

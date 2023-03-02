@@ -20,7 +20,7 @@ public:
 
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
-    void Teardown();
+    void Teardown(bool shutdown = false);
     void DoQueueCplByDPC(ULONG msix_msgid);
 
     NTSTATUS EnableController();
@@ -41,6 +41,11 @@ public:
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetPowerManagement(PSPCNVME_SRBEXT srbext);
 
+    bool IsWorking();
+    bool IsSetup();
+    bool IsTeardown();
+    bool IsStop();
+
     USHORT  VendorID;
     USHORT  DeviceID;
     ULONG   MaxTxSize;
@@ -57,7 +62,6 @@ private:
     CNvmeQueue* AdmQueue;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
 
-    BOOLEAN IsReady = FALSE;
     NVME_STATE State;
     ULONG RegisteredIoQ = 0;
     ULONG CreatedIoQ = 0;

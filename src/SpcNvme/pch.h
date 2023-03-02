@@ -14,7 +14,6 @@ EXTERN_C_END
 #include "PoolTags.h"
 #include "Constants.h"
 #include "Inline_Utils.h"
-#include "StateMachine.h"
 #include "NvmeConstants.h"
 #include "NvmeEnums.h"
 #include "PCIe_Msix.h"
@@ -27,12 +26,6 @@ EXTERN_C_END
 
 #include "BuildIo_Handlers.h"
 #include "StartIo_Handler.h"
-
-#include "ScsiHandler_CDB6.h"
-#include "ScsiHandler_CDB10.h"
-#include "ScsiHandler_CDB12.h"
-#include "ScsiHandler_CDB16.h"
-#include "ScsiHandler_InlineUtils.h"
 #include "ISR_and_DPC.h"
 
 using SPC::CAutoPtr;

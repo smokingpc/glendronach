@@ -89,6 +89,11 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
+inline bool CNvmeDevice::IsWorking() { return (State == NVME_STATE::RUNNING); }
+inline bool CNvmeDevice::IsSetup() { return (State == NVME_STATE::SETUP); }
+inline bool CNvmeDevice::IsTeardown() { return (State == NVME_STATE::TEARDOWN); }
+inline bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
+
 #pragma endregion
 
 #pragma region ======== CSpcNvmeDevice ======== 
@@ -96,10 +101,10 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
 
+    State = NVME_STATE::SETUP;
     InitVars();
     LoadRegistry();
     GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
-
     PortCfg = pci;
 
     //todo: handle NUMA nodes for each queue
@@ -123,7 +128,7 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     if (!NT_SUCCESS(status))
         return status;
 
-    IsReady = true;
+    State = NVME_STATE::RUNNING;
     return STATUS_SUCCESS;
 }
 
@@ -133,21 +138,23 @@ bool CNvmeDevice::GetMsixTable()
 }
 #endif 
 
-void CNvmeDevice::Teardown()
+void CNvmeDevice::Teardown(bool shutdown)
 {
-    if(!IsReady)
+    if (!IsWorking())
         return;
-    IsReady = false;
 
+    State = NVME_STATE::TEARDOWN;
     DeleteAdmQ();
     DeleteIoQ();
-//delete all io queues
-//    ShutdownController();
+    
+    State = NVME_STATE::STOP;
+    if(shutdown)
+        ShutdownController();
 }
 
 void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 {
-    if(!this->IsReady)
+    if (!IsWorking())
         return;
 
     if(0 == msix_msgid)
@@ -163,6 +170,9 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 
 NTSTATUS CNvmeDevice::EnableController()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     if (IsControllerReady())
         return STATUS_SUCCESS;
 
@@ -198,6 +208,9 @@ NTSTATUS CNvmeDevice::EnableController()
 }
 NTSTATUS CNvmeDevice::DisableController()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     if(!IsControllerReady())
         return STATUS_SUCCESS;
 
@@ -232,6 +245,9 @@ NTSTATUS CNvmeDevice::DisableController()
 //       all following behavior (e.g. submit new cmd) are UNDEFINED BEHAVIOR.
 NTSTATUS CNvmeDevice::ShutdownController()
 {
+    if (IsStop())
+        return STATUS_DEVICE_NOT_READY;
+
     NVME_CONTROLLER_STATUS csts = { 0 };
     NVME_CONTROLLER_CONFIGURATION cc = { 0 };
     //NTSTATUS status = STATUS_SUCCESS;
@@ -256,6 +272,9 @@ NTSTATUS CNvmeDevice::ShutdownController()
 }
 NTSTATUS CNvmeDevice::InitController()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     NTSTATUS status = STATUS_SUCCESS;
     status = DisableController();
     if(!NT_SUCCESS(status))
@@ -269,10 +288,15 @@ NTSTATUS CNvmeDevice::InitController()
 }
 NTSTATUS CNvmeDevice::RestartController()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
     return STATUS_NOT_IMPLEMENTED;
 }
 NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_SUCCESS;
@@ -302,36 +326,54 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 }
 NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetInterruptCoalescing() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetArbitration() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
     return STATUS_SUCCESS;
@@ -339,6 +381,9 @@ NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
 
 NTSTATUS CNvmeDevice::RegisterIoQ()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
     NTSTATUS status = STATUS_SUCCESS;
@@ -374,6 +419,9 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
 }
 NTSTATUS CNvmeDevice::UnregisterIoQ()
 {
+    if (!IsWorking())
+        return STATUS_DEVICE_NOT_READY;
+
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
     NTSTATUS status = STATUS_SUCCESS;
@@ -454,7 +502,7 @@ NTSTATUS CNvmeDevice::RegisterAdmQ()
 }
 NTSTATUS CNvmeDevice::UnregisterAdmQ()
 {
-    //AQA register should be only modified when csts.RDY==0(cc.EN == 0)
+    //AQA register should be only modified when (csts.RDY==0 && cc.EN == 0)
     if (IsControllerReady())
     {
         NVME_CONTROLLER_STATUS csts = { 0 };
@@ -488,7 +536,6 @@ void CNvmeDevice::ReadCtrlCap()
     ReadNvmeRegister(NvmeVer);
     ReadNvmeRegister(CtrlCap);
     DeviceTimeout = ((UCHAR)CtrlCap.TO) * (500 * 1000);
-
 }
 bool CNvmeDevice::MapCtrlRegisters()
 {
@@ -603,7 +650,6 @@ void CNvmeDevice::InitVars()
 
     VendorID = 0;
     DeviceID = 0;
-    IsReady = FALSE;
     State = NVME_STATE::STOP;
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
     TotalNumaNodes = 0;     //todo: query total numa nodes.
@@ -636,6 +682,7 @@ void CNvmeDevice::LoadRegistry()
 void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
 {
     UNREFERENCED_PARAMETER(queue);
+    //not implemented
 }
 NTSTATUS CNvmeDevice::CreateIoQ()
 {
@@ -649,6 +696,8 @@ NTSTATUS CNvmeDevice::CreateIoQ()
 
     for(USHORT i=0; i<DesiredIoQ; i++)
     {
+        if(NULL != IoQueue[i])
+            continue;
         CNvmeQueue* queue = new CNvmeQueue();
         this->GetQueueDbl(i, cfg.SubDbl, cfg.CplDbl);
         cfg.QID = i + 1;
