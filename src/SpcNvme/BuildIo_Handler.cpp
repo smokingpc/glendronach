@@ -53,18 +53,20 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             AdapterPnp_QueryCapHandler(srbext);
             break;
         case StorRemoveDevice:
-            AdapterPnp_RemoveHandler(srbext);
+        //regular RemoveDevice should shutdown controller first, then delete all queue memory.
             NTSTATUS status = srbext->DevExt->ShutdownController();
             if (!NT_SUCCESS(status))
             {
                 KdBreakPoint();
                 //todo: log
             }
+            AdapterPnp_RemoveHandler(srbext);
 
             break;
         case StorSurpriseRemoval:
-            AdapterPnp_RemoveHandler(srbext);
             //surprise remove doesn't need to shutdown controller.
+            //controller is already gone , access controller registers will make BSoD or other problem.
+            AdapterPnp_RemoveHandler(srbext);
             break;
     }
 

@@ -170,8 +170,8 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 
 NTSTATUS CNvmeDevice::EnableController()
 {
-    if (!IsWorking())
-        return STATUS_INVALID_DEVICE_STATE;
+    //if (!IsWorking())
+    //    return STATUS_INVALID_DEVICE_STATE;
 
     if (IsControllerReady())
         return STATUS_SUCCESS;
@@ -208,8 +208,8 @@ NTSTATUS CNvmeDevice::EnableController()
 }
 NTSTATUS CNvmeDevice::DisableController()
 {
-    if (!IsWorking())
-        return STATUS_INVALID_DEVICE_STATE;
+    //if (!IsWorking())
+    //    return STATUS_INVALID_DEVICE_STATE;
 
     if(!IsControllerReady())
         return STATUS_SUCCESS;
@@ -245,17 +245,17 @@ NTSTATUS CNvmeDevice::DisableController()
 //       all following behavior (e.g. submit new cmd) are UNDEFINED BEHAVIOR.
 NTSTATUS CNvmeDevice::ShutdownController()
 {
-    if (IsStop())
+    if (!IsStop() && !IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    NVME_CONTROLLER_STATUS csts = { 0 };
+    State = NVME_STATE::SHUTDOWN;
     NVME_CONTROLLER_CONFIGURATION cc = { 0 };
     //NTSTATUS status = STATUS_SUCCESS;
     //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 1 and CSTS.RDY == 1).
     bool ok = WaitForCtrlerState(DeviceTimeout, TRUE, TRUE);
     if (!ok)
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, 0, 0, 0);
+        goto ERROR_BSOD;
 
     ReadNvmeRegister(cc);
     cc.SHN = NVME_CC_SHN_NORMAL_SHUTDOWN;
@@ -263,12 +263,15 @@ NTSTATUS CNvmeDevice::ShutdownController()
 
     ok = WaitForCtrlerShst(DeviceTimeout);
     if (!ok)
-    {
-        ReadNvmeRegister(cc);
-        ReadNvmeRegister(csts);
-        KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)cc.AsUlong, (ULONG_PTR)csts.AsUlong, 0);
-    }
+        goto ERROR_BSOD;
+
     return DisableController();
+
+ERROR_BSOD:
+    NVME_CONTROLLER_STATUS csts = { 0 };
+    ReadNvmeRegister(cc);
+    ReadNvmeRegister(csts);
+    KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)cc.AsUlong, (ULONG_PTR)csts.AsUlong, 0);
 }
 NTSTATUS CNvmeDevice::InitController()
 {

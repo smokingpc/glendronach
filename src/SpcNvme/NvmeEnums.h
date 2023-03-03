@@ -45,5 +45,6 @@ typedef enum _NVME_STATE {
     RUNNING = 2,
     TEARDOWN = 3,
     RESET = 4,
+    SHUTDOWN = 5,   //CC.SHN==1
 }NVME_STATE;
 
