@@ -1,20 +1,20 @@
 #include "pch.h"
 
-UCHAR Scsi_Read16(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, FALSE);
 }
 
-UCHAR Scsi_Write16(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Write16(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, TRUE);
 }
 
-UCHAR Scsi_Verify16(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -36,7 +36,7 @@ UCHAR Scsi_Verify16(SPCNVME_SRBEXT srbext)
     //return srb_status;
 }
 
-UCHAR Scsi_ReadCapacity16(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;

@@ -1,10 +1,17 @@
 #include "pch.h"
 
-UCHAR Scsi_ReportLuns12(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
-
+    //struct _REPORT_LUNS {
+    //    UCHAR OperationCode;    // 0xA0 - SCSIOP_REPORT_LUNS
+    //    UCHAR Reserved1[5];
+    //    UCHAR AllocationLength[4];
+    //    UCHAR Reserved2[1];
+    //    UCHAR Control;
+    //} REPORT_LUNS;
+    
     //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     ////ULONG ret_size = 0;
     //UNREFERENCED_PARAMETER(srbext);
@@ -13,7 +20,7 @@ UCHAR Scsi_ReportLuns12(SPCNVME_SRBEXT srbext)
     //return srb_status;
 }
 
-UCHAR Scsi_Read12(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -21,7 +28,7 @@ UCHAR Scsi_Read12(SPCNVME_SRBEXT srbext)
 //    return ReadWriteRamdisk(srbext, FALSE);
 }
 
-UCHAR Scsi_Write12(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Write12(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -29,7 +36,7 @@ UCHAR Scsi_Write12(SPCNVME_SRBEXT srbext)
 //    return ReadWriteRamdisk(srbext, TRUE);
 }
 
-UCHAR Scsi_Verify12(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;

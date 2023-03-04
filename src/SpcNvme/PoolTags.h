@@ -1,5 +1,6 @@
 #pragma once
 
-#define TAG_GENERIC_BUFFER       (ULONG)'FUBG'
-#define SRB_TAG             (ULONG)' BRS'
-#define SRBEXT_TAG          (ULONG)'EBRS'
+#define TAG_GENBUF       (ULONG)'FUBG'
+#define TAG_SRB             (ULONG)' BRS'
+#define TAG_SRBEXT          (ULONG)'EBRS'
+#define TAG_VPDPAGE         (ULONG)'PDPV'

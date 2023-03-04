@@ -89,11 +89,30 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
-inline bool CNvmeDevice::IsWorking() { return (State == NVME_STATE::RUNNING); }
-inline bool CNvmeDevice::IsSetup() { return (State == NVME_STATE::SETUP); }
-inline bool CNvmeDevice::IsTeardown() { return (State == NVME_STATE::TEARDOWN); }
-inline bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
-
+ULONG CNvmeDevice::MinPageSize()
+{
+    return (ULONG)(1 << (12 + CtrlCap.MPSMIN));
+}
+ULONG CNvmeDevice::MaxPageSize()
+{
+    return (ULONG)(1 << (12 + CtrlCap.MPSMAX));
+}
+ULONG CNvmeDevice::MaxTxSize()
+{
+    return (ULONG)((1 << this->CtrlIdent.MDTS) * MinPageSize());
+}
+ULONG CNvmeDevice::MaxTxPages()
+{
+    return (ULONG)(MaxTxSize() / PAGE_SIZE);
+}
+ULONG CNvmeDevice::NsCount()
+{
+    return NamespaceCount;
+}
+bool CNvmeDevice::IsWorking() { return (State == NVME_STATE::RUNNING); }
+bool CNvmeDevice::IsSetup() { return (State == NVME_STATE::SETUP); }
+bool CNvmeDevice::IsTeardown() { return (State == NVME_STATE::TEARDOWN); }
+bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
 #pragma endregion
 
 #pragma region ======== CSpcNvmeDevice ======== 
@@ -151,7 +170,6 @@ void CNvmeDevice::Teardown()
     //if(shutdown)
     //    ShutdownController();
 }
-
 void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
 {
     if (!IsWorking())
@@ -167,7 +185,6 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
         }
     }
 }
-
 NTSTATUS CNvmeDevice::EnableController()
 {
     //if (!IsWorking())
@@ -300,14 +317,14 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_SUCCESS;
     if(NULL == my_srbext)
     {
         my_srbext = new SPCNVME_SRBEXT();
-        my_srbext->Init(this, NULL);
         srbext_ptr.Reset(my_srbext);
+        srbext_ptr->Init(this, NULL);
     }
     BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
     status = AdmQueue->SubmitCmd(my_srbext);
@@ -332,8 +349,42 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "IdentifyNamespace() still not implemented yet!!\n");
+    SPC::CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT my_srbext = srbext;
+    NTSTATUS status = STATUS_SUCCESS;
+    if (NULL == my_srbext)
+    {
+        srbext_ptr.Reset(new SPCNVME_SRBEXT());
+        srbext_ptr->Init(this, NULL);
+    }
+    //BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
+    for(ULONG nsid=1; nsid<=NVME_CONST::SUPPORT_NAMESPACES; nsid++)
+    {
+        BuildCmd_IdentNamespace(&my_srbext->NvmeCmd, &this->NsData[nsid-1], nsid);
+        status = AdmQueue->SubmitCmd(my_srbext);
+
+        //if(srbext != NULL) means this request comes from StartIo
+        if (srbext != NULL || !NT_SUCCESS(status))
+            return status;
+
+        //wait loop for FindAdapter called IdentifyController
+        do
+        {
+            StorPortStallExecution(StallDelay);
+        } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
+
+        if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
+            break;
+
+        //if namespace is not active, passed in NsData block will be zeroed.
+        if(0 == this->NsData[nsid - 1].NSZE)
+            break;
+        NamespaceCount++;
+    }
+
+    //if(0 == NamespaceCount)
+    //return STATUS_REQUEST_NOT_ACCEPTED;
+
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
@@ -387,7 +438,7 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == srbext)
@@ -425,7 +476,7 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == srbext)
@@ -664,8 +715,6 @@ void CNvmeDevice::InitVars()
     AccessRangeCount = 0;
     RtlZeroMemory(AccessRanges, sizeof(ACCESS_RANGE)* ACCESS_RANGE_COUNT);
 
-    MaxTxSize = NVME_CONST::TX_SIZE;
-    MaxTxPages = NVME_CONST::TX_PAGES;
     MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
     AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
     IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
@@ -676,7 +725,12 @@ void CNvmeDevice::InitVars()
     RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
     RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
     RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
-    RtlZeroMemory(&NsData, sizeof(NVME_IDENTIFY_NAMESPACE_DATA)* NVME_CONST::SUPPORT_NAMESPACES);
+//    RtlZeroMemory(&NsData, sizeof(NVME_IDENTIFY_NAMESPACE_DATA)* NVME_CONST::SUPPORT_NAMESPACES);
+
+    for(ULONG i=0; i< NVME_CONST::SUPPORT_NAMESPACES; i++)
+    {
+        memset(NsData + i, 0xFF, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
+    }
 }
 void CNvmeDevice::LoadRegistry()
 {

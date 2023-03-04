@@ -1,18 +1,23 @@
 #pragma once
-inline void CopyToCdbBuffer(PUCHAR& buffer, ULONG& buf_size, PVOID page, ULONG page_size, ULONG& ret_size)
+inline ULONG CopyToCdbBuffer(PUCHAR& buffer, ULONG& buf_size, PVOID page, ULONG page_size, ULONG &ret_size)
 {
-    ULONG copy_size = 0;
-    copy_size = page_size;
-    if (copy_size > buf_size)
-        copy_size = buf_size;
+    ULONG copied_size = 0;
+    copied_size = page_size;
+    if (copied_size > buf_size)
+        copied_size = buf_size;
 
-    StorPortCopyMemory(buffer, page, copy_size);
-    buf_size -= copy_size;  //calculate "how many bytes left for my pending copy"?
-    ret_size += copy_size;
-    buffer += copy_size;
+    RtlCopyMemory(buffer, page, copied_size);
+    buf_size -= copied_size;  //calculate "how many bytes left for my pending copy"?
+    buffer += copied_size;
+    ret_size += copied_size;
+    return copied_size;
 }
 inline void FillParamHeader(PMODE_PARAMETER_HEADER header)
 {
+//In a complete page return buffer, the header->ModeDataLength should be
+// => sizeof(followed page data) + sizeof(header) - sizeof(header->ModeDataLength).
+//Here are set header->ModeDataLength to sizeof(MODE_PARAMETER_HEADER) - sizeof(header->ModeDataLength).
+//In following procedure we will set it to header->ModeDataLength += page_size;
     header->ModeDataLength = sizeof(MODE_PARAMETER_HEADER) - sizeof(header->ModeDataLength);
     header->MediumType = DIRECT_ACCESS_DEVICE;
     header->DeviceSpecificParameter = 0;
@@ -47,55 +52,55 @@ inline void FillModePage_Control(PMODE_CONTROL_PAGE page)
     page->PageLength = (UCHAR)(sizeof(MODE_CONTROL_PAGE) - 2); //sizeof(MODE_CONTROL_PAGE) - sizeof(page->PageCode) - sizeof(page->PageLength)
     page->QueueAlgorithmModifier = 0;
 }
-inline void ReplyModePageCaching(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
+inline ULONG ReplyModePageCaching(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
 {
     MODE_CACHING_PAGE page = { 0 };
     ULONG page_size = sizeof(MODE_CACHING_PAGE);
     FillModePage_Caching(&page);
-    CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
+    return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }
-inline void ReplyModePageControl(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
+inline ULONG ReplyModePageControl(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
 {
     MODE_CONTROL_PAGE page = { 0 };
     ULONG page_size = sizeof(MODE_CONTROL_PAGE);
     FillModePage_Control(&page);
-    CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
+    return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }
-inline void ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
+inline ULONG ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
 {
     MODE_INFO_EXCEPTIONS page = { 0 };
     ULONG page_size = sizeof(MODE_INFO_EXCEPTIONS);
     FillModePage_InfoException(&page);
-    CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
+    return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }
-inline void FillInquiryPage_SerialNumber(PUCHAR buffer, ULONG buf_size, UCHAR* sn, UCHAR sn_len)
-{
-    PVPD_SERIAL_NUMBER_PAGE page = (PVPD_SERIAL_NUMBER_PAGE)buffer;
-    RtlZeroMemory(buffer, buf_size);
-    page->DeviceType = DIRECT_ACCESS_DEVICE;
-    page->DeviceTypeQualifier = DEVICE_CONNECTED;
-    page->PageCode = VPD_SERIAL_NUMBER;
-    page->PageLength = sn_len;
-
-    memcpy((++page), sn, sn_len);
-}
-inline void FillInquiryPage_Identifier(PVPD_IDENTIFICATION_PAGE page, UCHAR *vid, UCHAR vid_size, UCHAR *nqn, UCHAR nqn_size)
-{
-    PVPD_IDENTIFICATION_DESCRIPTOR desc = NULL;
-    ULONG size = sizeof(VPD_IDENTIFICATION_DESCRIPTOR) + vid_size + nqn_size;
-    page->DeviceType = DIRECT_ACCESS_DEVICE;
-    page->DeviceTypeQualifier = DEVICE_CONNECTED;
-    page->PageCode = VPD_DEVICE_IDENTIFIERS;
-    page->PageLength = (UCHAR)size;
-    desc = (PVPD_IDENTIFICATION_DESCRIPTOR)page->Descriptors;
-
-    desc->CodeSet = VpdCodeSetAscii;
-    desc->IdentifierType = VpdIdentifierTypeVendorId;
-    desc->Association = VpdAssocDevice;
-    desc->IdentifierLength = nqn_size + vid_size;
-    StorPortCopyMemory(desc->Identifier, vid, vid_size);
-    StorPortCopyMemory(&desc->Identifier[vid_size], nqn, nqn_size);
-}
+//inline void FillInquiryPage_SerialNumber(PUCHAR buffer, ULONG buf_size, UCHAR* sn, UCHAR sn_len)
+//{
+//    PVPD_SERIAL_NUMBER_PAGE page = (PVPD_SERIAL_NUMBER_PAGE)buffer;
+//    RtlZeroMemory(buffer, buf_size);
+//    page->DeviceType = DIRECT_ACCESS_DEVICE;
+//    page->DeviceTypeQualifier = DEVICE_CONNECTED;
+//    page->PageCode = VPD_SERIAL_NUMBER;
+//    page->PageLength = sn_len;
+//
+//    memcpy((++page), sn, sn_len);
+//}
+//inline void FillInquiryPage_Identifier(PVPD_IDENTIFICATION_PAGE page, UCHAR *vid, UCHAR vid_size, UCHAR *nqn, UCHAR nqn_size)
+//{
+//    PVPD_IDENTIFICATION_DESCRIPTOR desc = NULL;
+//    ULONG size = sizeof(VPD_IDENTIFICATION_DESCRIPTOR) + vid_size + nqn_size;
+//    page->DeviceType = DIRECT_ACCESS_DEVICE;
+//    page->DeviceTypeQualifier = DEVICE_CONNECTED;
+//    page->PageCode = VPD_DEVICE_IDENTIFIERS;
+//    page->PageLength = (UCHAR)size;
+//    desc = (PVPD_IDENTIFICATION_DESCRIPTOR)page->Descriptors;
+//
+//    desc->CodeSet = VpdCodeSetAscii;
+//    desc->IdentifierType = VpdIdentifierTypeVendorId;
+//    desc->Association = VpdAssocDevice;
+//    desc->IdentifierLength = nqn_size + vid_size;
+//    StorPortCopyMemory(desc->Identifier, vid, vid_size);
+//    StorPortCopyMemory(&desc->Identifier[vid_size], nqn, nqn_size);
+//}
 
 //inline void HandleCheckCondition(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status, ULONG ret_size)
 //{

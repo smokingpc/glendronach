@@ -41,6 +41,11 @@ public:
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetPowerManagement(PSPCNVME_SRBEXT srbext);
 
+    ULONG MinPageSize();
+    ULONG MaxPageSize();
+    ULONG MaxTxSize();
+    ULONG MaxTxPages();
+    ULONG NsCount();
     bool IsWorking();
     bool IsSetup();
     bool IsTeardown();
@@ -48,11 +53,13 @@ public:
 
     USHORT  VendorID;
     USHORT  DeviceID;
-    ULONG   MaxTxSize;
-    ULONG   MaxTxPages;
     ULONG   CpuCount;
 
     STOR_DPC QueueCplDpc;
+    NVME_VERSION                        NvmeVer;
+    NVME_CONTROLLER_CAPABILITIES        CtrlCap;
+    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
+    NVME_IDENTIFY_NAMESPACE_DATA        NsData[NVME_CONST::SUPPORT_NAMESPACES];
 
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
@@ -77,14 +84,13 @@ private:
     USHORT IoDepth;
     ULONG AdmDepth;
     ULONG TotalNumaNodes;
-
+    ULONG NamespaceCount;       //how many namespace active in current device?
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
     PCI_COMMON_CONFIG                   PciCfg;
-    NVME_VERSION                        NvmeVer;
-    NVME_CONTROLLER_CAPABILITIES        CtrlCap;
-    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
-    NVME_IDENTIFY_NAMESPACE_DATA NsData[NVME_CONST::SUPPORT_NAMESPACES];
+    ////NVME_CONTROLLER_CAPABILITIES        CtrlCap;
+    //NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
+    //NVME_IDENTIFY_NAMESPACE_DATA NsData[NVME_CONST::SUPPORT_NAMESPACES];
 
     void InitVars();
     void LoadRegistry();

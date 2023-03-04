@@ -42,73 +42,94 @@ namespace SPC
     };
 
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = SpcCppDeleter<_Ty, _PoolType, _PoolTag>>
-    class CAutoPtr
+    class CAutoPtr 
+    {
+    public:
+        using DataType = _Ty;
+        using DeleterType = _Dx;
+
+        CAutoPtr() noexcept {
+            this->Ptr = nullptr;
+        }
+        CAutoPtr(DataType* ptr) noexcept {
+            this->Ptr = ptr;
+        }
+        CAutoPtr(PVOID ptr) noexcept {
+            this->Ptr = (DataType*)ptr;
+        }
+
+        virtual ~CAutoPtr() noexcept {
+            if (nullptr != this->Ptr)
+                this->Deleter(this->Ptr);
+        }
+
+        CAutoPtr& operator=(CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
         {
-        public:
-            using DataType = _Ty;
-            using DeleterType = _Dx;
+            Reset(_Right.release());
+            return *this;
+        }
 
-            CAutoPtr(DataType* ptr = nullptr) noexcept {
-                this->Ptr = ptr;
-            }
+        operator _Ty* () const
+        {
+            return this->Ptr;
+        }
 
-            virtual ~CAutoPtr() noexcept {
-                if (nullptr != this->Ptr)
-                    this->Deleter(this->Ptr);
-            }
+        _Ty* operator->() const noexcept
+        {
+            return this->Ptr;
+        }
 
-            CAutoPtr& operator=(CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
+        void Set(_Ty* ptr)  noexcept {
+            this->Ptr = ptr;
+        }
+
+        _Ty* Get() const noexcept {
+            return this->Ptr;
+        }
+            
+        bool IsNull()  const noexcept 
+        {
+            return (NULL==this->Ptr);
+        }
+
+        void Reset(_Ty* new_ptr = nullptr) noexcept {
+            _Ty* old_ptr = NULL;
+            old_ptr = this->Ptr;
+            this->Ptr = new_ptr;
+
+            if (old_ptr)
             {
-                Reset(_Right.release());
-                return *this;
+                this->Deleter(old_ptr);
             }
+        }
 
-            operator _Ty* () const
-            {
-                return this->Ptr;
-            }
+        _Ty* Release() noexcept {
+            _Ty* old_ptr = this->Ptr;
+            this->Ptr = nullptr;
+            return old_ptr;
+        }
 
-            _Ty* operator->() const noexcept
-            {
-                return this->Ptr;
-            }
+    protected:
+        DataType* Ptr = nullptr;
+        DeleterType Deleter;
 
-            void Set(_Ty* ptr)  noexcept {
-                this->Ptr = ptr;
-            }
-
-            _Ty* Get() const noexcept {
-                return this->Ptr;
-            }
-
-            void Reset(_Ty* new_ptr = nullptr) noexcept {
-                _Ty* old_ptr = NULL;
-                old_ptr = this->Ptr;
-                this->Ptr = new_ptr;
-
-                if (old_ptr)
-                {
-                    this->Deleter(old_ptr);
-                }
-            }
-
-            _Ty* Release() noexcept {
-                _Ty* old_ptr = this->Ptr;
-                this->Ptr = nullptr;
-                return old_ptr;
-            }
-
-        protected:
-            DataType* Ptr = nullptr;
-            DeleterType Deleter;
-
-            friend class CAutoPtr;
-        };
+        friend class CAutoPtr;
+    };
 
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = WinKernelDeleter<_Ty, _PoolType, _PoolTag>>
-        class CWinAutoPtr : CAutoPtr<_Ty, _PoolType, _PoolTag>
-        {
-        protected:
-            friend class CWinAutoPtr;
-        };
+    class CWinAutoPtr : public CAutoPtr<_Ty, _PoolType, _PoolTag>
+    {
+    public:
+        CWinAutoPtr() noexcept
+            :CAutoPtr<_Ty, _PoolType, _PoolTag>()
+        {}
+        CWinAutoPtr(_Ty* ptr) noexcept
+            :CAutoPtr<_Ty, _PoolType, _PoolTag>(ptr)
+        {}
+        CWinAutoPtr(PVOID ptr) noexcept 
+            :CAutoPtr<_Ty, _PoolType, _PoolTag>(ptr)
+        {}
+    protected:
+        friend class CWinAutoPtr;
+    };
 }

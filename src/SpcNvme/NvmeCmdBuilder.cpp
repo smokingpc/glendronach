@@ -11,6 +11,15 @@ void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, PNVME_IDENTIFY_CONTROLLER_DATA data
 
     BuildPrp(cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
 }
+void BuildCmd_IdentNamespace(PNVME_COMMAND cmd, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid)
+{
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
+    cmd->NSID = nsid;
+    cmd->u.IDENTIFY.CDW10.CNS = (ULONG)IDENTIFY_CNS::IDENT_NAMESPACE;
+
+    BuildPrp(cmd, (PVOID)data, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
+}
 void BuildCmd_RegIoSubQ(PNVME_COMMAND cmd, CNvmeQueue *queue)
 {
     PHYSICAL_ADDRESS paddr = {0};
@@ -100,7 +109,7 @@ void BuildCmd_SyncHostTime(PNVME_COMMAND cmd, LARGE_INTEGER *timestamp)
 
     //PVOID timestamp = NULL;
     //ULONG size = PAGE_SIZE;
-    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENERIC_BUFFER, &timestamp);
+    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENBUF, &timestamp);
     //if (STOR_STATUS_SUCCESS != status)
     //    return FALSE;
     //RtlZeroMemory(timestamp, size);
@@ -200,7 +209,7 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 
     //PVOID timestamp = NULL;
     //ULONG size = PAGE_SIZE;
-    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENERIC_BUFFER, &timestamp);
+    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENBUF, &timestamp);
     //if (STOR_STATUS_SUCCESS != status)
     //    return FALSE;
     //RtlZeroMemory(timestamp, size);
@@ -261,7 +270,7 @@ NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
     //cmd.NSID = 1;
     //cmd.u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_SPECIFIC_NAMESPACE;
 
-    //StorPortAllocatePool(devext, size, TAG_GENERIC_BUFFER, &buffer);
+    //StorPortAllocatePool(devext, size, TAG_GENBUF, &buffer);
     //RtlZeroMemory(buffer, size);
 
     //cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, buffer, &size).QuadPart;

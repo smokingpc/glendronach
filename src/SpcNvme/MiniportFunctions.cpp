@@ -1,86 +1,11 @@
 #include "pch.h"
 
-#if 0
-static void CreateAdminQueue(PSPCNVME_DEVEXT devext)
-{
-    QUEUE_PAIR_CONFIG qcfg = {
-        .DevExt = devext,
-        .QID = 0,
-        .Depth = NVME_CONST::ADMIN_QUEUE_DEPTH,
-        .Type = QUEUE_TYPE::ADM_QUEUE,
-    };
-    devext->NvmeDev->GetAdmDoorbell(&qcfg.SubDbl, &qcfg.CplDbl);
-    devext->AdminQueue = new CNvmeQueue(&qcfg);
-}
-static void DeleteAdminQueue(PSPCNVME_DEVEXT devext)
-{
-    if (nullptr != devext->AdminQueue)
-    {
-        //devext->AdminQueue->Teardown();
-        delete devext->AdminQueue;
-        devext->AdminQueue = nullptr;
-    }
-}
-static void CreateIoQueues(PSPCNVME_DEVEXT devext)
-{
-    devext->IoQueueCount = NVME_CONST::IO_QUEUE_COUNT;
-    for(ULONG i=0; i<devext->IoQueueCount; i++)
-    {
-        QUEUE_PAIR_CONFIG qcfg = {
-            .DevExt = devext,
-            .QID = (USHORT) (i+1), //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
-            .Depth = NVME_CONST::IO_QUEUE_DEPTH,
-            .Type = QUEUE_TYPE::IO_QUEUE,
-        };
-        devext->IoQueue[i] = new CNvmeQueue(&qcfg);
-    }
-}
-static void DeleteIoQueues(PSPCNVME_DEVEXT devext)
-{
-    for (int i = devext->IoQueueCount; i > 0; i--)
-    {
-        QUEUE_PAIR_CONFIG qcfg = {
-            .DevExt = devext,
-            .QID = (USHORT)i, //nvme qid is 0-based, but AdminQ is always queue[0]. so I/O queue qid can be treat as 1-based.
-            .Depth = NVME_CONST::IO_QUEUE_DEPTH,
-            .Type = QUEUE_TYPE::IO_QUEUE,
-        };
-        delete devext->IoQueue[i-1];
-        devext->IoQueue[i - 1] = nullptr;
-    }
-    devext->IoQueueCount = 0;
-}
-static bool SetupDeviceExtension(PSPCNVME_DEVEXT devext, PSPCNVME_CONFIG cfg, PPORT_CONFIGURATION_INFORMATION portcfg)
-{
-//workaround
-    RtlCopyMemory(devext->PciSpace, (*portcfg->AccessRanges), sizeof(ACCESS_RANGE)*portcfg->NumberOfAccessRanges);
-
-    devext->NvmeDev = CNvmeDevice::Create(devext, cfg);
-    if(NULL == devext->NvmeDev)
-        return false;
-
-    devext->CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-
-    CreateAdminQueue(devext);
-    CreateIoQueues(devext);
-
-    //prepare DPC for MSIX interrupt
-    StorPortInitializeDpc(devext, &devext->NvmeDPC, NvmeDpcRoutine);
-    
-    return true;
-}
-static void TeardownDeviceExtension(PSPCNVME_DEVEXT devext)
-{
-    //stop msix
-    //teardown io queues
-    DeleteAdminQueue(devext);
-}
-#endif
-
 static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvmeDevice* nvme)
 {
-    portcfg->MaximumTransferLength = nvme->MaxTxSize;//MAX_TX_SIZE;
-    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages;//MAX_TX_PAGES;
+//Because MaxTxSize and MaxTxPages should be calculated by nvme->CtrlCap and nvme->CtrlIdent,
+//So FillPortConfiguration() should be called AFTER nvme->IdentifyController()
+    portcfg->MaximumTransferLength = nvme->MaxTxSize();
+    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages();
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
@@ -246,7 +171,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     BOOLEAN need_startio = FALSE;
     //UCHAR srb_status = 0;
 
-    switch (srbext->FuncCode)
+    switch (srbext->FuncCode())
     {
     case SRB_FUNCTION_ABORT_COMMAND:
     case SRB_FUNCTION_RESET_LOGICAL_UNIT: //handled by HwUnitControl?
@@ -266,8 +191,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     //case SRB_FUNCTION_WMI:
 
     case SRB_FUNCTION_POWER:
-        BuildIo_SrbPowerHandler(srbext);
-        need_startio = FALSE;
+        need_startio = BuildIo_SrbPowerHandler(srbext);
         break;
     case SRB_FUNCTION_EXECUTE_SCSI:
         need_startio = BuildIo_ScsiHandler(srbext);
@@ -291,10 +215,10 @@ _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
-    BOOLEAN ok = FALSE;
+    //BOOLEAN ok = FALSE;
     UCHAR srb_status = SRB_STATUS_ERROR;
 
-    switch (srbext->FuncCode)
+    switch (srbext->FuncCode())
     {
         //case SRB_FUNCTION_ABORT_COMMAND:
     //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
@@ -320,7 +244,8 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
     }
 
     //todo: handle SCSI status for SRB
-    srbext->Srb->SrbStatus = srb_status;
+    srbext->SetStatus(srb_status);
+    //srbext->Srb->SrbStatus = srb_status;
     StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
 
     //return TRUE indicates that "this driver handled this request, no matter succeed or fail..."

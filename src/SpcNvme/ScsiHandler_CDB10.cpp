@@ -1,6 +1,6 @@
 #include "pch.h"
 
-inline void FillReadCapacityEx(SPCNVME_SRBEXT srbext)
+inline void FillReadCapacityEx(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     //PREAD_CAPACITY_DATA_EX readcap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
@@ -14,7 +14,7 @@ inline void FillReadCapacityEx(SPCNVME_SRBEXT srbext)
 
     //SrbSetDataTransferLength((PVOID)(srbext->Srb), sizeof(READ_CAPACITY_DATA_EX));
 }
-inline void FillReadCapacity(SPCNVME_SRBEXT srbext)
+inline void FillReadCapacity(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     //PREAD_CAPACITY_DATA readcap = (PREAD_CAPACITY_DATA)srbext->DataBuffer;
@@ -32,20 +32,20 @@ inline void FillReadCapacity(SPCNVME_SRBEXT srbext)
     //SrbSetDataTransferLength((PVOID)(srbext->Srb), sizeof(READ_CAPACITY_DATA));
 }
 
-UCHAR Scsi_Read10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, FALSE);
 }
-UCHAR Scsi_Write10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Write10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 //    return ReadWriteRamdisk(srbext, TRUE);
 }
 
-UCHAR Scsi_ReadCapacity10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -72,7 +72,7 @@ UCHAR Scsi_ReadCapacity10(SPCNVME_SRBEXT srbext)
     ////HandleCheckCondition(srbext->Srb, srb_status, ret_size);
     //return srb_status;
 }
-UCHAR Scsi_Verify10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -93,7 +93,7 @@ UCHAR Scsi_Verify10(SPCNVME_SRBEXT srbext)
     //SrbSetDataTransferLength(srbext->Srb, 0);
     //return srb_status;
 }
-UCHAR Scsi_ModeSelect10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSelect10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -102,7 +102,7 @@ UCHAR Scsi_ModeSelect10(SPCNVME_SRBEXT srbext)
     //UNREFERENCED_PARAMETER(srbext);
     //return srb_status;
 }
-UCHAR Scsi_ModeSense10(SPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSense10(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string.h>
 #include <ntifs.h>
 #include <wdm.h>
 #include <ntddscsi.h>
@@ -30,4 +31,10 @@ EXTERN_C_END
 #include "StartIo_Handler.h"
 #include "ISR_and_DPC.h"
 
-using SPC::CAutoPtr;
+#include "ScsiHandler_CDB6.h"
+#include "ScsiHandler_CDB10.h"
+#include "ScsiHandler_CDB12.h"
+#include "ScsiHandler_CDB16.h"
+#include "ScsiHandler_InlineUtils.h"
+
+using SPC::CWinAutoPtr;

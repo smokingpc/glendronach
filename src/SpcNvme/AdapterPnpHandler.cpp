@@ -1,8 +1,8 @@
 #include "pch.h"
 
-void AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
+UCHAR AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
 {
-    PSTOR_DEVICE_CAPABILITIES_EX cap = (PSTOR_DEVICE_CAPABILITIES_EX)srbext->DataBuf;
+    PSTOR_DEVICE_CAPABILITIES_EX cap = (PSTOR_DEVICE_CAPABILITIES_EX)srbext->DataBuf();
     cap->Version = STOR_DEVICE_CAPABILITIES_EX_VERSION_1;
     cap->Size = sizeof(STOR_DEVICE_CAPABILITIES_EX);
     cap->DeviceD1 = 0;
@@ -17,12 +17,15 @@ void AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
     cap->NoDisplayInUI = 0;     //should this adapter be shown on DeviceManager UI?
     cap->Address = 0;
     cap->UINumber = 0xFFFFFFFF;
-    srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
+//    srbext->SetStatus(SRB_STATUS_SUCCESS);
+    return SRB_STATUS_SUCCESS;
 }
 
-void AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
+UCHAR AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    //NTSTATUS status = STATUS_UNSUCCESSFUL;
     srbext->DevExt->Teardown();
-    srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
+//    srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
+//    srbext->SetStatus(SRB_STATUS_SUCCESS);
+    return SRB_STATUS_SUCCESS;
 }

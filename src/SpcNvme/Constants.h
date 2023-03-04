@@ -18,6 +18,10 @@
 
 #define ACCESS_RANGE_COUNT  8
 
+//const char* SpcVendorID = "SPC     ";           //vendor name
+//const char* SpcProductID = "SomkingPC NVMe  ";  //model name
+//const char* SpcProductRev = "0100";
+
 #pragma region  ======== SCSI and SRB RELATED ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF
 #define INVALID_PATH_ID      ((UCHAR)~0)
