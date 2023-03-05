@@ -115,7 +115,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->PageCode = VPD_BLOCK_LIMITS;
     REVERSE_BYTES_2(page->PageLength, &buf_size);
 
-    ULONG max_tx = srbext->DevExt->MaxTxSize();
+    ULONG max_tx = srbext->DevExt->MaxTxSize;
     //tell I/O system: max tx size and optimal tx size of this adapter.
     REVERSE_BYTES_4(page->MaximumTransferLength, &max_tx);
     REVERSE_BYTES_4(page->OptimalTransferLength, &max_tx);
@@ -254,15 +254,43 @@ UCHAR Scsi_RequestSense6(PSPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_Read6(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, FALSE);
+//the SCSI I/O are based for BLOCKs of device, not bytes....
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+    UCHAR srb_status = SRB_STATUS_ERROR;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
+    srb_status = BuiildCmd_Read(srbext, offset, len);
+    if (SRB_STATUS_SUCCESS == srb_status)
+    {
+        status = srbext->DevExt->SubmitCmd(srbext, &srbext->NvmeCmd);
+        if (!NT_SUCCESS(status))
+            srb_status = SRB_STATUS_ERROR;
+    }
+
+    return srb_status;
 }
 UCHAR Scsi_Write6(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, TRUE);
+    //the SCSI I/O are based for BLOCKs of device, not bytes....
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+    UCHAR srb_status = SRB_STATUS_ERROR;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    
+    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
+    srb_status = BuiildCmd_Write(srbext, offset, len);
+    if (SRB_STATUS_SUCCESS == srb_status)
+    {
+        status = srbext->DevExt->SubmitCmd(srbext, &srbext->NvmeCmd);
+        if(!NT_SUCCESS(status))
+            srb_status = SRB_STATUS_ERROR;
+    }
+
+    return srb_status;
 }
 UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext) 
 {
@@ -286,7 +314,8 @@ UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext)
             ULONG size = srbext->DataBufLen();
             ret_size = 0;
             srb_status = SRB_STATUS_DATA_OVERRUN;
-            //in Win2000 and older version, NT SCSI system only query INQUIRYDATABUFFERSIZE bytes.
+            //in Win2000 and older version, NT SCSI system only query 
+            //INQUIRYDATABUFFERSIZE bytes.
             //Since WinXP, it should return sizeof(INQUIRYDATA) bytes data. 
             if(size >= INQUIRYDATABUFFERSIZE)
             {

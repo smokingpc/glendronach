@@ -2,22 +2,15 @@
 
 UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext)
 {
+//according SEAGATE SCSI reference, SCSIOP_REPORT_LUNS
+//is used to query SCSI Logical Unit class address.
+//each address are 8 bytes. In current windows system 
+//I can't find reference data to determine LU address.
+//MSDN also said it's NOT recommend to translate this SCSI 
+//command for NVMe device.
+//So I skip this command....
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
-    //struct _REPORT_LUNS {
-    //    UCHAR OperationCode;    // 0xA0 - SCSIOP_REPORT_LUNS
-    //    UCHAR Reserved1[5];
-    //    UCHAR AllocationLength[4];
-    //    UCHAR Reserved2[1];
-    //    UCHAR Control;
-    //} REPORT_LUNS;
-    
-    //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    ////ULONG ret_size = 0;
-    //UNREFERENCED_PARAMETER(srbext);
-    ////REPORT_LUNS + LUN_LIST structures
-
-    //return srb_status;
 }
 
 UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext)

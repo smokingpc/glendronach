@@ -10,7 +10,11 @@ typedef struct _SPCNVME_SRBEXT
     PSTORAGE_REQUEST_BLOCK Srb;
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
     BOOLEAN InitOK;
+    BOOLEAN FreePrp2List;
     NVME_COMMAND NvmeCmd;
+
+    PVOID Prp2VA;
+    PHYSICAL_ADDRESS Prp2PA;
 
     //ULONG FuncCode;         //SRB Function Code
     //ULONG ScsiQTag;
@@ -33,6 +37,7 @@ typedef struct _SPCNVME_SRBEXT
     UCHAR Lun();              //SCSI Logical UNit ID
     PVOID DataBuf();
     ULONG DataBufLen();
+    void SetTransferLength(ULONG length);
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
 UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status);

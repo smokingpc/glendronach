@@ -1,4 +1,18 @@
 #include "pch.h"
+inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
+{
+    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuf();
+    ULONG block_size = 0;
+    ULONG64 blocks = 0;
+    srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
+
+    //LogicalBlockAddress is MAX LBA index, it's zero-based id.
+    //**this field is (total LBA count)-1.
+    srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
+    blocks -= 1;
+    REVERSE_BYTES_4(cap->BytesPerBlock, &block_size);
+    REVERSE_BYTES_8(cap->LogicalBlockAddress.QuadPart, &blocks);
+}
 
 UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)
 {
@@ -38,31 +52,33 @@ UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
+    UCHAR srb_status = SRB_STATUS_SUCCESS;
+    ULONG ret_size = 0;
+    UCHAR lun = srbext->Lun();
+
+    //LUN is zero based...
+    if (lun >= srbext->DevExt->NamespaceCount)
+    {
+        srb_status = SRB_STATUS_INVALID_LUN;
+        goto END;
+    }
+    if (!srbext->DevExt->IsWorking())
+    {
+        srb_status = SRB_STATUS_NO_DEVICE;
+        goto END;
+    }
+
+    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA_EX))
+    {
+        FillReadCapacityEx(lun, srbext);
+        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    }
+    else
+    {
+        srb_status = SRB_STATUS_DATA_OVERRUN;
+        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    }
+END:
+    srbext->SetTransferLength(ret_size);
     return SRB_STATUS_INVALID_REQUEST;
-    //UCHAR srb_status = SRB_STATUS_SUCCESS;
-    //ULONG ret_size = sizeof(READ_CAPACITY16_DATA);
-    //PREAD_CAPACITY16_DATA readcap = (PREAD_CAPACITY16_DATA)srbext->DataBuffer;
-    //RtlZeroMemory(readcap, srbext->DataBufLen);
-
-    //if(srbext->DataBufLen >= sizeof(READ_CAPACITY16_DATA))
-    //{
-    //    CRamdisk* disk = srbext->DevExt->RamDisk;
-    //    ULONG block_size = disk->GetSizeOfBlock();
-    //    INT64 last_lba = disk->GetMaxLBA();
-
-    //    REVERSE_BYTES_QUAD(&readcap->LogicalBlockAddress, &last_lba);
-    //    REVERSE_BYTES(&readcap->BytesPerBlock, &block_size);
-    //    readcap->ProtectionEnable = FALSE;
-    //    //todo: fill other fields in READ_CAPACITY16_DATA
-    //    //e.g.      UCHAR ProtectionEnable : 1;
-    //    //          UCHAR ProtectionType : 3;
-    //}
-    //else
-    //{
-    //    srb_status = SRB_STATUS_DATA_OVERRUN;
-    //}
-
-    //SrbSetDataTransferLength(srbext->Srb, ret_size);
-    //return srb_status;
 }

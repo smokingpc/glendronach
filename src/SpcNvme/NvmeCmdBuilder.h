@@ -1,12 +1,14 @@
 #pragma once
+UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
+UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
 
-void BuildCmd_IdentCtrler(PNVME_COMMAND cmd, PNVME_IDENTIFY_CONTROLLER_DATA data);
-void BuildCmd_IdentNamespace(PNVME_COMMAND cmd, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid);
+void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data);
+void BuildCmd_IdentNamespace(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid);
 
-void BuildCmd_RegIoSubQ(PNVME_COMMAND cmd, CNvmeQueue* queue);
-void BuildCmd_RegIoCplQ(PNVME_COMMAND cmd, CNvmeQueue* queue);
-void BuildCmd_UnRegIoSubQ(PNVME_COMMAND cmd, CNvmeQueue* queue);
-void BuildCmd_UnRegIoCplQ(PNVME_COMMAND cmd, CNvmeQueue* queue);
+void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_RegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_UnRegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
 
-void BuildCmd_InterruptCoalescing(PNVME_COMMAND cmd, UCHAR threshold, UCHAR interval);
-void BuildCmd_SetArbitration(PNVME_COMMAND cmd);
+void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR interval);
+void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext);

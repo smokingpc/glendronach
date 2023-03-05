@@ -1,35 +1,29 @@
 #include "pch.h"
 
-inline void FillReadCapacityEx(PSPCNVME_SRBEXT srbext)
+inline void FillReadCapacity(UCHAR lun, PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    //PREAD_CAPACITY_DATA_EX readcap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
+    PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuf();
+    ULONG block_size = 0;
+    ULONG64 blocks = 0;
+    srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
 
-    //CRamdisk* disk = srbext->DevExt->RamDisk;
-    //ULONG block_size = disk->GetSizeOfBlock();
-    //INT64 last_lba = disk->GetMaxLBA();
+    //LogicalBlockAddress is MAX LBA index, it's zero-based id.
+    //**this field is (total LBA count)-1.
+    srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
 
-    //REVERSE_BYTES_QUAD(&readcap->LogicalBlockAddress.QuadPart, &last_lba);
-    //REVERSE_BYTES(&readcap->BytesPerBlock, &block_size);
-
-    //SrbSetDataTransferLength((PVOID)(srbext->Srb), sizeof(READ_CAPACITY_DATA_EX));
-}
-inline void FillReadCapacity(PSPCNVME_SRBEXT srbext)
-{
-    UNREFERENCED_PARAMETER(srbext);
-    //PREAD_CAPACITY_DATA readcap = (PREAD_CAPACITY_DATA)srbext->DataBuffer;
-
-    //CRamdisk* disk = srbext->DevExt->RamDisk;
-    //ULONG block_size = disk->GetSizeOfBlock();
-    //INT64 last_lba = disk->GetMaxLBA();
-
-    //if (last_lba > 0xFFFFFFFF)
-    //    last_lba = 0xFFFFFFFF;
-
-    //REVERSE_BYTES(&readcap->LogicalBlockAddress, &last_lba);
-    //REVERSE_BYTES(&readcap->BytesPerBlock, &block_size);
-
-    //SrbSetDataTransferLength((PVOID)(srbext->Srb), sizeof(READ_CAPACITY_DATA));
+    //NO support thin-provisioning in current stage....
+    //*From SBC - 3 r27:
+    //    *If the RETURNED LOGICAL BLOCK ADDRESS field is set to FFFF_FFFFh,
+    //    * then the application client should issue a READ CAPACITY(16)
+    //    * command(see 5.16) to request that the device server transfer the
+    //    * READ CAPACITY(16) parameter data to the data - in buffer.
+    if(blocks > MAXULONG32)
+        blocks = (ULONG64)MAXULONG32;
+    else
+        blocks -= 1;
+    cap->LogicalBlockAddress = cap->BytesPerBlock = 0;
+    REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
+    REVERSE_BYTES_4(&cap->LogicalBlockAddress, &blocks); //only reverse lower 4 bytes
 }
 
 UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
@@ -47,30 +41,53 @@ UCHAR Scsi_Write10(PSPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
+    UCHAR srb_status = SRB_STATUS_SUCCESS;
+    ULONG ret_size = 0;
+    UCHAR lun = srbext->Lun();
 
-    //UCHAR srb_status = SRB_STATUS_SUCCESS;
-    //ULONG ret_size = 0;
-    //RtlZeroMemory(srbext->DataBuffer, srbext->DataBufLen);
-    //if (srbext->DataBufLen >= sizeof(READ_CAPACITY_DATA_EX))
-    //{
-    //    FillReadCapacityEx(srbext);
-    //    ret_size = sizeof(READ_CAPACITY_DATA_EX);
-    //}
-    //else if (srbext->DataBufLen >= sizeof(READ_CAPACITY_DATA)) 
-    //{
-    //    FillReadCapacity(srbext);
-    //    ret_size = sizeof(READ_CAPACITY_DATA);
-    //}
-    //else 
-    //{
-    //    srb_status = SRB_STATUS_DATA_OVERRUN;
-    //    ret_size = sizeof(READ_CAPACITY_DATA_EX);
-    //}
-    //SrbSetDataTransferLength(srbext->Srb, ret_size);
-    ////HandleCheckCondition(srbext->Srb, srb_status, ret_size);
-    //return srb_status;
+    //LUN is zero based...
+    if(lun >= srbext->DevExt->NamespaceCount)
+    { 
+        srb_status = SRB_STATUS_INVALID_LUN;
+        goto END;
+    }
+    if(!srbext->DevExt->IsWorking())
+    {
+        srb_status = SRB_STATUS_NO_DEVICE;
+        goto END;
+    }
+    
+    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA))
+    {
+        FillReadCapacity(lun, srbext);
+        ret_size = sizeof(READ_CAPACITY_DATA);
+    }
+    else
+    {
+        srb_status = SRB_STATUS_DATA_OVERRUN;
+        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    }
+
+#if 0
+    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA_EX))
+    {
+        FillReadCapacityEx(lun, srbext);
+        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    }
+    else if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA)) 
+    {
+        FillReadCapacity(lun, srbext);
+        ret_size = sizeof(READ_CAPACITY_DATA);
+    }
+    else 
+    {
+        srb_status = SRB_STATUS_DATA_OVERRUN;
+        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    }
+#endif
+END:
+    srbext->SetTransferLength(ret_size);
+    return SRB_STATUS_INVALID_REQUEST;
 }
 UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
 {

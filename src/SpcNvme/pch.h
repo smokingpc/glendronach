@@ -26,7 +26,7 @@ EXTERN_C_END
 #include "MiniportFunctions.h"
 #include "NvmePrpBuilder.h"
 #include "NvmeCmdBuilder.h"
-
+#include "NvmeIoCommands.h"
 #include "BuildIo_Handlers.h"
 #include "StartIo_Handler.h"
 #include "ISR_and_DPC.h"

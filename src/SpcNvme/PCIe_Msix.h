@@ -12,16 +12,16 @@
 typedef union _MSIX_MSG_ADDR
 {
     struct {
-        ULONGLONG Aligment : 2;
-        ULONGLONG DestinationMode : 1;
-        ULONGLONG RedirHint : 1;
-        ULONGLONG Reserved : 8;
-        ULONGLONG DestinationID : 8;
-        ULONGLONG BaseAddr : 12;        //LocalAPIC register phypage, which set in CPU MSR(0x1B)
-        ULONGLONG Reserved2 : 32;
+        ULONG64 Aligment : 2;
+        ULONG64 DestinationMode : 1;
+        ULONG64 RedirHint : 1;
+        ULONG64 Reserved : 8;
+        ULONG64 DestinationID : 8;
+        ULONG64 BaseAddr : 12;        //LocalAPIC register phypage, which set in CPU MSR(0x1B)
+        ULONG64 Reserved2 : 32;
     };
-    inline ULONGLONG GetApicBaseAddr() { return (BaseAddr << 20); }
-    ULONGLONG AsUlonglong;
+    inline ULONG64 GetApicBaseAddr() { return (BaseAddr << 20); }
+    ULONG64 AsULONG64;
 }MSIX_MSG_ADDR, * PMSIX_MSG_ADDR;
 
 typedef union _MSIX_MSG_DATA{
@@ -48,7 +48,7 @@ typedef union _MSIX_VECTOR_CTRL
 typedef struct _MSIX_TABLE_ENTRY
 {
     MSIX_MSG_ADDR MsgAddr;
-    inline ULONGLONG GetApicBaseAddr() { return MsgAddr.GetApicBaseAddr(); }
+    inline ULONG64 GetApicBaseAddr() { return MsgAddr.GetApicBaseAddr(); }
     MSIX_MSG_DATA MsgData;
     MSIX_VECTOR_CTRL VectorCtrl;
 }MSIX_TABLE_ENTRY, * PMSIX_TABLE_ENTRY;

@@ -73,65 +73,51 @@ inline ULONG ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULO
     FillModePage_InfoException(&page);
     return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }
-//inline void FillInquiryPage_SerialNumber(PUCHAR buffer, ULONG buf_size, UCHAR* sn, UCHAR sn_len)
-//{
-//    PVPD_SERIAL_NUMBER_PAGE page = (PVPD_SERIAL_NUMBER_PAGE)buffer;
-//    RtlZeroMemory(buffer, buf_size);
-//    page->DeviceType = DIRECT_ACCESS_DEVICE;
-//    page->DeviceTypeQualifier = DEVICE_CONNECTED;
-//    page->PageCode = VPD_SERIAL_NUMBER;
-//    page->PageLength = sn_len;
-//
-//    memcpy((++page), sn, sn_len);
-//}
-//inline void FillInquiryPage_Identifier(PVPD_IDENTIFICATION_PAGE page, UCHAR *vid, UCHAR vid_size, UCHAR *nqn, UCHAR nqn_size)
-//{
-//    PVPD_IDENTIFICATION_DESCRIPTOR desc = NULL;
-//    ULONG size = sizeof(VPD_IDENTIFICATION_DESCRIPTOR) + vid_size + nqn_size;
-//    page->DeviceType = DIRECT_ACCESS_DEVICE;
-//    page->DeviceTypeQualifier = DEVICE_CONNECTED;
-//    page->PageCode = VPD_DEVICE_IDENTIFIERS;
-//    page->PageLength = (UCHAR)size;
-//    desc = (PVPD_IDENTIFICATION_DESCRIPTOR)page->Descriptors;
-//
-//    desc->CodeSet = VpdCodeSetAscii;
-//    desc->IdentifierType = VpdIdentifierTypeVendorId;
-//    desc->Association = VpdAssocDevice;
-//    desc->IdentifierLength = nqn_size + vid_size;
-//    StorPortCopyMemory(desc->Identifier, vid, vid_size);
-//    StorPortCopyMemory(&desc->Identifier[vid_size], nqn, nqn_size);
-//}
 
-//inline void HandleCheckCondition(PSTORAGE_REQUEST_BLOCK srb, UCHAR srb_status, ULONG ret_size)
-//{
-//    PSENSE_DATA sense = (PSENSE_DATA)SrbGetSenseInfoBuffer(srb);
-//    UCHAR sense_size = SrbGetSenseInfoBufferLength(srb);
-//    UCHAR sense_key = SCSI_SENSE_NO_SENSE;
-//    UCHAR adsense_key = SCSI_ADSENSE_NO_SENSE;
-//
-//    if (SRB_STATUS_SUCCESS != srb_status)
-//    {
-//        sense_key = SCSI_SENSE_ILLEGAL_REQUEST;
-//        adsense_key = SCSI_ADSENSE_ILLEGAL_COMMAND;
-//    }
-//
-//    if (sense && sense_size)
-//    {
-//        RtlZeroMemory(sense, sense_size);
-//        sense->ErrorCode = SCSI_SENSE_ERRORCODE_FIXED_CURRENT;
-//        sense->Valid = 0;
-//        sense->SenseKey = sense_key;
-//        sense->AdditionalSenseLength = 0;
-//        sense->AdditionalSenseCode = adsense_key;  //problem root cause
-//        sense->AdditionalSenseCodeQualifier = 0;
-//        SrbSetScsiStatus(srb, SCSISTAT_CHECK_CONDITION);
-//        srb_status |= SRB_STATUS_AUTOSENSE_VALID;
-//    }
-//    //
-//    // Set this to 0 to indicate that no data was transfered because
-//    // of the error.
-//    //
-//    if (srb_status != SRB_STATUS_DATA_OVERRUN && srb_status != SRB_STATUS_SUCCESS)
-//        ret_size = 0;
-//    SrbSetDataTransferLength(srb, ret_size);
-//}
+#pragma region ======== Parse SCSI ReadWrite length and offset ======== 
+//Note: In SCSI, all read/write request are in "BLOCKS", not in bytes.
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG len)
+{
+    //offset = ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb1 << 16) |
+    //    ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb0 << 8) |
+    //    ((ULONG64)cdb->CDB6READWRITE.LogicalBlockLsb);
+    //blocks = cdb->CDB6READWRITE.TransferBlocks ? cdb->CDB6READWRITE.TransferBlocks : 256;
+    offset = (rw.LogicalBlockMsb1 << 16) | (rw.LogicalBlockMsb0 << 8) | rw.LogicalBlockLsb;
+    len = rw.TransferBlocks;
+    if(0 == len)
+        len = 256;
+}
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG len)
+{
+    //offset = ((ULONG64)cdb->CDB10.LogicalBlockByte0 << 24) |
+    //    ((ULONG64)cdb->CDB10.LogicalBlockByte1 << 16) |
+    //    ((ULONG64)cdb->CDB10.LogicalBlockByte2 << 8) |
+    //    ((ULONG64)cdb->CDB10.LogicalBlockByte3);
+    //blocks = ((ULONG)cdb->CDB10.TransferBlocksMsb << 8) |
+    //    ((ULONG)cdb->CDB10.TransferBlocksLsb);
+    offset = 0;
+    len = 0;
+    REVERSE_BYTES_4(&offset, &rw.LogicalBlockByte0);
+    REVERSE_BYTES_2(&len, &rw.TransferBlocksMsb);
+}
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG len)
+{
+    //*offset = ((ULONG64)cdb->CDB12.LogicalBlock[0] << 24) |
+    //    ((ULONG64)cdb->CDB12.LogicalBlock[1] << 16) |
+    //    ((ULONG64)cdb->CDB12.LogicalBlock[2] << 8) |
+    //    ((ULONG64)cdb->CDB12.LogicalBlock[3]);
+    //*blocks = ((ULONG)cdb->CDB12.TransferLength[0] << 24) |
+    //    ((ULONG)cdb->CDB12.TransferLength[1] << 16) |
+    //    ((ULONG)cdb->CDB12.TransferLength[2] << 8) |
+    //    ((ULONG)cdb->CDB12.TransferLength[3]);
+    offset = 0;
+    len = 0;
+    REVERSE_BYTES_4(&offset, &rw.LogicalBlock);
+    REVERSE_BYTES_4(&len, &rw.TransferLength);
+}
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB16& rw, ULONG64& offset, ULONG len)
+{
+    REVERSE_BYTES_8(&offset, &rw.LogicalBlock);
+    REVERSE_BYTES_4(&len, &rw.TransferLength);
+}
+#pragma endregion 

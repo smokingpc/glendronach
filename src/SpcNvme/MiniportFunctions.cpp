@@ -4,8 +4,8 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
 {
 //Because MaxTxSize and MaxTxPages should be calculated by nvme->CtrlCap and nvme->CtrlIdent,
 //So FillPortConfiguration() should be called AFTER nvme->IdentifyController()
-    portcfg->MaximumTransferLength = nvme->MaxTxSize();
-    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages();
+    portcfg->MaximumTransferLength = nvme->MaxTxSize;
+    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages;
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;

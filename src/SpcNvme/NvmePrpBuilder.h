@@ -1,3 +1,3 @@
 #pragma once
 
-bool BuildPrp(PNVME_COMMAND cmd, PVOID buffer, size_t buf_size);
+bool BuildPrp(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, PVOID buffer, size_t buf_size);

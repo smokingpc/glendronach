@@ -89,6 +89,7 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
+#if 0
 ULONG CNvmeDevice::MinPageSize()
 {
     return (ULONG)(1 << (12 + CtrlCap.MPSMIN));
@@ -109,6 +110,7 @@ ULONG CNvmeDevice::NsCount()
 {
     return NamespaceCount;
 }
+#endif
 bool CNvmeDevice::IsWorking() { return (State == NVME_STATE::RUNNING); }
 bool CNvmeDevice::IsSetup() { return (State == NVME_STATE::SETUP); }
 bool CNvmeDevice::IsTeardown() { return (State == NVME_STATE::TEARDOWN); }
@@ -326,7 +328,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
         srbext_ptr.Reset(my_srbext);
         srbext_ptr->Init(this, NULL);
     }
-    BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
+    BuildCmd_IdentCtrler(my_srbext, &this->CtrlIdent);
     status = AdmQueue->SubmitCmd(my_srbext);
 
     //if(srbext != NULL) means this request comes from StartIo
@@ -354,13 +356,14 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == my_srbext)
     {
-        srbext_ptr.Reset(new SPCNVME_SRBEXT());
+        my_srbext = new SPCNVME_SRBEXT();
+        srbext_ptr.Reset(my_srbext);
         srbext_ptr->Init(this, NULL);
     }
     //BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
     for(ULONG nsid=1; nsid<=NVME_CONST::SUPPORT_NAMESPACES; nsid++)
     {
-        BuildCmd_IdentNamespace(&my_srbext->NvmeCmd, &this->NsData[nsid-1], nsid);
+        BuildCmd_IdentNamespace(my_srbext, &this->NsData[nsid-1], nsid);
         status = AdmQueue->SubmitCmd(my_srbext);
 
         //if(srbext != NULL) means this request comes from StartIo
@@ -432,7 +435,69 @@ NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
+NTSTATUS CNvmeDevice::GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT& format)
+{
+    //namespace id should be 1 based.
+    //** according NVME_COMMAND::CDW0, NSID==0 if not used in command.
+    //   So I guess the NSID is 1 based index....
+    if (0 == nsid)
+        return STATUS_INVALID_PARAMETER;
 
+    if (0 == NamespaceCount)
+        return STATUS_DEVICE_NOT_READY;
+
+    UCHAR lba_index = NsData[nsid-1].FLBAS.LbaFormatIndex;
+    RtlCopyMemory(&format, &NsData[nsid - 1].LBAF[lba_index], sizeof(NVME_LBA_FORMAT));
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::GetNamespaceBlockSize(ULONG nsid, ULONG& size)
+{
+    //namespace id should be 1 based.
+    //** according NVME_COMMAND::CDW0, NSID==0 if not used in command.
+    //   So I guess the NSID is 1 based index....
+    if (0 == nsid)
+        return STATUS_INVALID_PARAMETER;
+
+    if (0 == NamespaceCount)
+        return STATUS_DEVICE_NOT_READY;
+
+    UCHAR lba_index = NsData[nsid - 1].FLBAS.LbaFormatIndex;
+    size = (1 << NsData[nsid - 1].LBAF[lba_index].LBADS);
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks)
+{
+    //namespace id should be 1 based.
+    //** according NVME_COMMAND::CDW0, NSID==0 if not used in command.
+    //   So I guess the NSID is 1 based index....
+    if (0 == nsid)
+        return STATUS_INVALID_PARAMETER;
+
+    if (0 == NamespaceCount)
+        return STATUS_DEVICE_NOT_READY;
+
+    blocks = NsData[nsid - 1].NSZE;
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SubmitCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
+{
+    UNREFERENCED_PARAMETER(srbext);
+    UNREFERENCED_PARAMETER(cmd);
+    return STATUS_UNSUCCESSFUL;
+}
+bool CNvmeDevice::IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
+{
+    //namespace id should be 1 based.
+    //** according NVME_COMMAND::CDW0, NSID==0 if not used in command.
+    //   So I guess the NSID is 1 based index....
+    if (0 == nsid || 0 == NamespaceCount)
+        return false;
+
+    ULONG64 max_block_id = NsData[nsid - 1].NSZE - 1;
+    if((offset + len) >= max_block_id)
+        return false;
+    return true;
+}
 NTSTATUS CNvmeDevice::RegisterIoQ()
 {
     if (!IsWorking())
@@ -453,10 +518,10 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
             continue;
 //register IoQueue should register CplQ first, then SubQ.
 //They are "Pair" .
-        BuildCmd_RegIoCplQ(&srbext->NvmeCmd, IoQueue[i]);
+        BuildCmd_RegIoCplQ(srbext, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
 
-        BuildCmd_RegIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
+        BuildCmd_RegIoSubQ(srbext, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
     }
 
@@ -492,9 +557,9 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
     {
         if (NULL == IoQueue[i])
             continue;
-        BuildCmd_UnRegIoSubQ(&srbext->NvmeCmd, IoQueue[i]);
+        BuildCmd_UnRegIoSubQ(srbext, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
-        BuildCmd_UnRegIoCplQ(&srbext->NvmeCmd, IoQueue[i]);
+        BuildCmd_UnRegIoCplQ(srbext, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext);
 
     }
@@ -590,6 +655,10 @@ void CNvmeDevice::ReadCtrlCap()
     ReadNvmeRegister(NvmeVer);
     ReadNvmeRegister(CtrlCap);
     DeviceTimeout = ((UCHAR)CtrlCap.TO) * (500 * 1000);
+    MinPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMIN));
+    MaxPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMAX));
+    MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * MinPageSize);
+    MaxTxPages = (ULONG)(MaxTxSize / PAGE_SIZE);
 }
 bool CNvmeDevice::MapCtrlRegisters()
 {

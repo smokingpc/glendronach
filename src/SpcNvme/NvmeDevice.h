@@ -40,12 +40,33 @@ public:
     NTSTATUS SetArbitration(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetPowerManagement(PSPCNVME_SRBEXT srbext);
+    NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);
+    NTSTATUS GetNamespaceBlockSize(ULONG nsid, ULONG& size);    //get LBA block size in Bytes
+    NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
+    NTSTATUS SubmitCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    bool IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
 
-    ULONG MinPageSize();
-    ULONG MaxPageSize();
-    ULONG MaxTxSize();
-    ULONG MaxTxPages();
-    ULONG NsCount();
+    ULONG MinPageSize;
+    ULONG MaxPageSize;
+    ULONG MaxTxSize;
+    ULONG MaxTxPages;
+    NVME_STATE State;
+    ULONG RegisteredIoQ = 0;
+    ULONG CreatedIoQ = 0;
+    ULONG DesiredIoQ = 0;
+
+    ULONG DeviceTimeout;        //should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay;
+
+    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];         //AccessRange from miniport HwFindAdapter.
+    ULONG AccessRangeCount;
+    ULONG Bar0Size;
+    UCHAR MaxNamespaces;
+    USHORT IoDepth;
+    ULONG AdmDepth;
+    ULONG TotalNumaNodes;
+    ULONG NamespaceCount;       //how many namespace active in current device?
+
     bool IsWorking();
     bool IsSetup();
     bool IsTeardown();
@@ -69,28 +90,9 @@ private:
     CNvmeQueue* AdmQueue;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
 
-    NVME_STATE State;
-    ULONG RegisteredIoQ = 0;
-    ULONG CreatedIoQ = 0;
-    ULONG DesiredIoQ = 0;
-
-    ULONG DeviceTimeout;        //should be updated by CAP, unit in micro-seconds
-    ULONG StallDelay;
-
-    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];         //AccessRange from miniport HwFindAdapter.
-    ULONG AccessRangeCount;
-    ULONG Bar0Size;
-    UCHAR MaxNamespaces;
-    USHORT IoDepth;
-    ULONG AdmDepth;
-    ULONG TotalNumaNodes;
-    ULONG NamespaceCount;       //how many namespace active in current device?
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
     PCI_COMMON_CONFIG                   PciCfg;
-    ////NVME_CONTROLLER_CAPABILITIES        CtrlCap;
-    //NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
-    //NVME_IDENTIFY_NAMESPACE_DATA NsData[NVME_CONST::SUPPORT_NAMESPACES];
 
     void InitVars();
     void LoadRegistry();

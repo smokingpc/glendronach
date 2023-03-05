@@ -100,3 +100,8 @@ ULONG _SPCNVME_SRBEXT::DataBufLen() {
     return SrbGetDataTransferLength(Srb);
 }
 
+void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
+{
+    if(NULL != Srb)
+        SrbSetDataTransferLength(Srb, length);
+}
