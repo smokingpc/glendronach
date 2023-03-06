@@ -1,6 +1,7 @@
 #pragma once
-UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
-UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
+UCHAR BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write);
+//UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
+//UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks);
 
 void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data);
 void BuildCmd_IdentNamespace(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid);

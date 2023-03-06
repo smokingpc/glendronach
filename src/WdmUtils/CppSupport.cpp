@@ -55,7 +55,7 @@ static void DeletePoolTrackEntry(PVOID ptr, size_t size)
 //usage: MyClass *ptr = new MyClass();
 void* __cdecl operator new (size_t size)
 {
-    POBJ_POOL_TRACK buffer = CreatePoolTrackEntry(size, PagedPool);
+    POBJ_POOL_TRACK buffer = CreatePoolTrackEntry(size, NonPagedPool);
     if (buffer != NULL)
         return (PVOID)(buffer->Ptr);
     return NULL;
@@ -74,7 +74,7 @@ void* operator new (size_t size, POOL_TYPE type, ULONG tag)
 //usage: char *ptr = new char[10];
 void* __cdecl operator new[](size_t size)
 {
-    POBJ_POOL_TRACK buffer = CreatePoolTrackEntry(size, PagedPool);
+    POBJ_POOL_TRACK buffer = CreatePoolTrackEntry(size, NonPagedPool);
     if (buffer != NULL)
     {
         buffer->IsArray = TRUE;

@@ -6,10 +6,10 @@ UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_
     UCHAR srb_status = SRB_STATUS_ERROR;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    srb_status = BuiildCmd_Read(srbext, offset, len);
+    srb_status = BuiildCmd_ReadWrite(srbext, offset, len, is_write);
     if (SRB_STATUS_SUCCESS == srb_status)
     {
-        status = srbext->DevExt->SubmitCmd(srbext, &srbext->NvmeCmd);
+        status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
         if (!NT_SUCCESS(status))
             srb_status = SRB_STATUS_ERROR;
     }

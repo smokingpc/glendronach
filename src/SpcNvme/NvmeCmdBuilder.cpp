@@ -1,6 +1,5 @@
 #include "pch.h"
-
-UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
+UCHAR BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
@@ -9,7 +8,7 @@ UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
     if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
         return SRB_STATUS_ERROR;
 
-    cmd->CDW0.OPC = NVME_NVM_COMMAND_READ;
+    cmd->CDW0.OPC = (is_write)? NVME_NVM_COMMAND_WRITE : NVME_NVM_COMMAND_READ;
     cmd->NSID = nsid;
     BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
     cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
@@ -19,25 +18,45 @@ UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
 
     return SRB_STATUS_SUCCESS;
 }
-UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
-{
-    PNVME_COMMAND cmd = &srbext->NvmeCmd;
-    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
-    ULONG nsid = srbext->Lun() + 1;
 
-    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
-        return SRB_STATUS_ERROR;
-
-    cmd->CDW0.OPC = NVME_NVM_COMMAND_WRITE;
-    cmd->NSID = nsid;
-    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
-    cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
-    cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
-    cmd->u.READWRITE.CDW12.NLB = blocks - 1;
-    cmd->CDW0.CID = srbext->ScsiQTag();
-
-    return SRB_STATUS_SUCCESS;
-}
+//UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
+//{
+//    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+//    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+//    ULONG nsid = srbext->Lun() + 1;
+//
+//    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
+//        return SRB_STATUS_ERROR;
+//
+//    cmd->CDW0.OPC = NVME_NVM_COMMAND_READ;
+//    cmd->NSID = nsid;
+//    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+//    cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
+//    cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
+//    cmd->u.READWRITE.CDW12.NLB = blocks - 1;
+//    cmd->CDW0.CID = srbext->ScsiQTag();
+//
+//    return SRB_STATUS_SUCCESS;
+//}
+//UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
+//{
+//    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+//    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+//    ULONG nsid = srbext->Lun() + 1;
+//
+//    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
+//        return SRB_STATUS_ERROR;
+//
+//    cmd->CDW0.OPC = NVME_NVM_COMMAND_WRITE;
+//    cmd->NSID = nsid;
+//    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+//    cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
+//    cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
+//    cmd->u.READWRITE.CDW12.NLB = blocks - 1;
+//    cmd->CDW0.CID = srbext->ScsiQTag();
+//
+//    return SRB_STATUS_SUCCESS;
+//}
 
 //to build NVME_COMMAND for IdentifyController command
 void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data)

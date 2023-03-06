@@ -43,7 +43,8 @@ public:
     NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);
     NTSTATUS GetNamespaceBlockSize(ULONG nsid, ULONG& size);    //get LBA block size in Bytes
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
-    NTSTATUS SubmitCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    NTSTATUS SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     bool IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
 
     ULONG MinPageSize;

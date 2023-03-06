@@ -329,8 +329,8 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
         srbext_ptr->Init(this, NULL);
     }
     BuildCmd_IdentCtrler(my_srbext, &this->CtrlIdent);
-    status = AdmQueue->SubmitCmd(my_srbext);
-
+    //status = AdmQueue->SubmitCmd(my_srbext);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
     //if(srbext != NULL) means this request comes from StartIo
     if(srbext != NULL || !NT_SUCCESS(status))
         return status;
@@ -364,7 +364,8 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
     for(ULONG nsid=1; nsid<=NVME_CONST::SUPPORT_NAMESPACES; nsid++)
     {
         BuildCmd_IdentNamespace(my_srbext, &this->NsData[nsid-1], nsid);
-        status = AdmQueue->SubmitCmd(my_srbext);
+        //status = AdmQueue->SubmitCmd(my_srbext);
+        status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
 
         //if(srbext != NULL) means this request comes from StartIo
         if (srbext != NULL || !NT_SUCCESS(status))
@@ -479,12 +480,23 @@ NTSTATUS CNvmeDevice::GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks)
     blocks = NsData[nsid - 1].NSZE;
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SubmitCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
+NTSTATUS CNvmeDevice::SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    UNREFERENCED_PARAMETER(cmd);
-    return STATUS_UNSUCCESSFUL;
+    if(!IsWorking() || NULL == AdmQueue)
+        return STATUS_DEVICE_NOT_READY;
+    return AdmQueue->SubmitCmd(srbext, cmd);
 }
+NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
+{
+    if (!IsWorking() || NULL == IoQueue)
+        return STATUS_DEVICE_NOT_READY;
+
+    ULONG cpu_idx = KeGetCurrentProcessorNumberEx(NULL);
+    ULONG qid = cpu_idx % RegisteredIoQ;
+
+    return IoQueue[qid]->SubmitCmd(srbext, cmd);
+}
+
 bool CNvmeDevice::IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
 {
     //namespace id should be 1 based.
@@ -519,10 +531,12 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
 //register IoQueue should register CplQ first, then SubQ.
 //They are "Pair" .
         BuildCmd_RegIoCplQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext);
+        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
 
         BuildCmd_RegIoSubQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext);
+        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
+
+        RegisteredIoQ++;
     }
 
     //wait loop for
@@ -558,9 +572,9 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
         if (NULL == IoQueue[i])
             continue;
         BuildCmd_UnRegIoSubQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext);
+        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
         BuildCmd_UnRegIoCplQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext);
+        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
 
     }
 

@@ -108,17 +108,20 @@ QUEUE_TYPE CNvmeQueue::GetQueueType(){return this->Type;}
 
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT *srbext)
 {
+    return SubmitCmd(srbext, &srbext->NvmeCmd);
+}
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
+{
     CSpinLock lock(&SubLock);
     NTSTATUS status = STATUS_SUCCESS;
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
 
     PNVME_COMMAND cmd = &SubQ_VA[SubTail];
-    PNVME_COMMAND src_cmd = &srbext->NvmeCmd;
     CID++;
     src_cmd->CDW0.CID = CID;
     status = History.Push(CID, srbext);
-    if(!NT_SUCCESS(status))
+    if (!NT_SUCCESS(status))
     {
         //old cmd is timed out, release it...
         PSPCNVME_SRBEXT old_srbext = NULL;
