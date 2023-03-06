@@ -15,18 +15,22 @@ UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
 
-//    return ReadWriteRamdisk(srbext, FALSE);
+    ParseReadWriteOffsetAndLen(cdb->CDB12, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, false);
 }
 
 UCHAR Scsi_Write12(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
 
-//    return ReadWriteRamdisk(srbext, TRUE);
+    ParseReadWriteOffsetAndLen(cdb->CDB12, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, true);
 }
 
 UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)

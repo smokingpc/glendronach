@@ -30,6 +30,7 @@ EXTERN_C_END
 #include "StartIo_Handler.h"
 #include "ISR_and_DPC.h"
 
+#include "Scsi_Utils.h"
 #include "ScsiHandler_CDB6.h"
 #include "ScsiHandler_CDB10.h"
 #include "ScsiHandler_CDB12.h"

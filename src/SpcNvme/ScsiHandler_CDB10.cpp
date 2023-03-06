@@ -1,6 +1,6 @@
 #include "pch.h"
 
-inline void FillReadCapacity(UCHAR lun, PSPCNVME_SRBEXT srbext)
+static void FillReadCapacity(UCHAR lun, PSPCNVME_SRBEXT srbext)
 {
     PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuf();
     ULONG block_size = 0;
@@ -28,15 +28,21 @@ inline void FillReadCapacity(UCHAR lun, PSPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, FALSE);
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+
+    ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, false);
 }
 UCHAR Scsi_Write10(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, TRUE);
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+
+    ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, true);
 }
 
 UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)

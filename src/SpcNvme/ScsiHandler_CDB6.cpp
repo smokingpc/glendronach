@@ -258,19 +258,9 @@ UCHAR Scsi_Read6(PSPCNVME_SRBEXT srbext)
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB cdb = srbext->Cdb();
-    UCHAR srb_status = SRB_STATUS_ERROR;
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
 
     ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
-    srb_status = BuiildCmd_Read(srbext, offset, len);
-    if (SRB_STATUS_SUCCESS == srb_status)
-    {
-        status = srbext->DevExt->SubmitCmd(srbext, &srbext->NvmeCmd);
-        if (!NT_SUCCESS(status))
-            srb_status = SRB_STATUS_ERROR;
-    }
-
-    return srb_status;
+    return Scsi_ReadWrite(srbext, offset, len, false);
 }
 UCHAR Scsi_Write6(PSPCNVME_SRBEXT srbext)
 {
@@ -278,19 +268,9 @@ UCHAR Scsi_Write6(PSPCNVME_SRBEXT srbext)
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB cdb = srbext->Cdb();
-    UCHAR srb_status = SRB_STATUS_ERROR;
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-    
-    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
-    srb_status = BuiildCmd_Write(srbext, offset, len);
-    if (SRB_STATUS_SUCCESS == srb_status)
-    {
-        status = srbext->DevExt->SubmitCmd(srbext, &srbext->NvmeCmd);
-        if(!NT_SUCCESS(status))
-            srb_status = SRB_STATUS_ERROR;
-    }
 
-    return srb_status;
+    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, true);
 }
 UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext) 
 {

@@ -16,16 +16,22 @@ inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
 
 UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, FALSE);
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+
+    ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, false);
 }
 
 UCHAR Scsi_Write16(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-//    return ReadWriteRamdisk(srbext, TRUE);
+    ULONG64 offset = 0; //in blocks
+    ULONG len = 0;    //in blocks
+    PCDB cdb = srbext->Cdb();
+
+    ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, true);
 }
 
 UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)

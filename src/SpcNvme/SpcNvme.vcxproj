@@ -262,6 +262,7 @@
     <ClCompile Include="IoctlStorageQuery_Handlers.cpp" />
     <ClCompile Include="ISR_and_DPC.cpp" />
     <ClCompile Include="NvmePrpBuilder.cpp" />
+    <ClCompile Include="Scsi_Utils.cpp" />
     <ClCompile Include="SrbExt.cpp" />
     <ClCompile Include="NvmeCmdBuilder.cpp" />
     <ClCompile Include="ScsiHandler_CDB10.cpp" />
@@ -293,6 +294,7 @@
     <ClInclude Include="ScsiHandler_CDB16.h" />
     <ClInclude Include="ScsiHandler_CDB6.h" />
     <ClInclude Include="ScsiHandler_InlineUtils.h" />
+    <ClInclude Include="Scsi_Utils.h" />
     <ClInclude Include="Srb_Utils.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />

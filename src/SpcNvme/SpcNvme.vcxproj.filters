@@ -95,6 +95,9 @@
     <ClCompile Include="IoctlStorageQuery_Handlers.cpp">
       <Filter>StartIo_Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="Scsi_Utils.cpp">
+      <Filter>SCSI_Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">
@@ -163,6 +166,9 @@
     </ClInclude>
     <ClInclude Include="IoctlStorageQuery_Handlers.h">
       <Filter>StartIo_Handlers</Filter>
+    </ClInclude>
+    <ClInclude Include="Scsi_Utils.h">
+      <Filter>SCSI_Handlers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
