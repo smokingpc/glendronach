@@ -24,6 +24,7 @@ BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     //srbext->Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
     //todo: set log 
     //todo: build prp and dma
+    DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
     
     return TRUE;
 }

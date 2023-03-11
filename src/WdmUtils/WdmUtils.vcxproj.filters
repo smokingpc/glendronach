@@ -32,7 +32,7 @@
     <ClCompile Include="ScsiDebugFunction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SrbDebugFunction.cpp.cpp">
+    <ClCompile Include="SrbDebugFunction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="OS_Utils.cpp">

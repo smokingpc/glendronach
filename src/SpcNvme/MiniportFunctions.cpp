@@ -53,6 +53,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+    DbgBreakPoint();
 
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
@@ -133,10 +134,31 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     CDebugCallInOut inout(__FUNCTION__);
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+    DbgBreakPoint();
 
-    status = nvme->IdentifyNamespace(NULL);
-    if (!NT_SUCCESS(status))
-        return FALSE;
+    {
+    //only query 4 namespace now...
+        ULONG count = NVME_CONST::SUPPORT_NAMESPACES;
+        ULONG ret_count = 0;
+        CWinAutoPtr<ULONG, NonPagedPool, TAG_GENBUF> id_list(new ULONG[count]);
+        status = nvme->IdentifyActiveNamespaceIdList(NULL, count, id_list, ret_count);
+        if (!NT_SUCCESS(status) || 0 == ret_count)
+            return FALSE;
+        for (ULONG i = 0; i < ret_count; i++)
+        {
+            status = nvme->IdentifyNamespace(NULL, id_list.Get()[i], &nvme->NsData[i]);
+
+            if (!NT_SUCCESS(status))
+            {
+                if(i>0)
+                    continue;
+                else
+                    return FALSE;
+            }
+            nvme->NamespaceCount++;
+        }
+    }
+
     status = nvme->SetInterruptCoalescing(NULL);
     if (!NT_SUCCESS(status))
         return FALSE;
@@ -169,7 +191,6 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 
     PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
     BOOLEAN need_startio = FALSE;
-    //UCHAR srb_status = 0;
 
     switch (srbext->FuncCode())
     {
@@ -215,17 +236,16 @@ _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
-    //BOOLEAN ok = FALSE;
     UCHAR srb_status = SRB_STATUS_ERROR;
 
     switch (srbext->FuncCode())
     {
-        //case SRB_FUNCTION_ABORT_COMMAND:
-    //case SRB_FUNCTION_RESET_LOGICAL_UNIT:
-    //case SRB_FUNCTION_RESET_DEVICE:
-    //case SRB_FUNCTION_RESET_BUS:
-    //case SRB_FUNCTION_WMI:
-    //case SRB_FUNCTION_POWER:
+    //case SRB_FUNCTION_RESET_LOGICAL_UNIT:     //dispatched in HwUnitControl
+    //case SRB_FUNCTION_RESET_DEVICE:           //dispatched in HwAdapterControl
+    //case SRB_FUNCTION_RESET_BUS:              //dispatched in HwResetBus
+    //case SRB_FUNCTION_POWER:                  //dispatched in HwBuildIo
+    //case SRB_FUNCTION_ABORT_COMMAND:          //should I support abort of async I/O?
+    //case SRB_FUNCTION_WMI:                    //TODO: do it later....
     //    srb_status = DefaultCmdHandler(srb, srbext);
     //    break;
     case SRB_FUNCTION_EXECUTE_SCSI:
@@ -245,10 +265,10 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 
     //todo: handle SCSI status for SRB
     srbext->SetStatus(srb_status);
-    //srbext->Srb->SrbStatus = srb_status;
     StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
 
-    //return TRUE indicates that "this driver handled this request, no matter succeed or fail..."
+    //return TRUE indicates that "this driver handled this request, 
+    //no matter succeed or fail..."
     return TRUE;
 }
 
@@ -296,7 +316,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
         //In normal procedure of removing device, we don't have to do anything here.
         //BuildIo SRB_FUNCTION_PNP should handle DEVICE_REMOVE teardown.
         //ScsiStopAdapter is just a power state handler, we have no idea that
-        //"is this call a device remove? or sleep? or hibernation? or power down?"
+        //"is this call from a device remove? or sleep? or hibernation? or power down?"
         status = ScsiAdapterControlSuccess;
         break;
     }
@@ -314,6 +334,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     //**Is still SRB_PNP_xxx fired if this control code supported/implemented?
     //***SurpriseRemove don't need unregister queues. Only need to delete queues.
         nvme->Teardown();
+        status = ScsiAdapterControlSuccess;
         break;
     }
     //Valid since Win8. If this control enabled, storport will notify 
@@ -323,6 +344,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
      //**running at PASSIVE_LEVEL
         STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) Parameters;
         UNREFERENCED_PARAMETER(info);
+        status = ScsiAdapterControlSuccess;
         break;
     }
 
@@ -333,6 +355,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
      //**running <= DISPATCH_LEVEL
       STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)Parameters;
       UNREFERENCED_PARAMETER(power);
+      status = ScsiAdapterControlSuccess;
       break;
     }
 
@@ -378,13 +401,18 @@ void HwProcessServiceRequest(
     
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(DeviceExtension);
-    UNREFERENCED_PARAMETER(Irp);
+    PIRP irp = (PIRP) Irp;
+    //UNREFERENCED_PARAMETER(Irp);
     ////ioctl interface for miniport
     //PSMOKY_EXT devext = (PSMOKY_EXT)DeviceExtension;
     //PIRP irp = (PIRP)Irp;
     //irp->IoStatus.Information = 0;
     //irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
     //StorPortCompleteServiceIrp(devext, irp);
+
+    irp->IoStatus.Information = 0;
+    irp->IoStatus.Status = STATUS_SUCCESS;
+    StorPortCompleteServiceIrp(DeviceExtension, irp);
 }
 
 _Use_decl_annotations_
@@ -402,10 +430,6 @@ void HwCompleteServiceIrp(PVOID DeviceExtension)
     UNREFERENCED_PARAMETER(DeviceExtension);
     //if any async request in HwProcessServiceRequest, 
     //we should complete them here and let them go back asap.
-//    StorPortPause(DeviceExtension, PAUSE_ADAPTER_TIMEOUT);
-
-    //for(int i=0;i<6;i++)
-    //    StorPortStallExecution(STALL_TIMEOUT);
 }
 
 _Use_decl_annotations_

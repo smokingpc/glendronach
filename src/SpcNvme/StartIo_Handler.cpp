@@ -11,6 +11,8 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
     UCHAR opcode = srbext->Cdb()->CDB6GENERIC.OperationCode;
     UCHAR srb_status = SRB_STATUS_ERROR;
+    DebugScsiOpCode(opcode);
+
     switch(opcode)
     {
 #if 0

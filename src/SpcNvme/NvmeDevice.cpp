@@ -321,17 +321,20 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 
     CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
+    PNVME_IDENTIFY_CONTROLLER_DATA data = (PNVME_IDENTIFY_CONTROLLER_DATA)srbext->DataBuf();
     NTSTATUS status = STATUS_SUCCESS;
     if(NULL == my_srbext)
     {
         my_srbext = new SPCNVME_SRBEXT();
         srbext_ptr.Reset(my_srbext);
         srbext_ptr->Init(this, NULL);
+        data = &this->CtrlIdent;
     }
-    BuildCmd_IdentCtrler(my_srbext, &this->CtrlIdent);
+    BuildCmd_IdentCtrler(my_srbext, data);
     //status = AdmQueue->SubmitCmd(my_srbext);
     status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
     //if(srbext != NULL) means this request comes from StartIo
+    //only support internal command(initialize) using sync call here.
     if(srbext != NULL || !NT_SUCCESS(status))
         return status;
 
@@ -341,17 +344,18 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
         StorPortStallExecution(StallDelay);
     }while(SRB_STATUS_PENDING != my_srbext->SrbStatus);
 
+    //TODO: log
     if(my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
-        return STATUS_REQUEST_NOT_ACCEPTED;
+        return STATUS_UNSUCCESSFUL;
 
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data)
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    SPC::CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == my_srbext)
@@ -360,34 +364,67 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext)
         srbext_ptr.Reset(my_srbext);
         srbext_ptr->Init(this, NULL);
     }
-    //BuildCmd_IdentCtrler(&my_srbext->NvmeCmd, &this->CtrlIdent);
-    for(ULONG nsid=1; nsid<=NVME_CONST::SUPPORT_NAMESPACES; nsid++)
+
+    //Query ID List of all active Namespace
+    BuildCmd_IdentSpecifiedNS(my_srbext, data, nsid);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    if (srbext != NULL || !NT_SUCCESS(status))
+        return status;
+    //wait loop for FindAdapter called IdentifyController
+    do
     {
-        BuildCmd_IdentNamespace(my_srbext, &this->NsData[nsid-1], nsid);
-        //status = AdmQueue->SubmitCmd(my_srbext);
-        status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
 
-        //if(srbext != NULL) means this request comes from StartIo
-        if (srbext != NULL || !NT_SUCCESS(status))
-            return status;
+    //TODO: log
+    if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
+        return STATUS_UNSUCCESSFUL;
 
-        //wait loop for FindAdapter called IdentifyController
-        do
-        {
-            StorPortStallExecution(StallDelay);
-        } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, ULONG list_count, PULONG nsid_list, ULONG& ret_count)
+{
+//list_count is "how many elemens(not bytes) in nsid_list can store."
+//nsid_list is buffer to retrieve nsid returned by this command.
+//ret_count is "how many actual nsid(elements, not bytes) returned by this command".
+    if (!IsWorking())
+        return STATUS_INVALID_DEVICE_STATE;
 
-        if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
-            break;
+    if (NULL == nsid_list || 0 == list_count)
+        return STATUS_INVALID_PARAMETER;
 
-        //if namespace is not active, passed in NsData block will be zeroed.
-        if(0 == this->NsData[nsid - 1].NSZE)
-            break;
-        NamespaceCount++;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT my_srbext = srbext;
+    NTSTATUS status = STATUS_SUCCESS;
+    if (NULL == my_srbext)
+    {
+        my_srbext = new SPCNVME_SRBEXT();
+        srbext_ptr.Reset(my_srbext);
+        srbext_ptr->Init(this, NULL);
     }
 
-    //if(0 == NamespaceCount)
-    //return STATUS_REQUEST_NOT_ACCEPTED;
+    //Query ID List of all active Namespace
+    RtlZeroMemory(nsid_list, sizeof(ULONG) * list_count);
+    BuildCmd_IdentActiveNsidList(my_srbext, nsid_list, sizeof(ULONG) * list_count);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    if (!NT_SUCCESS(status))
+        return status;
+
+    do
+    {
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
+
+    if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
+        return STATUS_UNSUCCESSFUL;
+
+    ret_count = 0;
+    for(ULONG i=0; i<list_count; i++)
+    {
+        if(0 == nsid_list[i])
+            break;
+        ret_count ++;
+    }
 
     return STATUS_SUCCESS;
 }

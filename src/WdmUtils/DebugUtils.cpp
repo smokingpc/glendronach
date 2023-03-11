@@ -2,21 +2,6 @@
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 #include "pch.h"
 
-//#define DebugCallIn(func_name, prefix) \
-//{ \
-//    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DBG_FILTER, "%s [%s] IN =>\n", prefix, func_name); \
-//} 
-//
-//#define DebugCallOut(func_name, prefix) \
-//{ \
-//    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DBG_FILTER, "%s [%s] OUT <=\n", prefix, func_name); \
-//}
-
-//#define DebugLog(fmt,args) \
-//{ \
-//    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DBG_FILTER, fmt, args); \
-//}
-
 __inline void DebugCallIn(const char* func_name, const char* prefix)
 {
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DBG_FILTER, "%s [%s] IN =>\n", prefix, func_name); 

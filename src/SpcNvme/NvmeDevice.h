@@ -34,7 +34,9 @@ public:
     NTSTATUS UnregisterIoQ();
 
     NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext);
-    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext);
+    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);
+    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, ULONG list_count, PULONG nsid_list, ULONG &ret_count);
+
     NTSTATUS SetInterruptCoalescing(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetAsyncEvent(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetArbitration(PSPCNVME_SRBEXT srbext);

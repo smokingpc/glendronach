@@ -19,66 +19,51 @@ UCHAR BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, 
     return SRB_STATUS_SUCCESS;
 }
 
-//UCHAR BuiildCmd_Read(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
-//{
-//    PNVME_COMMAND cmd = &srbext->NvmeCmd;
-//    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
-//    ULONG nsid = srbext->Lun() + 1;
-//
-//    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
-//        return SRB_STATUS_ERROR;
-//
-//    cmd->CDW0.OPC = NVME_NVM_COMMAND_READ;
-//    cmd->NSID = nsid;
-//    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
-//    cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
-//    cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
-//    cmd->u.READWRITE.CDW12.NLB = blocks - 1;
-//    cmd->CDW0.CID = srbext->ScsiQTag();
-//
-//    return SRB_STATUS_SUCCESS;
-//}
-//UCHAR BuiildCmd_Write(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks)
-//{
-//    PNVME_COMMAND cmd = &srbext->NvmeCmd;
-//    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
-//    ULONG nsid = srbext->Lun() + 1;
-//
-//    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
-//        return SRB_STATUS_ERROR;
-//
-//    cmd->CDW0.OPC = NVME_NVM_COMMAND_WRITE;
-//    cmd->NSID = nsid;
-//    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
-//    cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
-//    cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
-//    cmd->u.READWRITE.CDW12.NLB = blocks - 1;
-//    cmd->CDW0.CID = srbext->ScsiQTag();
-//
-//    return SRB_STATUS_SUCCESS;
-//}
-
 //to build NVME_COMMAND for IdentifyController command
 void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
-    cmd->u.IDENTIFY.CDW10.CNS = (ULONG)IDENTIFY_CNS::IDENT_CONTROLLER;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
+    cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_CONTROLLER;
     cmd->u.IDENTIFY.CDW10.CNTID = 0;
 
     BuildPrp(srbext, cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
 }
-void BuildCmd_IdentNamespace(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid)
+void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, ULONG *nsid_list, size_t list_size)
+{
+//nsid_list is a ULONG array buffer to retrieve all nsid which is active in this NVMe.
+//list_size is size IN BYTES of nsid_list.
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
+    cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ACTIVE_NAMESPACES;
+
+    BuildPrp(srbext, cmd, (PVOID)nsid_list, list_size);
+}
+void BuildCmd_IdentSpecifiedNS(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
     cmd->NSID = nsid;
-    cmd->u.IDENTIFY.CDW10.CNS = (ULONG)IDENTIFY_CNS::IDENT_NAMESPACE;
+    cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_SPECIFIC_NAMESPACE;
 
     BuildPrp(srbext, cmd, (PVOID)data, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
+}
+void BuildCmd_IdentAllNSList(PSPCNVME_SRBEXT srbext, PVOID ns_buf, size_t buf_size)
+{
+    //ns_buf is a array to retrieve all NameSpace list.
+    //buf_size is SIZE IN BYTES of ns_buf.
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
+    cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ALLOCATED_NAMESPACE_LIST;
+
+    BuildPrp(srbext, cmd, (PVOID)ns_buf, buf_size);
 }
 void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
 {
@@ -89,7 +74,7 @@ void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
 
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_CREATE_IO_SQ;
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->GetQueueID();
     cmd->u.CREATEIOSQ.CDW10.QSIZE = queue->GetQueueDepth();
     cmd->u.CREATEIOSQ.CDW11.CQID = queue->GetQueueID();
@@ -109,7 +94,7 @@ void BuildCmd_RegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
 
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_CREATE_IO_CQ;
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOCQ.CDW10.QID = queue->GetQueueID();
     cmd->u.CREATEIOCQ.CDW10.QSIZE = queue->GetQueueDepth();
     cmd->u.CREATEIOCQ.CDW11.IEN = TRUE;
@@ -121,7 +106,7 @@ void BuildCmd_UnRegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_DELETE_IO_SQ;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->GetQueueID();
 }
 void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
@@ -129,7 +114,7 @@ void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_DELETE_IO_CQ;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->GetQueueID();
 }
 void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR interval)
@@ -140,7 +125,7 @@ void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_INTERRUPT_COALESCING;
     cmd->u.SETFEATURES.CDW11.InterruptCoalescing.THR = threshold;
     cmd->u.SETFEATURES.CDW11.InterruptCoalescing.TIME = interval;
@@ -150,7 +135,7 @@ void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_ARBITRATION;
     cmd->u.SETFEATURES.CDW11.Arbitration.AB = NVME_CONST::AB_BURST;
     cmd->u.SETFEATURES.CDW11.Arbitration.HPW = NVME_CONST::AB_HPW;
@@ -171,7 +156,7 @@ void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER *timestamp)
 
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    cmd->NSID = NVME_CONST::DEFAULT_NSID;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
 
     //PVOID timestamp = NULL;
@@ -203,7 +188,7 @@ NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
 //
 //    NVME_COMMAND cmd = {0};
 //    cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-//    cmd.NSID = NVME_CONST::DEFAULT_NSID;
+//    cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
 //    cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_INTERRUPT_COALESCING;
 //    cmd.u.SETFEATURES.CDW11.InterruptCoalescing.THR = NVME_CONST::INTCOAL_THRESHOLD;
 //    cmd.u.SETFEATURES.CDW11.InterruptCoalescing.TIME = NVME_CONST::INTCOAL_TIME;
@@ -232,7 +217,7 @@ NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
 
     //NVME_COMMAND cmd = { 0 };
     //cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd.NSID = NVME_CONST::DEFAULT_NSID;
+    //cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
     //cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_ARBITRATION;
     //cmd.u.SETFEATURES.CDW11.Arbitration.AB = NVME_CONST::AB_BURST;
     //cmd.u.SETFEATURES.CDW11.Arbitration.HPW = NVME_CONST::AB_HPW;
@@ -271,7 +256,7 @@ NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
 
     //NVME_COMMAND cmd = { 0 };
     //cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd.NSID = NVME_CONST::DEFAULT_NSID;
+    //cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
     //cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
 
     //PVOID timestamp = NULL;
