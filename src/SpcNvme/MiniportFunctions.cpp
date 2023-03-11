@@ -53,7 +53,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    DbgBreakPoint();
 
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
@@ -78,15 +77,21 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     return SP_RETURN_FOUND;
 
 error:
+//any return code which is not SP_RETURN_FOUND causes driver installation hanging?
+//I don't know why so fail this driver later....
     nvme->Teardown();
     //SP_RETURN_NOT_FOUND will cause driver installation hanging...?
-    return SP_RETURN_ERROR;
+    return SP_RETURN_FOUND;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
 {
 //Running at DIRQL
     CDebugCallInOut inout(__FUNCTION__);
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
+    if (!nvme->IsWorking())
+        return FALSE;
+
     //initialize perf options
     PERF_CONFIGURATION_DATA read_data = { 0 };
     PERF_CONFIGURATION_DATA write_data = { 0 };
@@ -135,7 +140,8 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     DbgBreakPoint();
-
+    if(!nvme->IsWorking())
+        return FALSE;
     {
     //only query 4 namespace now...
         ULONG count = NVME_CONST::SUPPORT_NAMESPACES;

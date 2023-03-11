@@ -321,17 +321,19 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
 
     CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
-    PNVME_IDENTIFY_CONTROLLER_DATA data = (PNVME_IDENTIFY_CONTROLLER_DATA)srbext->DataBuf();
+    PNVME_IDENTIFY_CONTROLLER_DATA ident = NULL;
     NTSTATUS status = STATUS_SUCCESS;
     if(NULL == my_srbext)
     {
         my_srbext = new SPCNVME_SRBEXT();
         srbext_ptr.Reset(my_srbext);
         srbext_ptr->Init(this, NULL);
-        data = &this->CtrlIdent;
+        ident = &this->CtrlIdent;
     }
-    BuildCmd_IdentCtrler(my_srbext, data);
-    //status = AdmQueue->SubmitCmd(my_srbext);
+    else
+        ident = (PNVME_IDENTIFY_CONTROLLER_DATA)srbext->DataBuf();
+    BuildCmd_IdentCtrler(my_srbext, ident);
+    DbgBreakPoint();
     status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
     //if(srbext != NULL) means this request comes from StartIo
     //only support internal command(initialize) using sync call here.
@@ -342,7 +344,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
     do
     {
         StorPortStallExecution(StallDelay);
-    }while(SRB_STATUS_PENDING != my_srbext->SrbStatus);
+    }while(SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     //TODO: log
     if(my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
@@ -374,7 +376,7 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVM
     do
     {
         StorPortStallExecution(StallDelay);
-    } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     //TODO: log
     if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
@@ -413,7 +415,7 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, ULON
     do
     {
         StorPortStallExecution(StallDelay);
-    } while (SRB_STATUS_PENDING != my_srbext->SrbStatus);
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
         return STATUS_UNSUCCESSFUL;
