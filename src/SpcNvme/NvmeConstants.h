@@ -21,6 +21,7 @@ namespace NVME_CONST{
     static const UCHAR IO_QUEUE_DEPTH = 128;
     static const ULONG DEFAULT_MAX_TXSIZE = 131072;
     static const USHORT MAX_CID = MAXUSHORT;
+    static const ULONG MAX_NS_COUNT = 1024;     //Max NameSpace count. defined in NVMe spec.
 
     //static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     //static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
