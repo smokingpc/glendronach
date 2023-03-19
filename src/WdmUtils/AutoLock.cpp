@@ -21,12 +21,18 @@ CSpinLock::~CSpinLock()
 void CSpinLock::DoAcquire()
 {
     if(!IsAcquired)
+    {
         KeAcquireSpinLock(this->Lock, &this->OldIrql);
+        IsAcquired = true;
+    }
 }
 void CSpinLock::DoRelease()
 {
     if(IsAcquired)
+    {
         KeReleaseSpinLock(this->Lock, this->OldIrql);
+        IsAcquired = false;
+    }
 }
 
 CStorSpinLock::CStorSpinLock(PVOID devext, STOR_SPINLOCK reason, PVOID ctx)

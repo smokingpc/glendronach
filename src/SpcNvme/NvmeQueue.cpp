@@ -18,17 +18,35 @@ static inline ULONG ReadDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL d
 }
 static inline void WriteDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl, ULONG value)
 {
+    //Doorbell should write 32bit ULONG.
+    //Some controller won't accept the doorbell value if you write only 16bit USHORT value.
     MemoryBarrier();
     StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
 }
 static inline void WriteDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl, ULONG value)
 {
+    //Doorbell should write 32bit ULONG.
+    //Some controller won't accept the doorbell value if you write only 16bit USHORT value.
     MemoryBarrier();
     StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
 }
 static inline bool IsValidQid(ULONG qid)
 {
     return (qid != NVME_INVALID_QID);
+}
+static inline bool NewCplArrived(PNVME_COMPLETION_ENTRY entry, USHORT current_tag)
+{
+    if (entry->DW3.Status.P == current_tag)
+        return true;
+    return false;
+}
+static inline void UpdateCplHeadAndPhase(ULONG &cpl_head, USHORT &phase, USHORT depth)
+{
+    cpl_head = (cpl_head + 1) % depth;
+    if (0 == cpl_head)
+        phase = !phase;
+    //quick calculation, write a boolean table will know why.
+    //    phase = !(cpl_head ^ phase);      
 }
 #pragma region ======== class CNvmeQueue ========
 CNvmeQueue::CNvmeQueue()
@@ -145,13 +163,14 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
     //cpl_count : how mant cmd completion done in this round?
 
     NTSTATUS status = STATUS_SUCCESS;
-    CSpinLock lock(&CplLock);
     done_count = 0;
+    CSpinLock lock(&CplLock);
     while(max_count > 0)
     {
         PSPCNVME_SRBEXT srbext = NULL;
         PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
-        if (entry->DW3.Status.P == PhaseTag)
+//        if (entry->DW3.Status.P == PhaseTag)
+        if(!NewCplArrived(entry, PhaseTag))
             break;
 
         USHORT cid = entry->DW3.CID;
@@ -170,8 +189,8 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
             }
         }
         SubHead = entry->DW2.SQHD;
+        UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
         done_count++;
-        CplHead = (CplHead + 1) % Depth;
 
         if(max_count > 0 && done_count >= max_count)
             break;
