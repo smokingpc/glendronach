@@ -338,7 +338,6 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
     else
         ident = (PNVME_IDENTIFY_CONTROLLER_DATA)srbext->DataBuf();
     BuildCmd_IdentCtrler(my_srbext, ident);
-    DbgBreakPoint();
     status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
     //if(srbext != NULL) means this request comes from StartIo
     //only support internal command(initialize) using sync call here.
@@ -579,7 +578,8 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
 
     srbext->Init(this, NULL);
     srbext_ptr.Reset(srbext);
-
+    
+    DbgBreakPoint();
     for (ULONG i = 0; i < DesiredIoQ; i++)
     {
         if(NULL == IoQueue[i])
@@ -595,10 +595,13 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
         RegisteredIoQ++;
     }
 
-    //wait loop for
     do
     {
+        ULONG done_count = 0;
         StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(2, done_count);
+        if (done_count > 0)
+            break;
     } while (SRB_STATUS_PENDING != srbext->SrbStatus);
 
     if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
@@ -620,9 +623,7 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
     srbext->Init(this, NULL);
     srbext_ptr.Reset(srbext);
 
-    //todo: submit cmd
-    //BuildCmd_IdentCtrler(&srbext->NvmeCmd, &this->CtrlIdent);
-
+    DbgBreakPoint();
     for (ULONG i = 0; i < DesiredIoQ; i++)
     {
         if (NULL == IoQueue[i])
@@ -634,10 +635,13 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
 
     }
 
-    //wait loop for FindAdapter called IdentifyController
     do
     {
+        ULONG done_count = 0;
         StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(2, done_count);
+        if (done_count > 0)
+            break;
     } while (SRB_STATUS_PENDING != srbext->SrbStatus);
 
     if (srbext->SrbStatus != SRB_STATUS_SUCCESS)

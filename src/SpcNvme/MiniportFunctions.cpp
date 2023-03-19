@@ -142,14 +142,17 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     DbgBreakPoint();
     if(!nvme->IsWorking())
         return FALSE;
+
+    if(nvme->NvmeVer.MNR > 0)
     {
     //only query 4 namespace now...
         ULONG count = NVME_CONST::SUPPORT_NAMESPACES;
         ULONG ret_count = 0;
-        CWinAutoPtr<ULONG, NonPagedPool, TAG_GENBUF> id_list(new ULONG[NVME_CONST::MAX_NS_COUNT]);
+        CWinAutoPtr<ULONG, NonPagedPool, TAG_GENBUF> id_list(new ULONG[count]);
         status = nvme->IdentifyActiveNamespaceIdList(NULL, count, id_list, ret_count);
         if (!NT_SUCCESS(status) || 0 == ret_count)
             return FALSE;
+        ret_count = min(ret_count, NVME_CONST::SUPPORT_NAMESPACES);
         for (ULONG i = 0; i < ret_count; i++)
         {
             status = nvme->IdentifyNamespace(NULL, id_list.Get()[i], &nvme->NsData[i]);
@@ -163,6 +166,13 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
             }
             nvme->NamespaceCount++;
         }
+    }
+    else  
+    {   //for NVMe v1.0 (VMWare NVMe Disk)
+        status = nvme->IdentifyNamespace(NULL, 1, &nvme->NsData[0]);
+        if (!NT_SUCCESS(status))
+            return FALSE;
+        nvme->NamespaceCount = 1;
     }
 
     status = nvme->SetInterruptCoalescing(NULL);

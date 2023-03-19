@@ -59,8 +59,7 @@ namespace SPC
         }
 
         virtual ~CAutoPtr() noexcept {
-            if (nullptr != this->Ptr)
-                this->Deleter(this->Ptr);
+            Reset();
         }
 
         CAutoPtr& operator=(CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>&& _Right) noexcept
