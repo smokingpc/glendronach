@@ -9,7 +9,7 @@ CSpinLock::CSpinLock(KSPIN_LOCK* lock, bool acquire)
     this->IsAcquired = false;
 
     if(acquire)
-        KeAcquireSpinLock(this->Lock, &this->OldIrql);
+        DoAcquire();
 }
 
 CSpinLock::~CSpinLock()
