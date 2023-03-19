@@ -89,6 +89,11 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
+inline void CNvmeDevice::UpdateMaxTxSize()
+{
+    this->MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * this->MinPageSize);
+    this->MaxTxPages = (ULONG)(this->MaxTxSize / PAGE_SIZE);
+}
 #if 0
 ULONG CNvmeDevice::MinPageSize()
 {
@@ -343,7 +348,11 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext)
     //wait loop for FindAdapter called IdentifyController
     do
     {
+        ULONG done_count = 0;
         StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(1, done_count);
+        if (done_count > 0)
+            break;
     }while(SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     //TODO: log
@@ -375,7 +384,11 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVM
     //wait loop for FindAdapter called IdentifyController
     do
     {
+        ULONG done_count = 0;
         StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(1, done_count);
+        if (done_count > 0)
+            break;
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     //TODO: log
@@ -414,7 +427,11 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, ULON
 
     do
     {
+        ULONG done_count = 0;
         StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(1, done_count);
+        if (done_count > 0)
+            break;
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (my_srbext->SrbStatus != SRB_STATUS_SUCCESS)
@@ -667,8 +684,8 @@ NTSTATUS CNvmeDevice::RegisterAdmQ()
         return STATUS_MEMORY_NOT_ALLOCATED;
     aqa.ASQS = AdmDepth - 1;    //ASQS and ACQS are zero based index. here we should fill "MAX index" not total count;
     aqa.ACQS = AdmDepth - 1;
-    asq.ASQB = subq.QuadPart;
-    acq.ACQB = cplq.QuadPart;
+    asq.AsUlonglong = (ULONGLONG)subq.QuadPart;
+    acq.AsUlonglong = (ULONGLONG)cplq.QuadPart;
     WriteNvmeRegister(aqa, asq, acq);
     return STATUS_SUCCESS;
 }
@@ -711,7 +728,10 @@ void CNvmeDevice::ReadCtrlCap()
     MinPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMIN));
     MaxPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMAX));
     MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * MinPageSize);
+    if(0 == MaxTxSize)
+        MaxTxSize = NVME_CONST::DEFAULT_MAX_TXSIZE;
     MaxTxPages = (ULONG)(MaxTxSize / PAGE_SIZE);
+
 }
 bool CNvmeDevice::MapCtrlRegisters()
 {

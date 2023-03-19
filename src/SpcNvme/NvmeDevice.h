@@ -138,7 +138,7 @@ private:
 
     BOOLEAN IsControllerEnabled(bool barrier = true);
     BOOLEAN IsControllerReady(bool barrier = true);
-
+    void UpdateMaxTxSize();
     void DoQueueCompletion(CNvmeQueue* queue);
 };
 

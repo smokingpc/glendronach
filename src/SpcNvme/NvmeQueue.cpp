@@ -134,7 +134,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     }
 
     RtlCopyMemory(cmd, src_cmd, sizeof(NVME_COMMAND));
-    SubTail++;
+    SubTail = (SubTail + 1) % Depth;
     WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
 
     return STATUS_SUCCESS;
@@ -171,7 +171,7 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
         }
         SubHead = entry->DW2.SQHD;
         done_count++;
-        CplHead++;
+        CplHead = (CplHead + 1) % Depth;
 
         if(max_count > 0 && done_count >= max_count)
             break;
@@ -214,7 +214,7 @@ ULONG CNvmeQueue::ReadSubTail()
     if (IsValidQid(QueueID) && NULL != SubDbl)
         return ReadDbl(DevExt, SubDbl);
     KdBreakPoint();
-    return INVALID_DBL_VALUE;
+    return NVME_CONST::INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteSubTail(ULONG value)
 {
@@ -227,7 +227,7 @@ ULONG CNvmeQueue::ReadCplHead()
     if (IsValidQid(QueueID) && NULL != CplDbl)
         return ReadDbl(DevExt, CplDbl);
     KdBreakPoint();
-    return INVALID_DBL_VALUE;
+    return NVME_CONST::INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteCplHead(ULONG value)
 {

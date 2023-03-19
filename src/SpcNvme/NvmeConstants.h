@@ -19,11 +19,14 @@ namespace NVME_CONST{
     static const USHORT CPL_INIT_PHASETAG = 1;  //CompletionQueue phase tag init value;
     static const UCHAR IO_QUEUE_COUNT = 4;
     static const UCHAR IO_QUEUE_DEPTH = 128;
-
+    static const ULONG DEFAULT_MAX_TXSIZE = 131072;
     static const USHORT MAX_CID = MAXUSHORT;
 
     //static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     //static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
+
+    static const ULONG INIT_DBL_VALUE = 0;
+    static const ULONG INVALID_DBL_VALUE = (ULONG)MAXUSHORT;
 
     static const ULONG STALL_TIME_US = 50;  //in micro-seconds
     static const ULONG SLEEP_TIME_US = STALL_TIME_US*10;    //in micro-seconds

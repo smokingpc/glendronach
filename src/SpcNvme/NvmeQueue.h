@@ -106,9 +106,9 @@ private:
 
     CCmdHistory History;
 
-    ULONG SubTail = INVALID_DBL_VALUE;
-    ULONG SubHead = INVALID_DBL_VALUE;
-    ULONG CplHead = INIT_CPL_DBL_HEAD;
+    ULONG SubTail = NVME_CONST::INIT_DBL_VALUE;
+    ULONG SubHead = NVME_CONST::INIT_DBL_VALUE;
+    ULONG CplHead = NVME_CONST::INIT_DBL_VALUE;
     USHORT PhaseTag = NVME_CONST::CPL_INIT_PHASETAG;
     PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
     PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
@@ -124,5 +124,4 @@ private:
     bool InitQueueBuffer();    //init contents of this queue
     bool AllocQueueBuffer();    //allocate memory of this queue
     void DeallocQueueBuffer();
-    void CmdCompleteDispatcher();
 };
