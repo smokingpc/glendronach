@@ -139,7 +139,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     CDebugCallInOut inout(__FUNCTION__);
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    DbgBreakPoint();
+
     if(!nvme->IsWorking())
         return FALSE;
 

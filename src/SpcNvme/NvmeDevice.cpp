@@ -593,19 +593,17 @@ NTSTATUS CNvmeDevice::RegisterIoQ()
         status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
 
         RegisteredIoQ++;
+
+        do
+        {
+            //when Register I/O Queues, Interrupt are already connected.
+            //We just wait for ISR complete commands...
+            StorPortStallExecution(StallDelay);
+        } while (SRB_STATUS_PENDING != srbext->SrbStatus);
+
+        if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
+            return STATUS_REQUEST_NOT_ACCEPTED;
     }
-
-    do
-    {
-        ULONG done_count = 0;
-        StorPortStallExecution(StallDelay);
-        status = AdmQueue->CompleteCmd(2, done_count);
-        if (done_count > 0)
-            break;
-    } while (SRB_STATUS_PENDING != srbext->SrbStatus);
-
-    if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
-        return STATUS_REQUEST_NOT_ACCEPTED;
 
     return STATUS_SUCCESS;
 }
@@ -633,19 +631,17 @@ NTSTATUS CNvmeDevice::UnregisterIoQ()
         BuildCmd_UnRegIoCplQ(srbext, IoQueue[i]);
         status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
 
+        do
+        {
+            //when Register I/O Queues, Interrupt are already connected.
+            //We just wait for ISR complete commands...
+            StorPortStallExecution(StallDelay);
+        } while (SRB_STATUS_PENDING != srbext->SrbStatus);
+
+        if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
+            return STATUS_REQUEST_NOT_ACCEPTED;
+
     }
-
-    do
-    {
-        ULONG done_count = 0;
-        StorPortStallExecution(StallDelay);
-        status = AdmQueue->CompleteCmd(2, done_count);
-        if (done_count > 0)
-            break;
-    } while (SRB_STATUS_PENDING != srbext->SrbStatus);
-
-    if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
-        return STATUS_REQUEST_NOT_ACCEPTED;
 
     return STATUS_SUCCESS;
 }
