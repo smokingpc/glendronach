@@ -4,23 +4,13 @@
 BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
 {
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
-    ULONG irql = 0;
-    ULONG status = STOR_STATUS_SUCCESS;
     BOOLEAN ok = FALSE;
-    status = StorPortAcquireMSISpinLock(devext, msgid, &irql);
-    //todo: log if acquire MSI lock failed.
-
     ok = StorPortIssueDpc(devext, &nvme->QueueCplDpc, (PVOID) msgid, NULL);
-
-    status = StorPortReleaseMSISpinLock(devext, msgid, irql);
-    //todo: log if release MSI lock failed.
-
     if (!ok)
     {
-        //todo: log
+        //Todo: add debug print or log if IssueDPC failed.
     }
 
-    //Todo: add debug print or log if IssueDPC failed.
 
     return TRUE;
 }

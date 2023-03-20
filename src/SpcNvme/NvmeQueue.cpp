@@ -169,7 +169,6 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
     {
         PSPCNVME_SRBEXT srbext = NULL;
         PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
-//        if (entry->DW3.Status.P == PhaseTag)
         if(!NewCplArrived(entry, PhaseTag))
             break;
 
@@ -178,12 +177,11 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
     
         //if pop failed, previously saved SrbExt could be released by CID collision cmd.
         //skip it and process next completion.
-        if(NT_SUCCESS(status))
+        if(NT_SUCCESS(status) && srbext != NULL)
         {
-            UCHAR srbstatus = ToSrbStatus(entry->DW3.Status);
-            srbext->SetStatus(srbstatus);
-            if(NULL != srbext->Srb)
-                StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+            UCHAR srb_status = ToSrbStatus(entry->DW3.Status);
+            RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
+            srbext->CompleteSrbWithStatus(srb_status);
         }
         SubHead = entry->DW2.SQHD;
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);

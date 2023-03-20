@@ -30,13 +30,20 @@ public:
     NTSTATUS InitController();      //for FindAdapter
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
-    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext);
-    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext);
+    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext, bool poll = false);
+    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext, bool poll = false);
 
-    NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext);
-    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);
-    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, ULONG list_count, PULONG nsid_list, ULONG &ret_count);
+    NTSTATUS InitIdentifyCtrl();
+    NTSTATUS InitIdentifyNS();
+    NTSTATUS InitIdentifyFirstNS();
+    NTSTATUS InitCreateIoQueues();
 
+    NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA ident, bool poll = false);
+    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data, bool poll = false);
+    //nsid_list : variable to store query result. It's size should be PAGE_SIZE.(NVMe max support 1024 NameSpace)
+    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count, bool poll = false);
+
+    NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
     NTSTATUS SetInterruptCoalescing(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetAsyncEvent(PSPCNVME_SRBEXT srbext);
     NTSTATUS SetArbitration(PSPCNVME_SRBEXT srbext);
@@ -55,7 +62,7 @@ public:
     ULONG MaxTxPages;
     NVME_STATE State;
     ULONG RegisteredIoQ = 0;
-    ULONG CreatedIoQ = 0;
+    ULONG AllocatedIoQ = 0;
     ULONG DesiredIoQ = 0;
 
     ULONG DeviceTimeout;        //should be updated by CAP, unit in micro-seconds

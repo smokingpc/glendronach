@@ -25,7 +25,7 @@ namespace NVME_CONST{
 
     //static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     //static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
-
+    static const ULONG CPL_ALL_ENTRY = MAXULONG;
     static const ULONG INIT_DBL_VALUE = 0;
     static const ULONG INVALID_DBL_VALUE = (ULONG)MAXUSHORT;
 

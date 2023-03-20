@@ -11,37 +11,9 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
     DevExt = (CNvmeDevice*)devext;
     Srb = srb;
-//    SrbStatus = SRB_STATUS_SUCCESS;
     RtlZeroMemory(&NvmeCmd, sizeof(NVME_COMMAND));
+    RtlZeroMemory(&NvmeCpl, sizeof(NVME_COMPLETION_ENTRY));
     SetStatus(SRB_STATUS_PENDING);
-#if 0
-    if(NULL != srb)
-    {
-        SrbStatus = SRB_STATUS_PENDING;
-        //FuncCode = SrbGetSrbFunction(srb);
-        //ScsiQTag = SrbGetQueueTag(srb);
-        //Cdb = SrbGetCdb(srb);
-        //CdbLen = SrbGetCdbLength(srb);
-        //PathID = SrbGetPathId(srb); //SCSI Path (bus) ID
-        //TargetID = SrbGetTargetId(srb); //SCSI Dvice ID
-        //Lun = SrbGetLun(srb); //SCSI Logical UNit ID
-        //DataBuf = SrbGetDataBuffer(srb);
-        //DataBufLen = SrbGetDataTransferLength(srb);
-    }
-    else
-    {
-        SrbStatus = SRB_STATUS_PENDING;
-        //FuncCode = SRB_FUNCTION_SPC_INTERNAL;
-        //ScsiQTag = INVALID_SRB_QUEUETAG;
-        //Cdb = NULL;
-        //CdbLen = 0;
-        //PathID = INVALID_PATH_ID;
-        //TargetID = INVALID_TARGET_ID;
-        //Lun = INVALID_LUN_ID;
-        //DataBuf = NULL;
-        //DataBufLen = 0;
-    }
-#endif
     InitOK = TRUE;
 }
 
@@ -50,6 +22,15 @@ void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
     if(NULL != Srb)
         SrbSetSrbStatus(Srb, status);
     this->SrbStatus = status;
+}
+void _SPCNVME_SRBEXT::CompleteSrbWithStatus(UCHAR status)
+{
+    this->SrbStatus = status;
+    if (NULL != Srb)
+    {
+        SrbSetSrbStatus(Srb, status);
+        StorPortNotification(RequestComplete, DevExt, Srb);
+    }
 }
 ULONG _SPCNVME_SRBEXT::FuncCode()
 {

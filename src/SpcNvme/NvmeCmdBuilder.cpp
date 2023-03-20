@@ -31,7 +31,7 @@ void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA
 
     BuildPrp(srbext, cmd, (PVOID) data, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
 }
-void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, ULONG *nsid_list, size_t list_size)
+void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, size_t list_size)
 {
 //nsid_list is a ULONG array buffer to retrieve all nsid which is active in this NVMe.
 //list_size is size IN BYTES of nsid_list.
@@ -41,8 +41,9 @@ void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, ULONG *nsid_list, size
     cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ACTIVE_NAMESPACES;
 
-    BuildPrp(srbext, cmd, (PVOID)nsid_list, list_size);
+    BuildPrp(srbext, cmd, nsid_list, list_size);
 }
+
 void BuildCmd_IdentSpecifiedNS(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
@@ -64,6 +65,15 @@ void BuildCmd_IdentAllNSList(PSPCNVME_SRBEXT srbext, PVOID ns_buf, size_t buf_si
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ALLOCATED_NAMESPACE_LIST;
 
     BuildPrp(srbext, cmd, (PVOID)ns_buf, buf_size);
+}
+void BuildCmd_SetIoQueueCount(PSPCNVME_SRBEXT srbext, USHORT count)
+{
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
+    cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_NUMBER_OF_QUEUES;
+    cmd->u.SETFEATURES.CDW11.NumberOfQueues.NSQ =
+        cmd->u.SETFEATURES.CDW11.NumberOfQueues.NCQ = count;
 }
 void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
 {

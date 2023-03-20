@@ -12,22 +12,13 @@ typedef struct _SPCNVME_SRBEXT
     BOOLEAN InitOK;
     BOOLEAN FreePrp2List;
     NVME_COMMAND NvmeCmd;
-
+    NVME_COMPLETION_ENTRY NvmeCpl;
     PVOID Prp2VA;
     PHYSICAL_ADDRESS Prp2PA;
 
-    //ULONG FuncCode;         //SRB Function Code
-    //ULONG ScsiQTag;
-    //PCDB Cdb;
-    //UCHAR CdbLen;
-    //UCHAR PathID;           //SCSI Path (bus) ID
-    //UCHAR TargetID;         //SCSI Device ID
-    //UCHAR Lun;              //SCSI Logical UNit ID
-    //PVOID DataBuf;
-    //ULONG DataBufLen;
-
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void SetStatus(UCHAR status);
+    void CompleteSrbWithStatus(UCHAR status);
     ULONG FuncCode();         //SRB Function Code
     ULONG ScsiQTag();
     PCDB Cdb();

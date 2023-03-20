@@ -62,9 +62,13 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
 
-    status = nvme->IdentifyController(NULL);
+    status = nvme->InitIdentifyCtrl();
     if (!NT_SUCCESS(status))
         goto error;
+    
+    status = nvme->InitCreateIoQueues();
+    if (!NT_SUCCESS(status))
+        return status;
 
     //PCI bus related initialize
     //this should be called AFTER identify controller , because 
@@ -143,13 +147,19 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     if(!nvme->IsWorking())
         return FALSE;
 
+    if (nvme->NvmeVer.MNR > 0)
+        nvme->InitIdentifyNS();
+    else
+        nvme->InitIdentifyFirstNS();
+
+#if 0
     if(nvme->NvmeVer.MNR > 0)
     {
     //only query 4 namespace now...
         ULONG count = NVME_CONST::SUPPORT_NAMESPACES;
         ULONG ret_count = 0;
         CWinAutoPtr<ULONG, NonPagedPool, TAG_GENBUF> id_list(new ULONG[count]);
-        status = nvme->IdentifyActiveNamespaceIdList(NULL, count, id_list, ret_count);
+        status = nvme->IdentifyActiveNamespaceIdList(NULL, id_list, ret_count);
         if (!NT_SUCCESS(status) || 0 == ret_count)
             return FALSE;
         ret_count = min(ret_count, NVME_CONST::SUPPORT_NAMESPACES);
@@ -174,7 +184,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
             return FALSE;
         nvme->NamespaceCount = 1;
     }
-
+#endif
     status = nvme->SetInterruptCoalescing(NULL);
     if (!NT_SUCCESS(status))
         return FALSE;
@@ -194,6 +204,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     if (!NT_SUCCESS(status))
         return FALSE;
 
+    DbgBreakPoint();
     return TRUE;
 }
 
