@@ -30,8 +30,8 @@ public:
     NTSTATUS InitController();      //for FindAdapter
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
-    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext, bool poll = false);
-    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext, bool poll = false);
+    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext);//, bool poll = false);
+    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext);//, bool poll = false);
 
     NTSTATUS InitIdentifyCtrl();
     NTSTATUS InitIdentifyNS();

@@ -25,12 +25,11 @@ static UCHAR Reply_VpdSupportPages(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     buf_size = (FIELD_OFFSET(VPD_SUPPORTED_PAGES_PAGE, SupportedPageList) +
         valid_pages * sizeof(UCHAR));
 
-    SPC::CWinAutoPtr<VPD_SUPPORTED_PAGES_PAGE, PagedPool, TAG_VPDPAGE>
-            page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
-
-    if(page.IsNull())
+    SPC::CWinAutoPtr<UCHAR, PagedPool, TAG_VPDPAGE>
+            page_ptr(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
+    if(page_ptr.IsNull())
         return SRB_STATUS_INSUFFICIENT_RESOURCES;
-
+    PVPD_SUPPORTED_PAGES_PAGE page = (PVPD_SUPPORTED_PAGES_PAGE)page_ptr.Get();
     page->DeviceType = DIRECT_ACCESS_DEVICE;
     page->DeviceTypeQualifier = DEVICE_CONNECTED;
     page->PageCode = VPD_SUPPORTED_PAGES;
@@ -120,7 +119,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     REVERSE_BYTES_4(page->MaximumTransferLength, &max_tx);
     REVERSE_BYTES_4(page->OptimalTransferLength, &max_tx);
 
-    //Refer to SCSI SBC3 doc or SCSI reference Block Limits VPD page.
+    //Refer to SCSI SBC3 doc or SCSI reference Block Limits VPD page_ptr.
     //http://www.13thmonkey.org/documentation/SCSI/sbc3r25.pdf
     USHORT granularity = 0;
     REVERSE_BYTES_2(page->OptimalTransferLengthGranularity, &granularity);

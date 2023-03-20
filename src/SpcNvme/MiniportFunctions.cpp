@@ -65,7 +65,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     status = nvme->InitIdentifyCtrl();
     if (!NT_SUCCESS(status))
         goto error;
-    
+DbgBreakPoint();
     status = nvme->InitCreateIoQueues();
     if (!NT_SUCCESS(status))
         return status;

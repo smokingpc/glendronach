@@ -86,3 +86,10 @@ void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
     if(NULL != Srb)
         SrbSetDataTransferLength(Srb, length);
 }
+
+PSRBEX_DATA_PNP _SPCNVME_SRBEXT::SrbDataPnp()
+{
+    if (NULL != Srb)
+        return (PSRBEX_DATA_PNP)SrbGetSrbExDataByType(Srb, SrbExDataTypePnP);
+    return NULL;
+}

@@ -72,8 +72,10 @@ void BuildCmd_SetIoQueueCount(PSPCNVME_SRBEXT srbext, USHORT count)
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_NUMBER_OF_QUEUES;
+
+    //NSQ and NCQ should be 0 based.
     cmd->u.SETFEATURES.CDW11.NumberOfQueues.NSQ =
-        cmd->u.SETFEATURES.CDW11.NumberOfQueues.NCQ = count;
+        cmd->u.SETFEATURES.CDW11.NumberOfQueues.NCQ = count - 1;
 }
 void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
 {

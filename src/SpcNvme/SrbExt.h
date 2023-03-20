@@ -29,6 +29,7 @@ typedef struct _SPCNVME_SRBEXT
     PVOID DataBuf();
     ULONG DataBufLen();
     void SetTransferLength(ULONG length);
+    PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
 UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status);

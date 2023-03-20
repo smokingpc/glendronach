@@ -46,10 +46,18 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
     ULONG flags = 0;
     ULONG action = 0;
     UCHAR srb_status = SRB_STATUS_ERROR;
+
+    STOR_PNP_ACTION PnPAction;
+    PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
+
+    ASSERT (NULL != srb_pnp);
+    flags = srb_pnp->SrbPnPFlags;
+    action = srb_pnp->PnPAction;
+
     //All unit control migrated to HwUnitControl callback...
     if(SRB_PNP_FLAGS_ADAPTER_REQUEST != (flags & SRB_PNP_FLAGS_ADAPTER_REQUEST))
     {
-        KdBreakPoint();
+        //KdBreakPoint();
         goto END;
     }
 
