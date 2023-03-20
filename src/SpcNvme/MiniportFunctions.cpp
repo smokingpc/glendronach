@@ -190,7 +190,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     status = nvme->SetAsyncEvent(NULL);
     if (!NT_SUCCESS(status))
         return FALSE;
-    status = nvme->RegisterIoQ();
+    status = nvme->RegisterIoQ(NULL);
     if (!NT_SUCCESS(status))
         return FALSE;
 

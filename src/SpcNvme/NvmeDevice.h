@@ -30,8 +30,8 @@ public:
     NTSTATUS InitController();      //for FindAdapter
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
-    NTSTATUS RegisterIoQ();
-    NTSTATUS UnregisterIoQ();
+    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext);
+    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext);
 
     NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext);
     NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);

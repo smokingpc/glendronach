@@ -13,8 +13,7 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     Srb = srb;
 //    SrbStatus = SRB_STATUS_SUCCESS;
     RtlZeroMemory(&NvmeCmd, sizeof(NVME_COMMAND));
-
-    SrbStatus = SRB_STATUS_PENDING;
+    SetStatus(SRB_STATUS_PENDING);
 #if 0
     if(NULL != srb)
     {
@@ -50,6 +49,7 @@ void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 {
     if(NULL != Srb)
         SrbSetSrbStatus(Srb, status);
+    this->SrbStatus = status;
 }
 ULONG _SPCNVME_SRBEXT::FuncCode()
 {

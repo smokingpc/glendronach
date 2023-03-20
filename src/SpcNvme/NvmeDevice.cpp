@@ -565,85 +565,153 @@ bool CNvmeDevice::IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
         return false;
     return true;
 }
-NTSTATUS CNvmeDevice::RegisterIoQ()
+NTSTATUS CNvmeDevice::RegisterIoQ(PSPCNVME_SRBEXT srbext)
 {
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
     if (!IsWorking())
-        return STATUS_INVALID_DEVICE_STATE;
+    { 
+        status = STATUS_INVALID_DEVICE_STATE;
+        goto END;
+    }
+    if (temp.IsNull())
+    {
+        status = STATUS_MEMORY_NOT_ALLOCATED;
+        goto END;
+    }
 
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
-    PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
-    NTSTATUS status = STATUS_SUCCESS;
-    if (NULL == srbext)
-        return STATUS_MEMORY_NOT_ALLOCATED;
-
-    srbext->Init(this, NULL);
-    srbext_ptr.Reset(srbext);
-    
     DbgBreakPoint();
     for (ULONG i = 0; i < DesiredIoQ; i++)
     {
-        if(NULL == IoQueue[i])
-            continue;
+        temp->Init(this, NULL);
 //register IoQueue should register CplQ first, then SubQ.
 //They are "Pair" .
-        BuildCmd_RegIoCplQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
-
-        BuildCmd_RegIoSubQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
-
-        RegisteredIoQ++;
+        BuildCmd_RegIoCplQ(temp, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(temp, &temp->NvmeCmd);
+        if(!NT_SUCCESS(status))
+        {
+            status = STATUS_REQUEST_ABORTED;
+            goto END;
+        }
 
         do
         {
             //when Register I/O Queues, Interrupt are already connected.
             //We just wait for ISR complete commands...
             StorPortStallExecution(StallDelay);
-        } while (SRB_STATUS_PENDING != srbext->SrbStatus);
+        } while (SRB_STATUS_PENDING != temp->SrbStatus);
 
-        if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
-            return STATUS_REQUEST_NOT_ACCEPTED;
+        if (temp->SrbStatus != SRB_STATUS_SUCCESS)
+            goto END;
+
+        temp->Init(this, NULL);
+        BuildCmd_RegIoSubQ(temp, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(temp, &temp->NvmeCmd);
+        if (!NT_SUCCESS(status))
+        {
+            status = STATUS_REQUEST_ABORTED;
+            goto END;
+        }
+
+        do
+        {
+            //when Register I/O Queues, Interrupt are already connected.
+            //We just wait for ISR complete commands...
+            StorPortStallExecution(StallDelay);
+        } while (SRB_STATUS_PENDING != temp->SrbStatus);
+
+        if (temp->SrbStatus != SRB_STATUS_SUCCESS)
+            goto END;
+
+        RegisteredIoQ++;
     }
 
-    return STATUS_SUCCESS;
+END:
+    if (RegisteredIoQ == DesiredIoQ)
+        status = STATUS_SUCCESS;
+
+    if (NULL != srbext)
+    { 
+        if(NT_SUCCESS(status))
+            srbext->SetStatus(SRB_STATUS_SUCCESS);
+        else
+            srbext->SetStatus(SRB_STATUS_ERROR);
+    }
+    return status;
 }
-NTSTATUS CNvmeDevice::UnregisterIoQ()
+NTSTATUS CNvmeDevice::UnregisterIoQ(PSPCNVME_SRBEXT srbext)
 {
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
     if (!IsWorking())
-        return STATUS_INVALID_DEVICE_STATE;
-
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
-    PSPCNVME_SRBEXT srbext = new SPCNVME_SRBEXT();
-    NTSTATUS status = STATUS_SUCCESS;
-    if (NULL == srbext)
-        return STATUS_MEMORY_NOT_ALLOCATED;
-
-    srbext->Init(this, NULL);
-    srbext_ptr.Reset(srbext);
+    {
+        status = STATUS_INVALID_DEVICE_STATE;
+        goto END;
+    }
+    if (temp.IsNull())
+    {
+        status = STATUS_MEMORY_NOT_ALLOCATED;
+        goto END;
+    }
 
     DbgBreakPoint();
     for (ULONG i = 0; i < DesiredIoQ; i++)
     {
-        if (NULL == IoQueue[i])
-            continue;
-        BuildCmd_UnRegIoSubQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
-        BuildCmd_UnRegIoCplQ(srbext, IoQueue[i]);
-        status = AdmQueue->SubmitCmd(srbext, &srbext->NvmeCmd);
+        temp->Init(this, NULL);
+        //register IoQueue should register CplQ first, then SubQ.
+        //They are "Pair" .
+        BuildCmd_UnRegIoSubQ(temp, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(temp, &temp->NvmeCmd);
+        if (!NT_SUCCESS(status))
+        {
+            status = STATUS_REQUEST_ABORTED;
+            goto END;
+        }
 
         do
         {
             //when Register I/O Queues, Interrupt are already connected.
             //We just wait for ISR complete commands...
             StorPortStallExecution(StallDelay);
-        } while (SRB_STATUS_PENDING != srbext->SrbStatus);
+        } while (SRB_STATUS_PENDING != temp->SrbStatus);
 
-        if (srbext->SrbStatus != SRB_STATUS_SUCCESS)
-            return STATUS_REQUEST_NOT_ACCEPTED;
+        if (temp->SrbStatus != SRB_STATUS_SUCCESS)
+            goto END;
 
+        temp->Init(this, NULL);
+        BuildCmd_UnRegIoCplQ(temp, IoQueue[i]);
+        status = AdmQueue->SubmitCmd(temp, &temp->NvmeCmd);
+        if (!NT_SUCCESS(status))
+        {
+            status = STATUS_REQUEST_ABORTED;
+            goto END;
+        }
+
+        do
+        {
+            //when Register I/O Queues, Interrupt are already connected.
+            //We just wait for ISR complete commands...
+            StorPortStallExecution(StallDelay);
+        } while (SRB_STATUS_PENDING != temp->SrbStatus);
+
+        if (temp->SrbStatus != SRB_STATUS_SUCCESS)
+            goto END;
+
+        RegisteredIoQ++;
     }
 
-    return STATUS_SUCCESS;
+END:
+    if (RegisteredIoQ == DesiredIoQ)
+        status = STATUS_SUCCESS;
+
+    if (NULL != srbext)
+    {
+        if (NT_SUCCESS(status))
+            srbext->SetStatus(SRB_STATUS_SUCCESS);
+        else
+            srbext->SetStatus(SRB_STATUS_ERROR);
+    }
+    return status;
 }
 
 NTSTATUS CNvmeDevice::CreateAdmQ()

@@ -181,12 +181,9 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
         if(NT_SUCCESS(status))
         {
             UCHAR srbstatus = ToSrbStatus(entry->DW3.Status);
-            srbext->SrbStatus = srbstatus;
+            srbext->SetStatus(srbstatus);
             if(NULL != srbext->Srb)
-            {
-                SrbSetSrbStatus(srbext->Srb, srbstatus);
                 StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
-            }
         }
         SubHead = entry->DW2.SQHD;
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
