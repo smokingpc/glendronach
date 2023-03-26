@@ -44,10 +44,9 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG flags = 0;
-    ULONG action = 0;
     UCHAR srb_status = SRB_STATUS_ERROR;
 
-    STOR_PNP_ACTION PnPAction;
+    STOR_PNP_ACTION action;
     PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
 
     ASSERT (NULL != srb_pnp);
