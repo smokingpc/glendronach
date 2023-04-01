@@ -653,6 +653,7 @@ NTSTATUS CNvmeDevice::RegisterIoQ(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
+    DbgBreakPoint();
     if (!IsWorking())
     { 
         status = STATUS_INVALID_DEVICE_STATE;

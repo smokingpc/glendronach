@@ -14,6 +14,9 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     RtlZeroMemory(&NvmeCmd, sizeof(NVME_COMMAND));
     RtlZeroMemory(&NvmeCpl, sizeof(NVME_COMPLETION_ENTRY));
     SetStatus(SRB_STATUS_PENDING);
+    FreePrp2List = FALSE;
+    Prp2VA = NULL;
+    Prp2PA.QuadPart = 0;
     InitOK = TRUE;
 }
 

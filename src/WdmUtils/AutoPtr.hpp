@@ -116,17 +116,17 @@ namespace SPC
     };
 
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = WinKernelDeleter<_Ty, _PoolType, _PoolTag>>
-    class CWinAutoPtr : public CAutoPtr<_Ty, _PoolType, _PoolTag>
+    class CWinAutoPtr : public CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>
     {
     public:
         CWinAutoPtr() noexcept
-            :CAutoPtr<_Ty, _PoolType, _PoolTag>()
+            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>()
         {}
         CWinAutoPtr(_Ty* ptr) noexcept
-            :CAutoPtr<_Ty, _PoolType, _PoolTag>(ptr)
+            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>(ptr)
         {}
         CWinAutoPtr(PVOID ptr) noexcept 
-            :CAutoPtr<_Ty, _PoolType, _PoolTag>(ptr)
+            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>(ptr)
         {}
     protected:
         friend class CWinAutoPtr;
