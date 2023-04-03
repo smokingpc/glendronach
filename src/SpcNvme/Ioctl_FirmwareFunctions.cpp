@@ -24,7 +24,8 @@ static ULONG ReplyFirmwareInfo(
         else
             ret_info->ImagePayloadAlignment = (ULONG)(PAGE_SIZE * ctrl->FWUG);
         //max size of payload in single piece of download image cmd...
-        ret_info->ImagePayloadMaxSize = max_tx_size;
+        //refer to https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/upgrading-firmware-for-an-nvme-device
+        ret_info->ImagePayloadMaxSize = min(max_tx_size, (128*PAGE_SIZE));
 
         for(UCHAR i=0; i< ctrl->FRMW.SlotCount; i++)
         {
