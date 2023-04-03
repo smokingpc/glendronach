@@ -281,9 +281,10 @@ NTSTATUS CNvmeDevice::ShutdownController()
     cc.SHN = NVME_CC_SHN_NORMAL_SHUTDOWN;
     WriteNvmeRegister(cc);
 
+    //VMware NVMe 1.0 not guarantee CSTS.SHST will response?
     ok = WaitForCtrlerShst(DeviceTimeout);
-    if (!ok)
-        goto ERROR_BSOD;
+    //if (!ok)
+    //    goto ERROR_BSOD;
 
     return DisableController();
 
