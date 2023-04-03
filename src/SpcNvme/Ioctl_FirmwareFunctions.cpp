@@ -1,4 +1,5 @@
 #include "pch.h"
+SPC_SRBEXT_COMPLETION Complete_FirmwareInfo;
 
 static ULONG NvmeStatus2FirmwareStatus(NVME_COMMAND_STATUS *status)
 {
@@ -131,64 +132,6 @@ END:
     srbext->ResetExtBuf(NULL);
 }
 
-//ULONG IoctlCpl_FirmwareInfo(
-//            PNVME_IDENTIFY_CONTROLLER_DATA ctrl,
-//            PNVME_FIRMWARE_SLOT_INFO_LOG logpage, 
-//            ULONG max_tx_size,
-//            PSTORAGE_FIRMWARE_INFO buffer,
-//            ULONG buf_size)
-//{
-//    buffer->ActiveSlot = logpage->AFI.ActiveSlot;
-//    buffer->PendingActivateSlot = logpage->AFI.PendingActivateSlot;
-//    buffer->UpgradeSupport = (ctrl->FRMW.SlotCount > 1);
-//    buffer->SlotCount = ctrl->FRMW.SlotCount;
-//    if(buf_size >= (sizeof(STORAGE_FIRMWARE_INFO_V2) + 
-//                sizeof(STORAGE_FIRMWARE_SLOT_INFO_V2)* ctrl->FRMW.SlotCount))
-//    {
-//        PSTORAGE_FIRMWARE_INFO_V2 ret_info = (PSTORAGE_FIRMWARE_INFO_V2) buffer;
-//        ret_info->Version = STORAGE_FIRMWARE_DOWNLOAD_STRUCTURE_VERSION_V2;
-//        ret_info->Size = sizeof(STORAGE_FIRMWARE_INFO_V2);
-//        ret_info->FirmwareShared = TRUE;
-//        
-//        if(ctrl->FWUG == 0xFF)
-//            ret_info->ImagePayloadAlignment = sizeof(ULONG);
-//        else
-//            ret_info->ImagePayloadAlignment = (ULONG)(PAGE_SIZE * ctrl->FWUG);
-//        //max size of payload in single piece of download image cmd...
-//        //refer to https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/upgrading-firmware-for-an-nvme-device
-//        ret_info->ImagePayloadMaxSize = min(max_tx_size, (128*PAGE_SIZE));
-//
-//        for(UCHAR i=0; i< ctrl->FRMW.SlotCount; i++)
-//        {
-//            PSTORAGE_FIRMWARE_SLOT_INFO_V2 slot = &ret_info->Slot[i];
-//            slot->ReadOnly = FALSE;
-//            slot->SlotNumber = i+1;
-//            RtlZeroMemory(slot->Revision, STORAGE_FIRMWARE_SLOT_INFO_V2_REVISION_LENGTH);
-//            RtlCopyMemory(slot->Revision, &logpage->FRS[i], sizeof(ULONGLONG));
-//        }
-//
-//        if(ctrl->FRMW.Slot1ReadOnly)
-//            ret_info->Slot[0].ReadOnly = TRUE;
-//    }
-//    else 
-//    {
-//        PSTORAGE_FIRMWARE_INFO ret_info = (PSTORAGE_FIRMWARE_INFO)buffer;
-//        ret_info->Version = STORAGE_FIRMWARE_DOWNLOAD_STRUCTURE_VERSION;
-//        ret_info->Size = sizeof(STORAGE_FIRMWARE_INFO);
-//
-//        for (UCHAR i = 0; i < ctrl->FRMW.SlotCount; i++)
-//        {
-//            PSTORAGE_FIRMWARE_SLOT_INFO slot = &ret_info->Slot[i];
-//            slot->ReadOnly = FALSE;
-//            slot->SlotNumber = i + 1;
-//            slot->Revision.AsUlonglong = logpage->FRS[i];
-//        }
-//        if (ctrl->FRMW.Slot1ReadOnly)
-//            ret_info->Slot[0].ReadOnly = TRUE;
-//    }
-//
-//    return FIRMWARE_STATUS_SUCCESS;
-//}
 UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
 {
     PNVME_FIRMWARE_SLOT_INFO_LOG logpage = NULL;

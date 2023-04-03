@@ -76,7 +76,7 @@ inline ULONG ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULO
 
 #pragma region ======== Parse SCSI ReadWrite length and offset ======== 
 //Note: In SCSI, all read/write request are in "BLOCKS", not in bytes.
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG len)
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG &len)
 {
     //offset = ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb1 << 16) |
     //    ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb0 << 8) |
@@ -87,7 +87,7 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset,
     if(0 == len)
         len = 256;
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG len)
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG &len)
 {
     //offset = ((ULONG64)cdb->CDB10.LogicalBlockByte0 << 24) |
     //    ((ULONG64)cdb->CDB10.LogicalBlockByte1 << 16) |
@@ -100,7 +100,7 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG l
     REVERSE_BYTES_4(&offset, &rw.LogicalBlockByte0);
     REVERSE_BYTES_2(&len, &rw.TransferBlocksMsb);
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG len)
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG &len)
 {
     //*offset = ((ULONG64)cdb->CDB12.LogicalBlock[0] << 24) |
     //    ((ULONG64)cdb->CDB12.LogicalBlock[1] << 16) |
@@ -115,7 +115,7 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG l
     REVERSE_BYTES_4(&offset, &rw.LogicalBlock);
     REVERSE_BYTES_4(&len, &rw.TransferLength);
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB16& rw, ULONG64& offset, ULONG len)
+inline void ParseReadWriteOffsetAndLen(CDB::_CDB16& rw, ULONG64& offset, ULONG &len)
 {
     REVERSE_BYTES_8(&offset, &rw.LogicalBlock);
     REVERSE_BYTES_4(&len, &rw.TransferLength);

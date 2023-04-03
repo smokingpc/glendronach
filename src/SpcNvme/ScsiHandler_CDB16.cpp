@@ -61,6 +61,9 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
     UCHAR lun = srbext->Lun();
+    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuf();
+    ULONG block_size = 0;
+    ULONG64 blocks = 0;
 
     //LUN is zero based...
     if (lun >= srbext->DevExt->NamespaceCount)
@@ -74,17 +77,24 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
         goto END;
     }
 
-    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA_EX))
-    {
-        FillReadCapacityEx(lun, srbext);
-        ret_size = sizeof(READ_CAPACITY_DATA_EX);
-    }
-    else
+    if (srbext->DataBufLen() < sizeof(READ_CAPACITY_DATA_EX))
     {
         srb_status = SRB_STATUS_DATA_OVERRUN;
         ret_size = sizeof(READ_CAPACITY_DATA_EX);
+        goto END;
     }
+
+    srbext->DevExt->GetNamespaceBlockSize(lun + 1, block_size);
+    //LogicalBlockAddress is MAX LBA index, it's zero-based id.
+    //**this field is (total LBA count)-1.
+    srbext->DevExt->GetNamespaceTotalBlocks(lun + 1, blocks);
+    blocks -= 1;
+    REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
+    REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);
+    ret_size = sizeof(READ_CAPACITY_DATA_EX);
+    srb_status = SRB_STATUS_SUCCESS;
+
 END:
     srbext->SetTransferLength(ret_size);
-    return SRB_STATUS_INVALID_REQUEST;
+    return srb_status;
 }

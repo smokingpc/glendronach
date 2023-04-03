@@ -182,10 +182,8 @@ void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
         DoQueueCompletion(AdmQueue);
     else
     {
-        for(CNvmeQueue* &queue : IoQueue)
-        {
-            DoQueueCompletion(queue);
-        }
+        for(ULONG i=0; i<RegisteredIoQ; i++)
+            DoQueueCompletion(IoQueue[i]);
     }
 }
 NTSTATUS CNvmeDevice::EnableController()
@@ -1033,7 +1031,7 @@ void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
 {
     ULONG done = 0;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    status = queue->CompleteCmd(NVME_CONST::CPL_ALL_ENTRY, done);
+    status = queue->CompleteCmd(queue->GetQueueDepth(), done);
     //todo: error checking and log
 }
 NTSTATUS CNvmeDevice::CreateIoQ()
@@ -1051,7 +1049,8 @@ NTSTATUS CNvmeDevice::CreateIoQ()
         if(NULL != IoQueue[i])
             continue;
         CNvmeQueue* queue = new CNvmeQueue();
-        this->GetQueueDbl(i, cfg.SubDbl, cfg.CplDbl);
+        //Dbl[0] is for AdminQ
+        this->GetQueueDbl(i+1, cfg.SubDbl, cfg.CplDbl);
         cfg.QID = i + 1;
         status = queue->Setup(&cfg);
         if(!NT_SUCCESS(status))

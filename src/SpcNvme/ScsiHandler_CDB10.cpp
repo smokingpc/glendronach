@@ -1,31 +1,5 @@
 #include "pch.h"
 
-static void FillReadCapacity(UCHAR lun, PSPCNVME_SRBEXT srbext)
-{
-    PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuf();
-    ULONG block_size = 0;
-    ULONG64 blocks = 0;
-    srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
-
-    //LogicalBlockAddress is MAX LBA index, it's zero-based id.
-    //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
-
-    //NO support thin-provisioning in current stage....
-    //*From SBC - 3 r27:
-    //    *If the RETURNED LOGICAL BLOCK ADDRESS field is set to FFFF_FFFFh,
-    //    * then the application client should issue a READ CAPACITY(16)
-    //    * command(see 5.16) to request that the device server transfer the
-    //    * READ CAPACITY(16) parameter data to the data - in buffer.
-    if(blocks > MAXULONG32)
-        blocks = (ULONG64)MAXULONG32;
-    else
-        blocks -= 1;
-    cap->LogicalBlockAddress = cap->BytesPerBlock = 0;
-    REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
-    REVERSE_BYTES_4(&cap->LogicalBlockAddress, &blocks); //only reverse lower 4 bytes
-}
-
 UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
@@ -49,6 +23,9 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
+    PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuf();
+    ULONG block_size = 0;
+    ULONG64 blocks = 0;
     UCHAR lun = srbext->Lun();
 
     //LUN is zero based...
@@ -63,37 +40,41 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
         goto END;
     }
     
-    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA))
-    {
-        FillReadCapacity(lun, srbext);
-        ret_size = sizeof(READ_CAPACITY_DATA);
-    }
-    else
+    if (srbext->DataBufLen() < sizeof(READ_CAPACITY_DATA))
     {
         srb_status = SRB_STATUS_DATA_OVERRUN;
-        ret_size = sizeof(READ_CAPACITY_DATA_EX);
+        ret_size = sizeof(READ_CAPACITY_DATA);
+        goto END;
     }
+    
+    //LogicalBlockAddress is MAX LBA index, it's zero-based id.
+    //**this field is (total LBA count)-1.
+    srbext->DevExt->GetNamespaceTotalBlocks(lun + 1, blocks);
+    srbext->DevExt->GetNamespaceBlockSize(lun + 1, block_size);
+    if (blocks > MAXULONG32)
+    {
+        srb_status = SRB_STATUS_INVALID_REQUEST;
+        ret_size = 0;
+        goto END;
+    }
+    //NO support thin-provisioning in current stage....
+    //*From SBC - 3 r27:
+    //    *If the RETURNED LOGICAL BLOCK ADDRESS field is set to FFFF_FFFFh,
+    //    * then the application client should issue a READ CAPACITY(16)
+    //    * command(see 5.16) to request that the device server transfer the
+    //    * READ CAPACITY(16) parameter data to the data - in buffer.
+    blocks -= 1;
 
-#if 0
-    if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA_EX))
-    {
-        FillReadCapacityEx(lun, srbext);
-        ret_size = sizeof(READ_CAPACITY_DATA_EX);
-    }
-    else if (srbext->DataBufLen() >= sizeof(READ_CAPACITY_DATA)) 
-    {
-        FillReadCapacity(lun, srbext);
-        ret_size = sizeof(READ_CAPACITY_DATA);
-    }
-    else 
-    {
-        srb_status = SRB_STATUS_DATA_OVERRUN;
-        ret_size = sizeof(READ_CAPACITY_DATA_EX);
-    }
-#endif
+    cap->LogicalBlockAddress = cap->BytesPerBlock = 0;
+    REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
+    REVERSE_BYTES_4(&cap->LogicalBlockAddress, &blocks); //only reverse lower 4 bytes
+
+    ret_size = sizeof(READ_CAPACITY_DATA);
+    srb_status = SRB_STATUS_SUCCESS;
+
 END:
     srbext->SetTransferLength(ret_size);
-    return SRB_STATUS_INVALID_REQUEST;
+    return srb_status;
 }
 UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
 {
