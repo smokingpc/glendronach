@@ -322,7 +322,7 @@ NTSTATUS CNvmeDevice::InitIdentifyCtrl()
 NTSTATUS CNvmeDevice::InitIdentifyNS()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CWinAutoPtr<ULONG, NonPagedPool, DEV_POOL_TAG> idlist(new ULONG[NVME_CONST::MAX_NS_COUNT]);
+    CAutoPtr<ULONG, NonPagedPool, DEV_POOL_TAG> idlist(new ULONG[NVME_CONST::MAX_NS_COUNT]);
     ULONG ret_count = 0;
     status = IdentifyActiveNamespaceIdList(NULL, idlist, ret_count, true);
     if(!NT_SUCCESS(status))
@@ -364,7 +364,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     
@@ -404,7 +404,7 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVM
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     if (NULL == my_srbext)
@@ -448,7 +448,7 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOI
     if (NULL == nsid_list)
         return STATUS_INVALID_PARAMETER;
 
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == my_srbext)
@@ -499,7 +499,7 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> my_srbext(new SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> my_srbext(new SPCNVME_SRBEXT());
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     my_srbext->Init(this, NULL);
 
@@ -652,8 +652,8 @@ bool CNvmeDevice::IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
 NTSTATUS CNvmeDevice::RegisterIoQ(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
-    DbgBreakPoint();
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
+
     if (!IsWorking())
     { 
         status = STATUS_INVALID_DEVICE_STATE;
@@ -722,7 +722,7 @@ END:
 NTSTATUS CNvmeDevice::UnregisterIoQ(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CWinAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> temp(new SPCNVME_SRBEXT());
     if (!IsWorking())
     {
         status = STATUS_INVALID_DEVICE_STATE;

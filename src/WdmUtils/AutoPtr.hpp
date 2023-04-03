@@ -23,24 +23,6 @@ namespace SPC
         }
     };
 
-    template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class WinKernelDeleter //: SpcDefaultDeleter<_Ty, _PoolType, _PoolTag> 
-    {
-    public:
-        static constexpr POOL_TYPE pool_type = _PoolType;
-        static constexpr ULONG pool_tag = _PoolTag;
-        constexpr WinKernelDeleter() noexcept = default;
-
-        WinKernelDeleter(const WinKernelDeleter<_Ty, _PoolType, _PoolTag>&) noexcept
-        {}
-
-        void operator()(_Ty* _Ptr) const noexcept {
-            //SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
-            static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
-            ExFreePoolWithTag(_Ptr, _PoolTag);
-        }
-    };
-
     template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = SpcCppDeleter<_Ty, _PoolType, _PoolTag>>
     class CAutoPtr 
     {
@@ -113,22 +95,5 @@ namespace SPC
         DeleterType Deleter;
 
         friend class CAutoPtr;
-    };
-
-    template<typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag, class _Dx = WinKernelDeleter<_Ty, _PoolType, _PoolTag>>
-    class CWinAutoPtr : public CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>
-    {
-    public:
-        CWinAutoPtr() noexcept
-            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>()
-        {}
-        CWinAutoPtr(_Ty* ptr) noexcept
-            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>(ptr)
-        {}
-        CWinAutoPtr(PVOID ptr) noexcept 
-            :CAutoPtr<_Ty, _PoolType, _PoolTag, _Dx>(ptr)
-        {}
-    protected:
-        friend class CWinAutoPtr;
     };
 }

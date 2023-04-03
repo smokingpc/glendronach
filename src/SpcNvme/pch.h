@@ -37,4 +37,4 @@ EXTERN_C_END
 #include "ScsiHandler_CDB16.h"
 #include "ScsiHandler_InlineUtils.h"
 
-using SPC::CWinAutoPtr;
+using SPC::CAutoPtr;

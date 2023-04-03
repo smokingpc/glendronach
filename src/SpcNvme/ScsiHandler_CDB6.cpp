@@ -25,7 +25,7 @@ static UCHAR Reply_VpdSupportPages(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     buf_size = (FIELD_OFFSET(VPD_SUPPORTED_PAGES_PAGE, SupportedPageList) +
         valid_pages * sizeof(UCHAR));
 
-    SPC::CWinAutoPtr<UCHAR, PagedPool, TAG_VPDPAGE>
+    SPC::CAutoPtr<UCHAR, PagedPool, TAG_VPDPAGE>
             page_ptr(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
     if(page_ptr.IsNull())
         return SRB_STATUS_INSUFFICIENT_RESOURCES;
@@ -75,7 +75,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     size_t buf_size = (ULONG)sizeof(VPD_IDENTIFICATION_PAGE) +
                         (ULONG)sizeof(VPD_IDENTIFICATION_DESCRIPTOR)
                         + nqn_size + vid_size + 1;      //1 more byte for "_"
-    SPC::CWinAutoPtr<VPD_IDENTIFICATION_PAGE, PagedPool, TAG_VPDPAGE>
+    SPC::CAutoPtr<VPD_IDENTIFICATION_PAGE, PagedPool, TAG_VPDPAGE>
         page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
 
     //NQN is too long. So only use VID + SN as Identifier.
@@ -106,7 +106,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     //Max SCSI transfer block size
     //question : is it really used in modern windows system? Orz
     ULONG buf_size = sizeof(VPD_BLOCK_LIMITS_PAGE);
-    SPC::CWinAutoPtr<VPD_BLOCK_LIMITS_PAGE, PagedPool, TAG_VPDPAGE>
+    SPC::CAutoPtr<VPD_BLOCK_LIMITS_PAGE, PagedPool, TAG_VPDPAGE>
         page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
 
     page->DeviceType = DIRECT_ACCESS_DEVICE;
@@ -132,7 +132,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 static UCHAR Reply_VpdBlockDeviceCharacteristics(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 {
     ULONG buf_size = sizeof(VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE);
-    SPC::CWinAutoPtr<VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE, PagedPool, TAG_VPDPAGE>
+    SPC::CAutoPtr<VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE, PagedPool, TAG_VPDPAGE>
         page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
 
     page->DeviceType = DIRECT_ACCESS_DEVICE;
