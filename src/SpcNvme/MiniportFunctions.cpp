@@ -199,6 +199,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     //              The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
     //              to satisfy an incoming bus-reset request.
     //But, I don't understand the difference.... Current Windows family are all NT-based system :p
+        DbgBreakPoint();
         SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
         need_startio = FALSE;
         break;
@@ -212,6 +213,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         break;
     case SRB_FUNCTION_IO_CONTROL:
         //should check signature to determine incoming IOCTL
+        need_startio = BuildIo_IoctlHandler(srbext);
         break;
     case SRB_FUNCTION_PNP:
         //should handle PNP remove adapter

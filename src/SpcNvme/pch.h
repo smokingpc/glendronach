@@ -37,4 +37,8 @@ EXTERN_C_END
 #include "ScsiHandler_CDB16.h"
 #include "ScsiHandler_InlineUtils.h"
 
+#include "IoctlScsiMiniport_Handlers.h"
+#include "IoctlStorageQuery_Handlers.h"
+#include "Ioctl_FirmwareFunctions.h"
+
 using SPC::CAutoPtr;

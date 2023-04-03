@@ -3,7 +3,6 @@
 
 BOOLEAN BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {
-//    srbext->Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
     srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
     //todo: set log 
     StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);

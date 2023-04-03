@@ -5,7 +5,7 @@ UCHAR StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
     UNREFERENCED_PARAMETER(srbext);
     //SetScsiSenseBySrbStatus(srbext->Srb, SRB_STATUS_INVALID_REQUEST);
     //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
-    return SRB_STATUS_ERROR;
+    return SRB_STATUS_INVALID_REQUEST;
 }
 UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
@@ -272,6 +272,7 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 }
 UCHAR StartIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
 {
+
     //SRB_FUNCTION_IO_CONTROL handles serveral kinds (groups) of IOCTL:
     //1. IOCTL_SCSI_MINIPORT_* ioctl codes.
     //2. IOCTL_STORAGE_* ioctl codes
@@ -293,23 +294,41 @@ UCHAR StartIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
     //  IOCTL_MINIPORT_SIGNATURE_QUERY_PHYSICAL_TOPOLOGY    "TOPOLOGY"
     //  IOCTL_MINIPORT_SIGNATURE_ENDURANCE_INFO     "ENDURINF"
     //** to use custom made ioctl codes, you should also define your own signature for SrbIoCtrl->Signature.
-    UCHAR srb_status = SRB_STATUS_ERROR;
+    UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL) srbext->DataBuf();
-    //all signature only has max 8 bytes length. so only need to calc this size one time.
     size_t count = strlen(IOCTL_MINIPORT_SIGNATURE_SCSIDISK);
 
-    if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_SCSIDISK, count))
+    switch (ioctl->ControlCode)
     {
-        //handles IOCTL_SCSI_MINIPORT_* forwarded from DISK class driver device.
-        //(e.g. disk SMART query request: "IOCTL_SCSI_MINIPORT_READ_SMART_LOG" from \\.\PhysicalDrive3)
+        case IOCTL_SCSI_MINIPORT_FIRMWARE:
+            if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_FIRMWARE, count))
+                srb_status = IoctlScsiMiniport_Firmware(srbext, ioctl);
+            break;
+        default:
+//        case IOCTL_SCSI_MINIPORT_IDENTIFY:
+            srb_status = SRB_STATUS_INVALID_REQUEST;
+            break;
+    }
 
-    }
-    else if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_QUERY_PROTOCOL, count))
-    {
-        //handles IOCTL_STORAGE_QUERY_PROPERTY
-    }
-    else
-    {}
+    //all signature only has max 8 bytes length. so only need to calc this size one time.
+    //size_t count = strlen(IOCTL_MINIPORT_SIGNATURE_SCSIDISK);
+    //DbgBreakPoint();
+    //if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_SCSIDISK, count))
+    //{
+    //    //handles IOCTL_SCSI_MINIPORT_* forwarded from DISK class driver device.
+    //    //(e.g. disk SMART query request: "IOCTL_SCSI_MINIPORT_READ_SMART_LOG" from \\.\PhysicalDrive3)
+    //    //IOCTL_SCSI_MINIPORT_IDENTIFY
+    //}
+    //else if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_QUERY_PROTOCOL, count))
+    //{
+    //    //handles IOCTL_STORAGE_QUERY_PROPERTY
+    //}
+    //else if (0 == strncmp((const char*)ioctl->Signature, IOCTL_MINIPORT_SIGNATURE_FIRMWARE, count))
+    //{
+    //     //IOCTL_MINIPORT_SIGNATURE_FIRMWARE
+    //}
+    //else
+    //{}
 
     return srb_status;
 }

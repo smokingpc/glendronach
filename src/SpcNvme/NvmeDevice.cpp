@@ -392,7 +392,10 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_
     }while(SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+    {
+        UpdateMaxTxSize();
         status = STATUS_SUCCESS;
+    }
     else
         status = STATUS_UNSUCCESSFUL;
 END:

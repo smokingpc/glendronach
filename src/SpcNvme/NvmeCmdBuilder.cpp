@@ -187,176 +187,34 @@ void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER *timestamp)
     //bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, CMD_CTX_TYPE::WAIT_EVENT);
 }
 
-#if 0
-NTSTATUS SetFeature_InterruptCoalescing(PSPCNVME_DEVEXT devext, bool wait)
+void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info)
 {
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
 
-    return STATUS_NOT_IMPLEMENTED;
-//    KIRQL irql;
-//    StorPortGetCurrentIrql((PVOID)devext, &irql);
-//    ASSERT(irql == PASSIVE_LEVEL);
-//
-//    NVME_COMMAND cmd = {0};
-//    cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-//    cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
-//    cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_INTERRUPT_COALESCING;
-//    cmd.u.SETFEATURES.CDW11.InterruptCoalescing.THR = NVME_CONST::INTCOAL_THRESHOLD;
-//    cmd.u.SETFEATURES.CDW11.InterruptCoalescing.TIME = NVME_CONST::INTCOAL_TIME;
-//
-//    //submit command
-//    bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, true);
-//    if(!ok)
-//        return STATUS_INTERNAL_ERROR;
-//
-//    if(!wait)
-//        return STATUS_SUCCESS;
-//
-////todo: refactor NVME_STATUS replying
-//    NVME_COMMAND_STATUS nvme_status = {0};
-//    NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
-//    return status;
+    //In this command, we need "count of DWORD" not "size in bytes".
+    ULONG dword_count = (ULONG)(sizeof(NVME_FIRMWARE_SLOT_INFO_LOG) >> 2);
+    cmd->u.GETLOGPAGE.CDW10_V13.NUMDL = (USHORT) (dword_count & 0x0000FFFF);
+    cmd->u.GETLOGPAGE.CDW10_V13.LID = NVME_LOG_PAGE_FIRMWARE_SLOT_INFO;
+    cmd->u.GETLOGPAGE.CDW11.NUMDU = (USHORT) (dword_count >> 16);
+
+    BuildPrp(srbext, cmd, info, sizeof(NVME_FIRMWARE_SLOT_INFO_LOG));
 }
-NTSTATUS SetFeature_Arbitration(PSPCNVME_DEVEXT devext, bool wait)
+
+//NVMe v1.0 and v1.3 has different cmd structure in this command.
+void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info)
 {
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
-    return STATUS_NOT_IMPLEMENTED;
-    //KIRQL irql;
-    //StorPortGetCurrentIrql((PVOID)devext, &irql);
-    //ASSERT(irql == PASSIVE_LEVEL);
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
+    cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
 
-    //NVME_COMMAND cmd = { 0 };
-    //cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
-    //cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_ARBITRATION;
-    //cmd.u.SETFEATURES.CDW11.Arbitration.AB = NVME_CONST::AB_BURST;
-    //cmd.u.SETFEATURES.CDW11.Arbitration.HPW = NVME_CONST::AB_HPW;
-    //cmd.u.SETFEATURES.CDW11.Arbitration.MPW = NVME_CONST::AB_MPW;
-    //cmd.u.SETFEATURES.CDW11.Arbitration.LPW = NVME_CONST::AB_LPW;
+    USHORT dword_count = (USHORT)(sizeof(NVME_FIRMWARE_SLOT_INFO_LOG) >> 2);
+    cmd->u.GETLOGPAGE.CDW10.NUMD = dword_count & (USHORT)0x0FFF;
+    cmd->u.GETLOGPAGE.CDW10.LID = NVME_LOG_PAGE_FIRMWARE_SLOT_INFO;
 
-    ////submit command
-    //bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, true);
-    //if (!ok)
-    //    return STATUS_INTERNAL_ERROR;
-
-    //if (!wait)
-    //    return STATUS_SUCCESS;
-
-    ////todo: refactor NVME_STATUS replying
-    //NVME_COMMAND_STATUS nvme_status = { 0 };
-    //NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
-    //return status;
+    BuildPrp(srbext, cmd, info, sizeof(NVME_FIRMWARE_SLOT_INFO_LOG));
 }
-NTSTATUS SetFeature_SyncHostTime(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
-    return STATUS_NOT_IMPLEMENTED;
-    //KIRQL irql;
-    //StorPortGetCurrentIrql((PVOID)devext, &irql);
-    //ASSERT(irql == PASSIVE_LEVEL);
 
-    ////KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
-    //LARGE_INTEGER systime = { 0 };
-    //KeQuerySystemTime(&systime);
-
-    //LARGE_INTEGER elapsed = { 0 };
-    //RtlTimeToSecondsSince1970(&systime, &elapsed.LowPart);
-    //elapsed.QuadPart = elapsed.LowPart * 1000;
-
-    //NVME_COMMAND cmd = { 0 };
-    //cmd.CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd.NSID = NVME_CONST::UNSPECIFIC_NSID;
-    //cmd.u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
-
-    //PVOID timestamp = NULL;
-    //ULONG size = PAGE_SIZE;
-    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENBUF, &timestamp);
-    //if (STOR_STATUS_SUCCESS != status)
-    //    return FALSE;
-    //RtlZeroMemory(timestamp, size);
-    //RtlCopyMemory(timestamp, &elapsed, sizeof(LARGE_INTEGER));
-
-    //cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, timestamp, &size).QuadPart;
-
-    ////implement wait
-    //return STATUS_INTERNAL_ERROR;
-    ////submit command
-    //bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, CMD_CTX_TYPE::WAIT_EVENT);
-    //if (!ok)
-    //    return STATUS_INTERNAL_ERROR;
-
-    //if (!wait)
-    //    return STATUS_SUCCESS;
-
-    ////todo: refactor NVME_STATUS replying
-    //NVME_COMMAND_STATUS nvme_status = { 0 };
-    //NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
-    //
-    ////todo: maybe crash when STATUS_TIMEOUT?
-    //StorPortFreePool(devext, timestamp);
-
-    //return status;
-}
-NTSTATUS SetFeature_PowerManagement(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(wait);
-    KIRQL irql;
-    StorPortGetCurrentIrql((PVOID)devext, &irql);
-    ASSERT(irql == PASSIVE_LEVEL);
-    return STATUS_NOT_IMPLEMENTED;
-}
-NTSTATUS SetFeature_AsyncEvent(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(wait);
-    KIRQL irql;
-    StorPortGetCurrentIrql((PVOID)devext, &irql);
-    ASSERT(irql == PASSIVE_LEVEL);
-    return STATUS_NOT_IMPLEMENTED;
-}
-NTSTATUS NvmeIdentifyNamespace(PSPCNVME_DEVEXT devext, bool wait)
-{
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(wait);
-    return STATUS_NOT_IMPLEMENTED;
-    //NVME_COMMAND cmd = { 0 };
-    //PVOID buffer = NULL;
-    //ULONG size = PAGE_SIZE;
-    //KIRQL irql;
-    //StorPortGetCurrentIrql((PVOID)devext, &irql);
-    //ASSERT(irql == PASSIVE_LEVEL);
-
-    //cmd.CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    ////each namespace map to one LUN. each namespace replied data should save to one LunExt.
-    ////Now It only support 1 namespace on NVMe so I hardcode the LunExt array here.
-    //cmd.NSID = 1;
-    //cmd.u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_SPECIFIC_NAMESPACE;
-
-    //StorPortAllocatePool(devext, size, TAG_GENBUF, &buffer);
-    //RtlZeroMemory(buffer, size);
-
-    //cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, buffer, &size).QuadPart;
-
-    ////submit command
-    //bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, true);
-    //if (!ok)
-    //    return STATUS_INTERNAL_ERROR;
-
-    //if (!wait)
-    //    return STATUS_SUCCESS;
-
-    ////todo: refactor NVME_STATUS replying
-    //NVME_COMMAND_STATUS nvme_status = { 0 };
-    //NTSTATUS status = WaitAndPollCompletion(nvme_status, devext, devext->AdminQueue, &cmd);
-
-    //if (NT_SUCCESS(status) && nvme_status.SC == 0 && nvme_status.SCT == 0)
-    //    RtlCopyMemory(&devext->NsData[0], buffer, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
-
-    ////todo: maybe crash when STATUS_TIMEOUT?
-    //StorPortFreePool(devext, buffer);
-
-    //return status;
-}
-#endif
