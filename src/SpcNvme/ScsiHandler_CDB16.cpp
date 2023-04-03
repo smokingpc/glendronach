@@ -10,8 +10,8 @@ inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
     //**this field is (total LBA count)-1.
     srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
     blocks -= 1;
-    REVERSE_BYTES_4(cap->BytesPerBlock, &block_size);
-    REVERSE_BYTES_8(cap->LogicalBlockAddress.QuadPart, &blocks);
+    REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
+    REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);
 }
 
 UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)

@@ -259,8 +259,8 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
     }
 
     //todo: handle SCSI status for SRB
-    srbext->SetStatus(srb_status);
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    if (srb_status != SRB_STATUS_PENDING)
+        srbext->CompleteSrbWithStatus(srb_status);
 
     //return TRUE indicates that "this driver handled this request, 
     //no matter succeed or fail..."

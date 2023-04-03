@@ -9,14 +9,11 @@ _SPCNVME_SRBEXT* _SPCNVME_SRBEXT::GetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK
 
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
+    RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
+
     DevExt = (CNvmeDevice*)devext;
     Srb = srb;
-    RtlZeroMemory(&NvmeCmd, sizeof(NVME_COMMAND));
-    RtlZeroMemory(&NvmeCpl, sizeof(NVME_COMPLETION_ENTRY));
     SetStatus(SRB_STATUS_PENDING);
-    FreePrp2List = FALSE;
-    Prp2VA = NULL;
-    Prp2PA.QuadPart = 0;
     InitOK = TRUE;
 }
 
@@ -88,6 +85,13 @@ void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
 {
     if(NULL != Srb)
         SrbSetDataTransferLength(Srb, length);
+}
+
+void _SPCNVME_SRBEXT::ResetExtBuf(PVOID new_buffer)
+{
+    if(NULL != ExtBuf)
+        delete[] ExtBuf;
+    ExtBuf = new_buffer;
 }
 
 PSRBEX_DATA_PNP _SPCNVME_SRBEXT::SrbDataPnp()

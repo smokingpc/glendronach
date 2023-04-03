@@ -1,6 +1,10 @@
 #pragma once
 
 class CNvmeDevice;
+struct _SPCNVME_SRBEXT;
+
+typedef VOID SPC_SRBEXT_COMPLETION(struct _SPCNVME_SRBEXT *srbext);
+typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
 typedef struct _SPCNVME_SRBEXT
 {
@@ -15,6 +19,10 @@ typedef struct _SPCNVME_SRBEXT
     NVME_COMPLETION_ENTRY NvmeCpl;
     PVOID Prp2VA;
     PHYSICAL_ADDRESS Prp2PA;
+    PSPC_SRBEXT_COMPLETION CompletionCB;
+    //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPage().
+    //It should be freed in CompletionCB.
+    PVOID ExtBuf;        
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void SetStatus(UCHAR status);
@@ -29,6 +37,7 @@ typedef struct _SPCNVME_SRBEXT
     PVOID DataBuf();
     ULONG DataBufLen();
     void SetTransferLength(ULONG length);
+    void ResetExtBuf(PVOID new_buffer = NULL);
     PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 

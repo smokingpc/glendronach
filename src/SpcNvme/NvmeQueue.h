@@ -68,7 +68,6 @@ public:
     
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext);
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
-    //NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, ULONG wait_us, bool poll_cpl = true);
     NTSTATUS CompleteCmd(ULONG max_count, ULONG & done_count);
 
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);

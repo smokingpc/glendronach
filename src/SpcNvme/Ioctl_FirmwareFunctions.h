@@ -1,4 +1,7 @@
 #pragma once
-ULONG Firmware_ReplyInfo(PSPCNVME_SRBEXT srbext, PVOID out_buf, ULONG buf_size);
-ULONG Firmware_DownloadToAdapter(PSPCNVME_SRBEXT srbext, PVOID in_buf, ULONG buf_size);
-ULONG Firmware_ActivateSlot(PSPCNVME_SRBEXT srbext);
+
+SPC_SRBEXT_COMPLETION Complete_FirmwareInfo;
+
+UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext);
+UCHAR Firmware_DownloadToAdapter(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request);
+UCHAR Firmware_ActivateSlot(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request);

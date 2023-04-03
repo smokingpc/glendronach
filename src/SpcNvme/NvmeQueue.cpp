@@ -164,28 +164,41 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
 
     NTSTATUS status = STATUS_SUCCESS;
     done_count = 0;
-    CSpinLock lock(&CplLock);
     while(max_count > 0)
     {
         PSPCNVME_SRBEXT srbext = NULL;
-        PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
-        if(!NewCplArrived(entry, PhaseTag))
-            break;
-
-        USHORT cid = entry->DW3.CID;
-        status = History.Pop(cid, srbext);
-    
-        //if pop failed, previously saved SrbExt could be released by CID collision cmd.
-        //skip it and process next completion.
-        if(NT_SUCCESS(status) && srbext != NULL)
         {
-            UCHAR srb_status = ToSrbStatus(entry->DW3.Status);
-            RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
-            srbext->CompleteSrbWithStatus(srb_status);
+            CSpinLock lock(&CplLock);
+            PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
+            if(!NewCplArrived(entry, PhaseTag))
+                break;
+
+            USHORT cid = entry->DW3.CID;
+            srbext = NULL;
+            status = History.Pop(cid, srbext);
+
+            //if pop failed, previously saved SrbExt could be released by CID collision cmd.
+            //skip it and process next completion.
+            if(NT_SUCCESS(status) && NULL != srbext)
+            {
+                RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
+            }
+            SubHead = entry->DW2.SQHD;
+            UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
+            done_count++;
         }
-        SubHead = entry->DW2.SQHD;
-        UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
-        done_count++;
+
+        if(NULL != srbext)
+        {
+            if (srbext->CompletionCB)
+                srbext->CompletionCB(srbext);
+            else
+            {
+                UCHAR srb_status = ToSrbStatus(srbext->NvmeCpl.DW3.Status);
+                srbext->CompleteSrbWithStatus(srb_status);
+                srbext->ResetExtBuf(NULL);
+            }
+        }
 
         if(max_count > 0 && done_count >= max_count)
             break;
