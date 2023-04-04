@@ -42,7 +42,6 @@ private:
     PVOID DevExt = NULL;
     PVOID Buffer = NULL;
     size_t BufferSize = 0;
-    //PCMD_INFO History = NULL;     //Cast of RawBuffer
     PSPCNVME_SRBEXT *History = NULL; //Cast of RawBuffer
     ULONG Depth = 0;                   //how many items in this->History ?
     USHORT QueueID = NVME_INVALID_QID;
@@ -56,7 +55,7 @@ class CNvmeQueue
 {
 public:
     const static ULONG BufferTag = (ULONG)'QMVN';
-    const static MEMORY_CACHING_TYPE CacheType = MEMORY_CACHING_TYPE::MmCached;
+    const static MEMORY_CACHING_TYPE CacheType = MEMORY_CACHING_TYPE::MmNonCached;
     CNvmeQueue();
     CNvmeQueue(QUEUE_PAIR_CONFIG* config);
     ~CNvmeQueue();
@@ -100,7 +99,7 @@ private:
     PHYSICAL_ADDRESS CplQ_PA = { 0 }; 
     size_t CplQ_Size = 0;       //total length of CplQ Buffer.
 
-    USHORT CID = NVME_INVALID_CID;
+//    USHORT CID = NVME_INVALID_CID;
     QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
 
     CCmdHistory History;

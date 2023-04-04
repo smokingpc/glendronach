@@ -36,7 +36,7 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.AutoRequestSense = TRUE;
     init_data.NeedPhysicalAddresses = TRUE;
     init_data.AdapterInterfaceType = PCIBus;
-    init_data.MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS;
+    init_data.MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE;
     init_data.TaggedQueuing = TRUE;
     init_data.MultipleRequestPerLu = TRUE;
     init_data.NumberOfAccessRanges = 2;

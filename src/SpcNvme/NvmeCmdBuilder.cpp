@@ -1,12 +1,9 @@
 #include "pch.h"
-UCHAR BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write)
+void BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     ULONG nsid = srbext->Lun() + 1;
-
-    if (!srbext->DevExt->IsInValidIoRange(nsid, offset, blocks))
-        return SRB_STATUS_ERROR;
 
     cmd->CDW0.OPC = (is_write)? NVME_NVM_COMMAND_WRITE : NVME_NVM_COMMAND_READ;
     cmd->NSID = nsid;
@@ -15,8 +12,6 @@ UCHAR BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, 
     cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
     cmd->u.READWRITE.CDW12.NLB = blocks - 1;
     cmd->CDW0.CID = srbext->ScsiQTag();
-
-    return SRB_STATUS_SUCCESS;
 }
 
 //to build NVME_COMMAND for IdentifyController command
@@ -88,7 +83,7 @@ void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
     cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->GetQueueID();
-    cmd->u.CREATEIOSQ.CDW10.QSIZE = queue->GetQueueDepth();
+    cmd->u.CREATEIOSQ.CDW10.QSIZE = queue->GetQueueDepth() - 1; //0-based value
     cmd->u.CREATEIOSQ.CDW11.CQID = queue->GetQueueID();
     cmd->u.CREATEIOSQ.CDW11.PC = 1;
 
@@ -108,7 +103,7 @@ void BuildCmd_RegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
     cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.CREATEIOCQ.CDW10.QID = queue->GetQueueID();
-    cmd->u.CREATEIOCQ.CDW10.QSIZE = queue->GetQueueDepth();
+    cmd->u.CREATEIOCQ.CDW10.QSIZE = queue->GetQueueDepth() - 1; //0-based value
     cmd->u.CREATEIOCQ.CDW11.IEN = TRUE;
     cmd->u.CREATEIOCQ.CDW11.IV = (queue->GetQueueType() == QUEUE_TYPE::ADM_QUEUE ? 0 : 1 );
     cmd->u.CREATEIOCQ.CDW11.PC = TRUE;

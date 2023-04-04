@@ -76,6 +76,7 @@ bool BuildPrp(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, PVOID buffer, size_t bu
         srbext->FreePrp2List = TRUE;
         srbext->Prp2PA = MmGetPhysicalAddress(srbext->Prp2VA);
         BuildPrp2List(srbext->Prp2VA, cursor, size_left);
+        cmd->PRP2 = srbext->Prp2PA.QuadPart;
     }
     return true;
 }

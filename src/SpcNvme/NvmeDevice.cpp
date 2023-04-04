@@ -647,7 +647,7 @@ bool CNvmeDevice::IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
         return false;
 
     ULONG64 max_block_id = NsData[nsid - 1].NSZE - 1;
-    if((offset + len) >= max_block_id)
+    if((offset + len - 1) > max_block_id)
         return false;
     return true;
 }

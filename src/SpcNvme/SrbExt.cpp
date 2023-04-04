@@ -17,6 +17,16 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     InitOK = TRUE;
 }
 
+void _SPCNVME_SRBEXT::CleanUp()
+{
+    ResetExtBuf(NULL);
+    if(NULL != Prp2VA)
+    { 
+        ExFreePoolWithTag(Prp2VA, TAG_PRP2);
+        Prp2VA = NULL;
+    }
+}
+
 void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 {
     if(NULL != Srb)

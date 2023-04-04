@@ -128,8 +128,8 @@ VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
 
 END:
     ioctl->ReturnCode = fw_status;
+    srbext->CleanUp();
     srbext->CompleteSrbWithStatus(srb_status);
-    srbext->ResetExtBuf(NULL);
 }
 
 UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)

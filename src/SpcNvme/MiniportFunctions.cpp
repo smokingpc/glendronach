@@ -10,7 +10,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
-    portcfg->MapBuffers = STOR_MAP_NON_READ_WRITE_BUFFERS; //specify bounce buffer type?
+    portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
     portcfg->MaximumNumberOfTargets = NVME_CONST::MAX_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
     portcfg->DeviceExtensionSize = sizeof(CNvmeDevice);

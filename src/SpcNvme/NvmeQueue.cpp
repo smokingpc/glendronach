@@ -77,7 +77,6 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     BufferSize = config->PreAllocBufSize;
     SubDbl = config->SubDbl;
     CplDbl = config->CplDbl;
-    CID = 0;
     
     if(NULL == Buffer)
     {
@@ -132,26 +131,25 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
     CSpinLock lock(&SubLock);
     NTSTATUS status = STATUS_SUCCESS;
+    ULONG history_idx = 0;
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
 
-    PNVME_COMMAND cmd = &SubQ_VA[SubTail];
-    CID++;
-    src_cmd->CDW0.CID = CID;
-    status = History.Push(CID, srbext);
+    history_idx = src_cmd->CDW0.CID % Depth;
+    status = History.Push(history_idx, srbext);
     if (!NT_SUCCESS(status))
     {
         //old cmd is timed out, release it...
         PSPCNVME_SRBEXT old_srbext = NULL;
-        History.Pop(CID, old_srbext);
+        History.Pop(history_idx, old_srbext);
         SrbSetSrbStatus(old_srbext->Srb, SRB_STATUS_TIMEOUT);
         StorPortNotification(RequestComplete, old_srbext->DevExt, old_srbext->Srb);
 
         //after release old cmd, push current cmd again...
-        History.Push(CID, srbext);
+        History.Push(history_idx, srbext);
     }
 
-    RtlCopyMemory(cmd, src_cmd, sizeof(NVME_COMMAND));
+    RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
     SubTail = (SubTail + 1) % Depth;
     WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
 
@@ -170,12 +168,15 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
         {
             CSpinLock lock(&CplLock);
             PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
+            ULONG history_idx = 0;
+            USHORT cid = 0;
             if(!NewCplArrived(entry, PhaseTag))
                 break;
 
-            USHORT cid = entry->DW3.CID;
+            cid = entry->DW3.CID;
+            history_idx = cid % Depth;
             srbext = NULL;
-            status = History.Pop(cid, srbext);
+            status = History.Pop(history_idx, srbext);
 
             //if pop failed, previously saved SrbExt could be released by CID collision cmd.
             //skip it and process next completion.
@@ -183,6 +184,8 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
             {
                 RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
             }
+            else
+                DbgBreakPoint();
             SubHead = entry->DW2.SQHD;
             UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
             done_count++;
@@ -372,6 +375,9 @@ void CCmdHistory::Teardown()
 }
 NTSTATUS CCmdHistory::Push(ULONG index, PSPCNVME_SRBEXT srbext)
 {
+    if(index >= Depth)
+        return STATUS_UNSUCCESSFUL;
+
     PVOID old_ptr = InterlockedCompareExchangePointer(
                         (volatile PVOID*)&History[index], srbext, NULL);
 
@@ -382,6 +388,9 @@ NTSTATUS CCmdHistory::Push(ULONG index, PSPCNVME_SRBEXT srbext)
 }
 NTSTATUS CCmdHistory::Pop(ULONG index, PSPCNVME_SRBEXT& srbext)
 {
+    if (index >= Depth)
+        return STATUS_UNSUCCESSFUL;
+
     srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer((volatile PVOID*)&History[index], NULL);
     if(NULL == srbext)
         return STATUS_INVALID_DEVICE_STATE;

@@ -25,6 +25,7 @@ typedef struct _SPCNVME_SRBEXT
     PVOID ExtBuf;        
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
+    void CleanUp();
     void SetStatus(UCHAR status);
     void CompleteSrbWithStatus(UCHAR status);
     ULONG FuncCode();         //SRB Function Code
