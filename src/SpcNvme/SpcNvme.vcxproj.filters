@@ -14,9 +14,6 @@
     <Filter Include="SCSI_Handlers">
       <UniqueIdentifier>{abf383f4-256a-42b7-a3fa-be1767784a3a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ISR_and_DPC">
-      <UniqueIdentifier>{241797aa-4e4a-4272-8b64-edace1d2dcb0}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Nvme_Device">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -57,9 +54,6 @@
     </ClCompile>
     <ClCompile Include="ScsiHandler_CDB16.cpp">
       <Filter>SCSI_Handlers</Filter>
-    </ClCompile>
-    <ClCompile Include="ISR_and_DPC.cpp">
-      <Filter>ISR_and_DPC</Filter>
     </ClCompile>
     <ClCompile Include="BuildIo_Handler.cpp">
       <Filter>BuildIo_Handlers</Filter>
@@ -129,9 +123,6 @@
     </ClInclude>
     <ClInclude Include="ScsiHandler_InlineUtils.h">
       <Filter>SCSI_Handlers</Filter>
-    </ClInclude>
-    <ClInclude Include="ISR_and_DPC.h">
-      <Filter>ISR_and_DPC</Filter>
     </ClInclude>
     <ClInclude Include="StartIo_Handler.h">
       <Filter>StartIo_Handlers</Filter>

@@ -17,7 +17,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
     portcfg->MaximumNumberOfLogicalUnits = NVME_CONST::MAX_LU;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
-    portcfg->HwMSInterruptRoutine = NvmeMsixISR;
+    portcfg->HwMSInterruptRoutine = CNvmeDevice::NvmeMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
     portcfg->NumberOfBuses = 1;
     portcfg->ScatterGather = TRUE;
@@ -76,7 +76,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     FillPortConfiguration(port_cfg, nvme);
 
     //register Storport DPC
-    StorPortInitializeDpc(devext, &nvme->QueueCplDpc, NvmeDpcRoutine);
+    //StorPortInitializeDpc(devext, &nvme->QueueCplDpc, NvmeDpcRoutine);
 
     return SP_RETURN_FOUND;
 
@@ -97,40 +97,28 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
         return FALSE;
 
     //initialize perf options
-    PERF_CONFIGURATION_DATA read_data = { 0 };
-    PERF_CONFIGURATION_DATA write_data = { 0 };
-    GROUP_AFFINITY affinity;
+    PERF_CONFIGURATION_DATA perf = { 0 };
     ULONG stor_status;
 
-    memset(&affinity, 0, sizeof(GROUP_AFFINITY));
-    read_data.Version = STOR_PERF_VERSION;
-    read_data.Size = sizeof(PERF_CONFIGURATION_DATA);
-    read_data.MessageTargets = &affinity;
-
-    stor_status = StorPortInitializePerfOpts(devext, TRUE, &read_data);
-
-    if (stor_status == STOR_STATUS_SUCCESS) 
-    {
-        write_data.Version = STOR_PERF_VERSION;
-        write_data.Size = sizeof(PERF_CONFIGURATION_DATA);
-
-        if (read_data.Flags & STOR_PERF_CONCURRENT_CHANNELS)
-        {
-            write_data.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
-            write_data.ConcurrentChannels = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-        }
-        if (read_data.Flags & STOR_PERF_NO_SGL)     //I don't use SGL...
-            write_data.Flags |= STOR_PERF_NO_SGL;
-        if (read_data.Flags & STOR_PERF_DPC_REDIRECTION)
-            write_data.Flags |= STOR_PERF_DPC_REDIRECTION;
-        if (read_data.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO)
-            write_data.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
-        if (read_data.Flags & STOR_PERF_DPC_REDIRECTION_CURRENT_CPU)
-            write_data.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
-
-        stor_status = StorPortInitializePerfOpts(devext, FALSE, &write_data);
-        ASSERT(STOR_STATUS_SUCCESS == stor_status);
-    }
+    perf.Version = STOR_PERF_VERSION;
+    perf.Size = sizeof(PERF_CONFIGURATION_DATA);
+    //Allow multiple I/O incoming concurrently. 
+    perf.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
+    perf.ConcurrentChannels = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+    //I don't use SGL...
+    perf.Flags |= STOR_PERF_NO_SGL;
+    //spread DPC to all cpu. don't make single cpu too busy.
+    perf.Flags |= STOR_PERF_DPC_REDIRECTION;  
+    //IF not set this flag, storport will attempt to fire completion DPC on
+    //original cpu which accept this I/O request.
+    perf.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
+    
+    //In generic case, miniport complete request in HwStartIo.
+    //So need this flag to optimize DPC Redirection.
+    //But in NVMe driver, request doesn't be completed in HwStartIo.
+    //They are completed later by ISR and DPC. So don't set this flag.
+    //perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
+    stor_status = StorPortInitializePerfOpts(devext, FALSE, &perf);
 
     StorPortEnablePassiveInitialization(devext, HwPassiveInitialize);
     return TRUE;

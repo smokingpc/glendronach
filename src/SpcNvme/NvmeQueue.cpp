@@ -69,6 +69,25 @@ static __inline void UpdateCplHeadAndPhase(ULONG &cpl_head, USHORT &phase, USHOR
     //    phase = !(cpl_head ^ phase);      
 }
 #pragma region ======== class CNvmeQueue ========
+
+VOID CNvmeQueue::QueueCplDpcRoutine(
+    _In_ PSTOR_DPC dpc,
+    _In_ PVOID devext,
+    _In_opt_ PVOID sysarg1,
+    _In_opt_ PVOID sysarg2
+)
+{
+    UNREFERENCED_PARAMETER(dpc);
+    UNREFERENCED_PARAMETER(devext);
+    UNREFERENCED_PARAMETER(sysarg2);
+
+    ULONG done = 0;
+    CNvmeQueue *queue = (CNvmeQueue*)sysarg1;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    status = queue->CompleteCmd(queue->GetQueueDepth(), done);
+    //todo: Log
+}
+
 CNvmeQueue::CNvmeQueue()
 {
     KeInitializeSpinLock(&SubLock);
@@ -97,7 +116,8 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     BufferSize = config->PreAllocBufSize;
     SubDbl = config->SubDbl;
     CplDbl = config->CplDbl;
-    
+    StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
+
     if(NULL == Buffer)
     {
         BufferSize = CalcQueueBufferSize(Depth);
@@ -184,32 +204,33 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
     done_count = 0;
     while(max_count > 0)
     {
+        CSpinLock lock(&CplLock);
         PSPCNVME_SRBEXT srbext = NULL;
+        PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
+        ULONG history_idx = 0;
+        USHORT cid = 0;
+        if(!NewCplArrived(entry, PhaseTag))
+            break;
+
+        cid = entry->DW3.CID;
+        history_idx = cid % Depth;
+        srbext = NULL;
+        status = History.Pop(history_idx, srbext);
+
+        //if pop failed, previously saved SrbExt could be released by CID collision cmd.
+        //skip it and process next completion.
+        if(NT_SUCCESS(status) && NULL != srbext)
         {
-            CSpinLock lock(&CplLock);
-            PNVME_COMPLETION_ENTRY entry = &CplQ_VA[CplHead];
-            ULONG history_idx = 0;
-            USHORT cid = 0;
-            if(!NewCplArrived(entry, PhaseTag))
-                break;
-
-            cid = entry->DW3.CID;
-            history_idx = cid % Depth;
-            srbext = NULL;
-            status = History.Pop(history_idx, srbext);
-
-            //if pop failed, previously saved SrbExt could be released by CID collision cmd.
-            //skip it and process next completion.
-            if(NT_SUCCESS(status) && NULL != srbext)
-            {
-                RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
-            }
-            else
-                DbgBreakPoint();
-            SubHead = entry->DW2.SQHD;
-            UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
-            done_count++;
+            RtlCopyMemory(&srbext->NvmeCpl, entry, sizeof(NVME_COMPLETION_ENTRY));
         }
+        else
+        {
+            DbgBreakPoint();
+            continue;
+        }
+        SubHead = entry->DW2.SQHD;
+        UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
+        done_count++;
 
         if(NULL != srbext)
         {
@@ -219,11 +240,11 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
             {
                 UCHAR srb_status = ToSrbStatus(srbext->NvmeCpl.DW3.Status);
                 srbext->CompleteSrbWithStatus(srb_status);
-                srbext->ResetExtBuf(NULL);
+                //srbext->ResetExtBuf(NULL);
             }
         }
 
-        if(max_count > 0 && done_count >= max_count)
+        if(done_count >= max_count)
             break;
     }
 

@@ -1,3 +1,0 @@
-#pragma once
-HW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE NvmeMsixISR;
-HW_DPC_ROUTINE NvmeDpcRoutine;

@@ -1,5 +1,29 @@
 #include "pch.h"
 
+BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
+{
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
+    if(nvme->IsWorking())
+    {
+        switch(msgid)
+        {
+        case 0:
+            StorPortIssueDpc(devext, &nvme->AdmQueue->QueueCplDpc, nvme->AdmQueue, NULL);
+            break;
+        default:
+            for(ULONG i=0; i<nvme->RegisteredIoQ; i++)
+            {
+                if (NULL != nvme->IoQueue[i])
+                    StorPortIssueDpc(devext, &nvme->IoQueue[i]->QueueCplDpc, nvme->IoQueue[i], NULL);
+            }
+
+            break;
+        }
+    }
+    return TRUE;
+}
+
+
 #pragma region ======== CSpcNvmeDevice inline routines ======== 
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
@@ -172,19 +196,6 @@ void CNvmeDevice::Teardown()
     State = NVME_STATE::STOP;
     //if(shutdown)
     //    ShutdownController();
-}
-void CNvmeDevice::DoQueueCplByDPC(ULONG msix_msgid)
-{
-    if (!IsWorking())
-        return;
-
-    if(0 == msix_msgid)
-        DoQueueCompletion(AdmQueue);
-    else
-    {
-        for(ULONG i=0; i<RegisteredIoQ; i++)
-            DoQueueCompletion(IoQueue[i]);
-    }
 }
 NTSTATUS CNvmeDevice::EnableController()
 {
@@ -1084,13 +1095,13 @@ void CNvmeDevice::LoadRegistry()
 
     StorPortFreeRegistryBuffer(this, buffer);
 }
-void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
-{
-    ULONG done = 0;
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-    status = queue->CompleteCmd(queue->GetQueueDepth(), done);
-    //todo: error checking and log
-}
+//void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
+//{
+//    ULONG done = 0;
+//    NTSTATUS status = STATUS_UNSUCCESSFUL;
+//    status = queue->CompleteCmd(queue->GetQueueDepth(), done);
+//    //todo: error checking and log
+//}
 NTSTATUS CNvmeDevice::CreateIoQ()
 {
     //TODO: if IoQ already allocated?

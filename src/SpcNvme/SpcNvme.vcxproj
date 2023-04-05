@@ -261,7 +261,6 @@
     <ClCompile Include="HandleAdapterControl.cpp" />
     <ClCompile Include="Ioctl_FirmwareFunctions.cpp" />
     <ClCompile Include="IoctlStorageQuery_Handlers.cpp" />
-    <ClCompile Include="ISR_and_DPC.cpp" />
     <ClCompile Include="NvmePrpBuilder.cpp" />
     <ClCompile Include="Scsi_Utils.cpp" />
     <ClCompile Include="SrbExt.cpp" />
@@ -285,7 +284,6 @@
     <ClInclude Include="IoctlScsiMiniport_Handlers.h" />
     <ClInclude Include="Ioctl_FirmwareFunctions.h" />
     <ClInclude Include="IoctlStorageQuery_Handlers.h" />
-    <ClInclude Include="ISR_and_DPC.h" />
     <ClInclude Include="NvmeCmdBuilder.h" />
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />

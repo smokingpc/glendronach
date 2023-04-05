@@ -5,6 +5,7 @@ typedef struct _DOORBELL_PAIR{
     NVME_COMPLETION_QUEUE_HEAD_DOORBELL CplHead;
 }DOORBELL_PAIR, *PDOORBELL_PAIR;
 
+//HW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE NvmeMsixISR;
 
 //Using this class represents the DeviceExtension.
 //Because memory allocation in kernel is still C style,
@@ -18,10 +19,10 @@ public:
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE + 10;
     static const ULONG DEV_POOL_TAG = (ULONG) 'veDN';
 
+    static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     void Teardown();
-    void DoQueueCplByDPC(ULONG msix_msgid);
 
     NTSTATUS EnableController();
     NTSTATUS DisableController();
@@ -89,7 +90,6 @@ public:
     USHORT  DeviceID;
     ULONG   CpuCount;
 
-    STOR_DPC QueueCplDpc;
     NVME_VERSION                        NvmeVer;
     NVME_CONTROLLER_CAPABILITIES        CtrlCap;
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
@@ -149,6 +149,6 @@ private:
     BOOLEAN IsControllerEnabled(bool barrier = true);
     BOOLEAN IsControllerReady(bool barrier = true);
     void UpdateMaxTxSize();
-    void DoQueueCompletion(CNvmeQueue* queue);
+    //void DoQueueCompletion(CNvmeQueue* queue);
 };
 

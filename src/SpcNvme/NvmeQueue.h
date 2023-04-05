@@ -56,6 +56,13 @@ class CNvmeQueue
 public:
     const static ULONG BufferTag = (ULONG)'QMVN';
     const static MEMORY_CACHING_TYPE CacheType = MEMORY_CACHING_TYPE::MmNonCached;
+    static VOID QueueCplDpcRoutine(
+        _In_ PSTOR_DPC dpc,
+        _In_ PVOID devext,
+        _In_opt_ PVOID sysarg1,
+        _In_opt_ PVOID sysarg2
+    );
+    
     CNvmeQueue();
     CNvmeQueue(QUEUE_PAIR_CONFIG* config);
     ~CNvmeQueue();
@@ -77,6 +84,8 @@ public:
     USHORT GetQueueID();
     USHORT GetQueueDepth();
     QUEUE_TYPE GetQueueType();
+
+    STOR_DPC QueueCplDpc;
 private:
     PVOID DevExt = NULL;
     USHORT QueueID = NVME_INVALID_QID;
