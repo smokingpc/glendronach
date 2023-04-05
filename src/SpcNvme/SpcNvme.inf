@@ -27,10 +27,12 @@ SpcNvme.sys=1,,
 SpcNvme.sys
 
 [Manufacturer]
-%ManufacturerName%=NVMeInstall,NT$ARCH$
+%ManufacturerName% = NVMeDisk,NT$ARCH$
+
+[NVMeDisk.NT$ARCH$]
+%DiskName% = NVMeInstall, PCI\CC_010802
 
 [NVMeInstall.NT$ARCH$]
-%DiskName% = NVMeInstall, PCI\CC_010802
 CopyFiles=DiskCopyfiles
 
 [NVMeInstall.NT$ARCH$.HW]

@@ -1,46 +1,66 @@
 #include "pch.h"
-static inline size_t CalcQueueBufferSize(USHORT depth)
+static __inline size_t CalcQueueBufferSize(USHORT depth)
 {
     size_t page_count = BYTES_TO_PAGES(depth * sizeof(NVME_COMMAND)) +
                     BYTES_TO_PAGES(depth * sizeof(NVME_COMPLETION_ENTRY));
     return page_count * PAGE_SIZE;
 }
 
-static inline ULONG ReadDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl)
+static __inline ULONG ReadDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl)
 {
+//In release build, Read/Write Register use READ_REGISTER_ULONG / WRITE_REGISTER_ULONG
+//Macros. They all have FastFence() already so no need to call MemoryBarrier in release build.
+#if !defined(DBG)
     MemoryBarrier();
+    UNREFERENCED_PARAMETER(devext);
+#endif
     return StorPortReadRegisterUlong(devext, &dbl->AsUlong);
 }
-static inline ULONG ReadDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl)
+static __inline ULONG ReadDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl)
 {
+//In release build, Read/Write Register use READ_REGISTER_ULONG / WRITE_REGISTER_ULONG
+//Macros. They all have FastFence() already so no need to call MemoryBarrier in release build.
+#if !defined(DBG)
     MemoryBarrier();
+    UNREFERENCED_PARAMETER(devext);
+#endif
     return StorPortReadRegisterUlong(devext, &dbl->AsUlong);
 }
-static inline void WriteDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl, ULONG value)
+static __inline void WriteDbl(PVOID devext, PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL dbl, ULONG value)
 {
+//In release build, Read/Write Register use READ_REGISTER_ULONG / WRITE_REGISTER_ULONG
+//Macros. They all have FastFence() already so no need to call MemoryBarrier in release build.
+#if !defined(DBG)
+    MemoryBarrier();
+    UNREFERENCED_PARAMETER(devext);
+#endif
     //Doorbell should write 32bit ULONG.
     //Some controller won't accept the doorbell value if you write only 16bit USHORT value.
-    MemoryBarrier();
     StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
 }
-static inline void WriteDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl, ULONG value)
+static __inline void WriteDbl(PVOID devext, PNVME_COMPLETION_QUEUE_HEAD_DOORBELL dbl, ULONG value)
 {
+//In release build, Read/Write Register use READ_REGISTER_ULONG / WRITE_REGISTER_ULONG
+//Macros. They all have FastFence() already so no need to call MemoryBarrier in release build.
+#if !defined(DBG)
+    MemoryBarrier();
+    UNREFERENCED_PARAMETER(devext);
+#endif
     //Doorbell should write 32bit ULONG.
     //Some controller won't accept the doorbell value if you write only 16bit USHORT value.
-    MemoryBarrier();
     StorPortWriteRegisterUlong(devext, &dbl->AsUlong, value);
 }
-static inline bool IsValidQid(ULONG qid)
+static __inline bool IsValidQid(ULONG qid)
 {
     return (qid != NVME_INVALID_QID);
 }
-static inline bool NewCplArrived(PNVME_COMPLETION_ENTRY entry, USHORT current_tag)
+static __inline bool NewCplArrived(PNVME_COMPLETION_ENTRY entry, USHORT current_tag)
 {
     if (entry->DW3.Status.P == current_tag)
         return true;
     return false;
 }
-static inline void UpdateCplHeadAndPhase(ULONG &cpl_head, USHORT &phase, USHORT depth)
+static __inline void UpdateCplHeadAndPhase(ULONG &cpl_head, USHORT &phase, USHORT depth)
 {
     cpl_head = (cpl_head + 1) % depth;
     if (0 == cpl_head)
