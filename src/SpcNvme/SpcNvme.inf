@@ -77,9 +77,13 @@ HKR, Parameters\Device, AdmQDepth,         %REG_DWORD%, 0x00000040 ; admin queue
 HKR, Parameters\Device, IoQDepth,         %REG_DWORD%, 0x00000080 ; IO queue size (num of entries)
 HKR, Parameters\Device, IoQCount,         %REG_DWORD%, 0x00000004 ; How many I/O queue will be created?
 
-HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000002 ; coalescing time in 100-us unit.
-HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x00000008 ; # of coalescing interrupts
-
+;Interrupt coalescing will decrease performance profiling result.
+;So I turn it off by default.
+;This feature can lower OS time cost and supress OS latency/rapid freeze issue.
+;HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000001 ; coalescing time in 100-us unit.
+;HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x0000000A ; # of coalescing interrupts
+HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0 ; coalescing time in 100-us unit.
+HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0 ; # of coalescing interrupts
 
 [Strings]
 ManufacturerName="SmokingPC"
