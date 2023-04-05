@@ -152,19 +152,19 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     else
         nvme->InitIdentifyFirstNS();
 
-    status = nvme->SetInterruptCoalescing(NULL);
+    status = nvme->SetInterruptCoalescing();
     if (!NT_SUCCESS(status))
         return FALSE;
-    status = nvme->SetArbitration(NULL);
+    status = nvme->SetArbitration();
     if (!NT_SUCCESS(status))
         return FALSE;
-    status = nvme->SetSyncHostTime(NULL);
+    status = nvme->SetSyncHostTime();
     if (!NT_SUCCESS(status))
         return FALSE;
-    status = nvme->SetPowerManagement(NULL);
+    status = nvme->SetPowerManagement();
     if (!NT_SUCCESS(status))
         return FALSE;
-    status = nvme->SetAsyncEvent(NULL);
+    status = nvme->SetAsyncEvent();
     if (!NT_SUCCESS(status))
         return FALSE;
     status = nvme->RegisterIoQ(NULL);

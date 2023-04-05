@@ -63,19 +63,18 @@ HKR,,TypesSupported,%REG_DWORD%,7
 HKR, Interrupt Management, 0x00000010
 HKR, Interrupt Management\MessageSignaledInterruptProperties, 0x00000010
 HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,       %REG_DWORD%,   1
-HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   65
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   4
 HKR, Interrupt Management\Affinity Policy, 0x00000010
-HKR, Interrupt Management\Affinity Policy, DevicePolicy, %REG_DWORD%, 5 ;IrqPolicySpreadMessagesAcrossAllProcessors
+HKR, Interrupt Management\Affinity Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
 HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, 3
 HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
 
 [Parameters]
-HKR, Parameters\Device, Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
-HKR, Parameters\Device, MaxTXSize,          %REG_DWORD%, 0x00020000 ; max trasnfer size
-HKR, Parameters\Device, AdQEntries,         %REG_DWORD%, 0x00000080 ; admin queue size (num of entries)
-HKR, Parameters\Device, IoQEntries,         %REG_DWORD%, 0x00000400 ; IO queue size (num of entries)
-HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000000 ; time threshold for INT coalescing
-HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x00000000 ; # of entries threadhold for INT coalescing
+;HKR, Parameters\Device, Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
+HKR, Parameters\Device, AdQEntries,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
+HKR, Parameters\Device, IoQEntries,         %REG_DWORD%, 0x00000080 ; IO queue size (num of entries)
+HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000002 ; coalescing time in 100-us unit.
+HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x00000008 ; # of coalescing interrupts
 
 
 [Strings]

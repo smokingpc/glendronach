@@ -17,7 +17,7 @@
 //const char* SpcProductID = "SomkingPC NVMe  ";  //model name
 //const char* SpcProductRev = "0100";
 
-#pragma region  ======== SCSI and SRB RELATED ========
+#pragma region  ======== SCSI and SRB ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF
 #define INVALID_PATH_ID      ((UCHAR)~0)
 #define INVALID_TARGET_ID    ((UCHAR)~0)
@@ -25,6 +25,16 @@
 #define INVALID_SRB_QUEUETAG ((ULONG)~0)
 #pragma endregion
 
-#pragma region  ======== NVME_RELATED ========
+#pragma region  ======== NVME ========
+#define DEFAULT_INT_COALESCE_COUNT  10
+#define DEFAULT_INT_COALESCE_TIME   2    //in 100us unit
 #pragma endregion
 
+#pragma region  ======== REGISTRY ========
+#define REGNAME_ADMQ_SIZE       (UCHAR*)"AdQEntries"
+#define REGNAME_IOQ_SIZE        (UCHAR*)"IoQEntries"
+#define REGNAME_COALESCE_TIME   (UCHAR*)"IntCoalescingTime"
+#define REGNAME_COALESCE_COUNT  (UCHAR*)"IntCoalescingEntries"
+
+
+#pragma endregion

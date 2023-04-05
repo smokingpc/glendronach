@@ -497,7 +497,6 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
     //  2.device reply to host "how many queues I can permit you to use".
     //CNvmeDevice::DesiredIoQ should be filled by step2's answer.
 
-
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
@@ -532,48 +531,66 @@ END:
 
     return status;
 }
-NTSTATUS CNvmeDevice::SetInterruptCoalescing(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetInterruptCoalescing()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetInterruptCoalescing() still not implemented yet!!\n");
-    return STATUS_SUCCESS;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> my_srbext(new SPCNVME_SRBEXT());
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    my_srbext->Init(this, NULL);
+
+    BuildCmd_InterruptCoalescing(my_srbext, CoalescingThreshold, CoalescingTime);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+
+    if (!NT_SUCCESS(status))
+        return status;
+
+    do
+    {
+        ULONG done_count = 0;
+        StorPortStallExecution(StallDelay);
+        status = AdmQueue->CompleteCmd(4, done_count);
+        if (done_count > 0)
+            break;
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+
+    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+        status = STATUS_SUCCESS;
+    else
+        status = STATUS_UNSUCCESSFUL;
+
+    return status;
 }
-NTSTATUS CNvmeDevice::SetAsyncEvent(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetAsyncEvent()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetArbitration(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetArbitration()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetArbitration() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetSyncHostTime()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetPowerManagement(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetPowerManagement()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    UNREFERENCED_PARAMETER(srbext);
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
@@ -1005,6 +1022,9 @@ void CNvmeDevice::InitVars()
     StallDelay = NVME_CONST::STALL_TIME_US;
     AccessRangeCount = 0;
     NamespaceCount = 0;
+    CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;
+    CoalescingTime = DEFAULT_INT_COALESCE_TIME;
+
     RtlZeroMemory(AccessRanges, sizeof(ACCESS_RANGE)* ACCESS_RANGE_COUNT);
 
     MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
@@ -1025,7 +1045,38 @@ void CNvmeDevice::InitVars()
 }
 void CNvmeDevice::LoadRegistry()
 {
-    //not implemented
+    ULONG size = sizeof(ULONG);
+    BOOLEAN ok = FALSE;
+
+    UCHAR* buffer = StorPortAllocateRegistryBuffer(this, &size);
+    if (buffer == NULL)
+        return;
+
+    RtlZeroMemory(buffer, size);
+    ok = StorPortRegistryRead(this, REGNAME_COALESCE_COUNT, TRUE, 
+                        MINIPORT_REG_DWORD, (PUCHAR) buffer, &size);
+    if(ok)
+        CoalescingThreshold = (UCHAR) *((ULONG*)buffer);
+
+    RtlZeroMemory(buffer, size);
+    ok = StorPortRegistryRead(this, REGNAME_COALESCE_TIME, TRUE,
+        MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
+    if (ok)
+        CoalescingTime = (UCHAR) *((ULONG*)buffer);
+
+    RtlZeroMemory(buffer, size);
+    ok = StorPortRegistryRead(this, REGNAME_ADMQ_SIZE, TRUE,
+        MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
+    if (ok)
+        AdmDepth = (USHORT) *((ULONG*)buffer);
+
+    RtlZeroMemory(buffer, size);
+    ok = StorPortRegistryRead(this, REGNAME_IOQ_SIZE, TRUE,
+        MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
+    if (ok)
+        IoDepth = (USHORT) *((ULONG*)buffer);
+
+    StorPortFreeRegistryBuffer(this, buffer);
 }
 void CNvmeDevice::DoQueueCompletion(CNvmeQueue* queue)
 {

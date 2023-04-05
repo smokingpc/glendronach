@@ -44,17 +44,22 @@ public:
     NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count, bool poll = false);
 
     NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
-    NTSTATUS SetInterruptCoalescing(PSPCNVME_SRBEXT srbext);
-    NTSTATUS SetAsyncEvent(PSPCNVME_SRBEXT srbext);
-    NTSTATUS SetArbitration(PSPCNVME_SRBEXT srbext);
-    NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext);
-    NTSTATUS SetPowerManagement(PSPCNVME_SRBEXT srbext);
+    NTSTATUS SetInterruptCoalescing();
+    NTSTATUS SetAsyncEvent();
+    NTSTATUS SetArbitration();
+    NTSTATUS SetSyncHostTime();
+    NTSTATUS SetPowerManagement();
     NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);
     NTSTATUS GetNamespaceBlockSize(ULONG nsid, ULONG& size);    //get LBA block size in Bytes
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
     NTSTATUS SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     bool IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
+
+    bool IsWorking();
+    bool IsSetup();
+    bool IsTeardown();
+    bool IsStop();
 
     ULONG MinPageSize;
     ULONG MaxPageSize;
@@ -73,14 +78,12 @@ public:
     ULONG Bar0Size;
     UCHAR MaxNamespaces;
     USHORT IoDepth;
-    ULONG AdmDepth;
+    USHORT AdmDepth;
     ULONG TotalNumaNodes;
     ULONG NamespaceCount;       //how many namespace active in current device?
-
-    bool IsWorking();
-    bool IsSetup();
-    bool IsTeardown();
-    bool IsStop();
+    
+    UCHAR CoalescingThreshold;  //how many interrupt should be coalesced into one interrupt?
+    UCHAR CoalescingTime;       //how long(time) should interrupts be coalesced?
 
     USHORT  VendorID;
     USHORT  DeviceID;
