@@ -1065,16 +1065,22 @@ void CNvmeDevice::LoadRegistry()
         CoalescingTime = (UCHAR) *((ULONG*)buffer);
 
     RtlZeroMemory(buffer, size);
-    ok = StorPortRegistryRead(this, REGNAME_ADMQ_SIZE, TRUE,
+    ok = StorPortRegistryRead(this, REGNAME_ADMQ_DEPTH, TRUE,
         MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
     if (ok)
         AdmDepth = (USHORT) *((ULONG*)buffer);
 
     RtlZeroMemory(buffer, size);
-    ok = StorPortRegistryRead(this, REGNAME_IOQ_SIZE, TRUE,
+    ok = StorPortRegistryRead(this, REGNAME_IOQ_DEPTH, TRUE,
         MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
     if (ok)
         IoDepth = (USHORT) *((ULONG*)buffer);
+
+    RtlZeroMemory(buffer, size);
+    ok = StorPortRegistryRead(this, REGNAME_IOQ_COUNT, TRUE,
+        MINIPORT_REG_DWORD, (PUCHAR)buffer, &size);
+    if (ok)
+        DesiredIoQ = *((ULONG*)buffer);
 
     StorPortFreeRegistryBuffer(this, buffer);
 }

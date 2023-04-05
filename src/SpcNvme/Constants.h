@@ -31,8 +31,9 @@
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========
-#define REGNAME_ADMQ_SIZE       (UCHAR*)"AdQEntries"
-#define REGNAME_IOQ_SIZE        (UCHAR*)"IoQEntries"
+#define REGNAME_ADMQ_DEPTH      (UCHAR*)"AdmQDepth"
+#define REGNAME_IOQ_DEPTH       (UCHAR*)"IoQDepth"
+#define REGNAME_IOQ_COUNT       (UCHAR*)"IoQCount"
 #define REGNAME_COALESCE_TIME   (UCHAR*)"IntCoalescingTime"
 #define REGNAME_COALESCE_COUNT  (UCHAR*)"IntCoalescingEntries"
 

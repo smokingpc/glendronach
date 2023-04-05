@@ -71,8 +71,10 @@ HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
 
 [Parameters]
 ;HKR, Parameters\Device, Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
-HKR, Parameters\Device, AdQEntries,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
-HKR, Parameters\Device, IoQEntries,         %REG_DWORD%, 0x00000080 ; IO queue size (num of entries)
+HKR, Parameters\Device, AdmQDepth,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
+HKR, Parameters\Device, IoQDepth,         %REG_DWORD%, 0x00000080 ; IO queue size (num of entries)
+HKR, Parameters\Device, IoQCount,         %REG_DWORD%, 0x00000004 ; How many I/O queue will be created?
+
 HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000002 ; coalescing time in 100-us unit.
 HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x00000008 ; # of coalescing interrupts
 
