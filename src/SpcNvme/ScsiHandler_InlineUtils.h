@@ -32,11 +32,13 @@ inline void FillParamHeader10(PMODE_PARAMETER_HEADER10 header)
     header->DeviceSpecificParameter = 0;
     //I don't want reply BlockDescriptor, so dont set BlockDescriptorLength field  :p
 }
-inline void FillModePage_Caching(PMODE_CACHING_PAGE page)
+inline void FillModePage_Caching(CNvmeDevice* devext, PMODE_CACHING_PAGE page)
 {
     page->PageCode = MODE_PAGE_CACHING;
     page->PageLength = (UCHAR)(sizeof(MODE_CACHING_PAGE) - 2); //sizeof(MODE_CACHING_PAGE) - sizeof(page->PageCode) - sizeof(page->PageLength)
-    page->ReadDisableCache = 1;
+    page->ReadDisableCache = !devext->ReadCacheEnabled;
+    page->WriteCacheEnable = devext->WriteCacheEnabled;
+    page->PageSavable = TRUE;
 }
 inline void FillModePage_InfoException(PMODE_INFO_EXCEPTIONS page)
 {
@@ -51,11 +53,11 @@ inline void FillModePage_Control(PMODE_CONTROL_PAGE page)
     page->PageLength = (UCHAR)(sizeof(MODE_CONTROL_PAGE) - 2); //sizeof(MODE_CONTROL_PAGE) - sizeof(page->PageCode) - sizeof(page->PageLength)
     page->QueueAlgorithmModifier = 0;
 }
-inline ULONG ReplyModePageCaching(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
+inline ULONG ReplyModePageCaching(CNvmeDevice* devext, PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
 {
     MODE_CACHING_PAGE page = { 0 };
     ULONG page_size = sizeof(MODE_CACHING_PAGE);
-    FillModePage_Caching(&page);
+    FillModePage_Caching(devext, &page);
 
     return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }

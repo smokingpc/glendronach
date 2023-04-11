@@ -326,14 +326,61 @@ UCHAR Scsi_Verify6(PSPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
 {
+    CDB::_MODE_SELECT *select = &srbext->Cdb()->MODE_SELECT;
+    PUCHAR buffer = (PUCHAR)srbext->DataBuf();
+    ULONG mode_data_size = 0;
+    ULONG offset = 0;
+    PMODE_PARAMETER_HEADER header = (PMODE_PARAMETER_HEADER)buffer;
+    PMODE_PARAMETER_BLOCK param_block = (PMODE_PARAMETER_BLOCK)(header+1);
+    PUCHAR cursor = ((PUCHAR)param_block + header->BlockDescriptorLength);
+    //ParameterList Layout of ModeSelect is:
+    //[MODE_PARAMETER_HEADER][MODE_PARAMETER_BLOCK][PAGE1][PAGE2][.....]
+    //There are two problem here:
+    //1.PMODE_PARAMETER_BLOCK is optional. Sometimes it is not exist 
+    //  so header->BlockDescriptorLength == 0.
+    //2.header->ModeDataLength IS ALWAYS 0. Don't use it to check following data.
+    //  (refet to Seagate SCSI Command reference. This field is reserved in MODE_SELECT cmd)
+    //  You should use total buffer length to check following data(mode page) blocks.
+
+    //currently don't support VendorSpecific MODE_SELECT op.
+    if(0 == select->PFBit)
+        return SRB_STATUS_INVALID_REQUEST;
+
+    DbgBreakPoint();
+    if(0 == header->BlockDescriptorLength)
+        param_block = NULL;
+
+    //windows set header->ModeDataLength to 0. No idea if it is bug or lazy....
+    mode_data_size = srbext->DataBufLen() - sizeof(MODE_PARAMETER_HEADER) - header->BlockDescriptorLength;
+    offset = 0;
+    while(mode_data_size > 0)
+    {
+        PMODE_CACHING_PAGE page = (PMODE_CACHING_PAGE)(cursor + offset);
+        mode_data_size -= (page->PageLength+2);
+        offset += (page->PageLength + 2);
+
+        if (0 == page->PageLength)
+            break;
+
+        if(page->PageCode != MODE_PAGE_CACHING || page->PageLength != (sizeof(MODE_CACHING_PAGE)-2))
+            continue;
+
+        DbgBreakPoint();
+        srbext->DevExt->ReadCacheEnabled = !page->ReadDisableCache;
+        srbext->DevExt->WriteCacheEnabled = page->WriteCacheEnable;
+    }
+
+    SrbSetDataTransferLength(srbext->Srb, 0);
+    return SRB_STATUS_SUCCESS;
+}
+#if 0
+UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
+{
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
-    //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    ////ULONG ret_size = 0;
-    //UNREFERENCED_PARAMETER(srbext);
-    ////HandleCheckCondition(srbext->Srb, srb_status, ret_size);
-    //return srb_status;
 }
+#endif
+
 UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_ERROR;
@@ -361,7 +408,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
     {
     case MODE_PAGE_CACHING:
     {
-        page_size = ReplyModePageCaching(buffer, buf_size, ret_size);
+        page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
         header->ModeDataLength += (UCHAR)page_size;
         srb_status = SRB_STATUS_SUCCESS;
         break;
@@ -388,7 +435,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
         if (buf_size > 0)
         {
         //buffer size and buffer will be updated in function.
-            page_size = ReplyModePageCaching(buffer, buf_size, ret_size);
+            page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
             header->ModeDataLength += (UCHAR)page_size;
         }
         if (buf_size > 0)

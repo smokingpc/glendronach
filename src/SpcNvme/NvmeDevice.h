@@ -62,6 +62,9 @@ public:
     bool IsTeardown();
     bool IsStop();
 
+    bool ReadCacheEnabled;
+    bool WriteCacheEnabled;
+
     ULONG MinPageSize;
     ULONG MaxPageSize;
     ULONG MaxTxSize;

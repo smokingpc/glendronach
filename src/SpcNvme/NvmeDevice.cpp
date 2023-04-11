@@ -1036,6 +1036,8 @@ void CNvmeDevice::InitVars()
     CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;
     CoalescingTime = DEFAULT_INT_COALESCE_TIME;
 
+    ReadCacheEnabled = WriteCacheEnabled = false;
+
     RtlZeroMemory(AccessRanges, sizeof(ACCESS_RANGE)* ACCESS_RANGE_COUNT);
 
     MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
