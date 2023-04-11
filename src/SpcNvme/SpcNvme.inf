@@ -88,7 +88,7 @@ HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0 ; # of coales
 [Strings]
 ManufacturerName="SmokingPC"
 ClassName=""
-DiskName="SpcNvme open source driver for NVMe Storage Device"
+DiskName="SpcNvme NVMe Storage"
 
 REG_EXPAND_SZ  = 0x00020000
 REG_DWORD      = 0x00010001

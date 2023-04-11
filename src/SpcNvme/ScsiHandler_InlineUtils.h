@@ -25,7 +25,6 @@ inline void FillParamHeader(PMODE_PARAMETER_HEADER header)
 }
 inline void FillParamHeader10(PMODE_PARAMETER_HEADER10 header)
 {
-    //MODE_PARAMETER_HEADER10 header = { 0 };
     USHORT data_size = sizeof(MODE_PARAMETER_HEADER10);
     USHORT mode_data_size = data_size - sizeof(header->ModeDataLength);
     REVERSE_BYTES_2(header->ModeDataLength, &mode_data_size);
@@ -57,6 +56,7 @@ inline ULONG ReplyModePageCaching(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_si
     MODE_CACHING_PAGE page = { 0 };
     ULONG page_size = sizeof(MODE_CACHING_PAGE);
     FillModePage_Caching(&page);
+
     return CopyToCdbBuffer(buffer, buf_size, &page, page_size, ret_size);
 }
 inline ULONG ReplyModePageControl(PUCHAR& buffer, ULONG& buf_size, ULONG& ret_size)
@@ -78,10 +78,6 @@ inline ULONG ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULO
 //Note: In SCSI, all read/write request are in "BLOCKS", not in bytes.
 inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG &len)
 {
-    //offset = ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb1 << 16) |
-    //    ((ULONG64)cdb->CDB6READWRITE.LogicalBlockMsb0 << 8) |
-    //    ((ULONG64)cdb->CDB6READWRITE.LogicalBlockLsb);
-    //blocks = cdb->CDB6READWRITE.TransferBlocks ? cdb->CDB6READWRITE.TransferBlocks : 256;
     offset = (rw.LogicalBlockMsb1 << 16) | (rw.LogicalBlockMsb0 << 8) | rw.LogicalBlockLsb;
     len = rw.TransferBlocks;
     if(0 == len)
@@ -89,12 +85,6 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset,
 }
 inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG &len)
 {
-    //offset = ((ULONG64)cdb->CDB10.LogicalBlockByte0 << 24) |
-    //    ((ULONG64)cdb->CDB10.LogicalBlockByte1 << 16) |
-    //    ((ULONG64)cdb->CDB10.LogicalBlockByte2 << 8) |
-    //    ((ULONG64)cdb->CDB10.LogicalBlockByte3);
-    //blocks = ((ULONG)cdb->CDB10.TransferBlocksMsb << 8) |
-    //    ((ULONG)cdb->CDB10.TransferBlocksLsb);
     offset = 0;
     len = 0;
     REVERSE_BYTES_4(&offset, &rw.LogicalBlockByte0);
@@ -102,14 +92,6 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG &
 }
 inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG &len)
 {
-    //*offset = ((ULONG64)cdb->CDB12.LogicalBlock[0] << 24) |
-    //    ((ULONG64)cdb->CDB12.LogicalBlock[1] << 16) |
-    //    ((ULONG64)cdb->CDB12.LogicalBlock[2] << 8) |
-    //    ((ULONG64)cdb->CDB12.LogicalBlock[3]);
-    //*blocks = ((ULONG)cdb->CDB12.TransferLength[0] << 24) |
-    //    ((ULONG)cdb->CDB12.TransferLength[1] << 16) |
-    //    ((ULONG)cdb->CDB12.TransferLength[2] << 8) |
-    //    ((ULONG)cdb->CDB12.TransferLength[3]);
     offset = 0;
     len = 0;
     REVERSE_BYTES_4(&offset, &rw.LogicalBlock);

@@ -51,10 +51,10 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     case SCSIOP_REQUEST_SENSE:
         srb_status = Scsi_RequestSense6(srbext);
         break;
-    case SCSIOP_MODE_SELECT:
+#endif
+    case SCSIOP_MODE_SELECT:        //cache and other feature options
         srb_status = Scsi_ModeSelect6(srbext);
         break;
-#endif
     case SCSIOP_READ6:
         //case SCSIOP_RECEIVE:
         srb_status = Scsi_Read6(srbext);
@@ -128,10 +128,10 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     case SCSIOP_SEND_CUE_SHEET:
     case SCSIOP_PERSISTENT_RESERVE_IN:
     case SCSIOP_PERSISTENT_RESERVE_OUT:
-    case SCSIOP_MODE_SELECT10:
+#endif
+    case SCSIOP_MODE_SELECT10:          //cache and other feature options
         srb_status = Scsi_ModeSelect10(srbext);
         break;
-#endif
     case SCSIOP_READ_CAPACITY:
         srb_status = Scsi_ReadCapacity10(srbext);
         break;
