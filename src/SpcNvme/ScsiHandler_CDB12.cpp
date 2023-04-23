@@ -55,3 +55,49 @@ UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)
     //return srb_status;
 }
 
+//In windows, SED(Self Encrypted Disk) features are implemented by 
+//SCSIOP_SECURITY_PROTOCOL_IN and SCSIOP_SECURITY_PROTOCOL_OUT.
+//SED tool (e.g. sed-utils) send SED cmd to disk via IOCTL_SCSI_PASS_THROUGH_DIRECT,
+//which carried CDB data with SCSIOP_SECURITY_PROTOCOL_IN and SCSIOP_SECURITY_PROTOCOL_OUT.
+//Then in disk.sys it picks CDB data and send to NVMe driver via SCSI command.
+
+//SCSIOP_SECURITY_PROTOCOL_IN => Host retrieve security protocol data from device
+UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext)
+{
+    UCHAR srb_status = SRB_STATUS_SUCCESS;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    if(!is_support)
+        return SRB_STATUS_ERROR;
+
+    //Note: In this command , payload data should be aligned to block size 
+    //of namespace format. Usually it is PAGE_SIZE from app.
+    BuildCmd_AdminSecurityRecv(srbext, NVME_CONST::DEFAULT_CTRLID, srbext->Cdb());
+    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    if (!NT_SUCCESS(status))
+        srb_status = SRB_STATUS_ERROR;
+    else
+        srb_status = SRB_STATUS_PENDING;
+
+    return srb_status;
+}
+//SCSIOP_SECURITY_PROTOCOL_OUT => Host send security protocol data to device
+UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext)
+{
+    UCHAR srb_status = SRB_STATUS_SUCCESS;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    if (!is_support)
+        return SRB_STATUS_ERROR;
+
+    //Note: In this command , payload data should be aligned to block size 
+    //of namespace format. Usually it is PAGE_SIZE from app.
+    BuildCmd_AdminSecuritySend(srbext, NVME_CONST::DEFAULT_CTRLID, srbext->Cdb());
+    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    if (!NT_SUCCESS(status))
+        srb_status = SRB_STATUS_ERROR;
+    else
+        srb_status = SRB_STATUS_PENDING;
+
+    return srb_status;
+}

@@ -212,3 +212,39 @@ void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT
     BuildPrp(srbext, cmd, info, sizeof(NVME_FIRMWARE_SLOT_INFO_LOG));
 }
 
+void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
+{
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SECURITY_SEND;
+    cmd->NSID = nsid;
+
+    //In this command, we need "count of DWORD" not "size in bytes".
+    cmd->u.SECURITYSEND.CDW10.SECP = cdb->SECURITY_PROTOCOL_OUT.SecurityProtocol;
+    USHORT spsp = 0;
+    REVERSE_BYTES_2(&spsp, cdb->SECURITY_PROTOCOL_OUT.SecurityProtocolSpecific);
+    cmd->u.SECURITYSEND.CDW10.SPSP = spsp;
+    ULONG payload_size = 0;
+    REVERSE_BYTES_4(&payload_size, cdb->SECURITY_PROTOCOL_OUT.AllocationLength);
+    cmd->u.SECURITYSEND.CDW11.TL = payload_size;
+
+    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+}
+void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
+{
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SECURITY_RECEIVE;
+    cmd->NSID = nsid;
+
+    //In this command, we need "count of DWORD" not "size in bytes".
+    cmd->u.SECURITYSEND.CDW10.SECP = cdb->SECURITY_PROTOCOL_IN.SecurityProtocol;
+    USHORT spsp = 0;
+    REVERSE_BYTES_2(&spsp, cdb->SECURITY_PROTOCOL_IN.SecurityProtocolSpecific);
+    cmd->u.SECURITYSEND.CDW10.SPSP = spsp;
+    ULONG payload_size = 0;
+    REVERSE_BYTES_4(&payload_size, cdb->SECURITY_PROTOCOL_IN.AllocationLength);
+    cmd->u.SECURITYSEND.CDW11.TL = payload_size;
+
+    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+}

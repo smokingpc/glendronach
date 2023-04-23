@@ -49,6 +49,7 @@ namespace NVME_CONST{
     static const ULONG TX_SIZE = PAGE_SIZE * TX_PAGES;
     static const UCHAR SUPPORT_NAMESPACES = 4;
     static const ULONG UNSPECIFIC_NSID = 0;
+    static const ULONG DEFAULT_CTRLID = 1;
     static const UCHAR MAX_TARGETS = 1;
     static const UCHAR MAX_LU = 1;
     static const ULONG MAX_IO_PER_LU = 4096;

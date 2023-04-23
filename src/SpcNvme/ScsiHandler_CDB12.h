@@ -44,3 +44,7 @@ UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_Write12(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext);
+
+//for SED feature. NVMe driver only need to forward the request to Admin Queue.
+UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext);
+UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext);
