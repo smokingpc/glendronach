@@ -34,7 +34,7 @@
 // 
 // There is only one requirement to use this source code:
 // PLEASE DO NOT remove or modify the "original author" of this codes.
-// Each copy or modify in source code should keep all "original author" line in codes.
+// Keep "original author" declaration unmodified.
 // 
 // Enjoy it.
 // ================================================================
