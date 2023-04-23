@@ -38,7 +38,6 @@ void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, size_
 
     BuildPrp(srbext, cmd, nsid_list, list_size);
 }
-
 void BuildCmd_IdentSpecifiedNS(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;

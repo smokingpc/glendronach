@@ -284,6 +284,7 @@
     <ClInclude Include="IoctlScsiMiniport_Handlers.h" />
     <ClInclude Include="Ioctl_FirmwareFunctions.h" />
     <ClInclude Include="IoctlStorageQuery_Handlers.h" />
+    <ClInclude Include="LicenseTemplate.h" />
     <ClInclude Include="NvmeCmdBuilder.h" />
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
@@ -295,7 +296,6 @@
     <ClInclude Include="ScsiHandler_CDB6.h" />
     <ClInclude Include="ScsiHandler_InlineUtils.h" />
     <ClInclude Include="Scsi_Utils.h" />
-    <ClInclude Include="Srb_Utils.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Inline_Utils.h" />
     <ClInclude Include="SrbExt.h" />

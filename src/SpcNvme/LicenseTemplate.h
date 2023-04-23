@@ -1,4 +1,3 @@
-#pragma once
 // ================================================================
 // SpcNvme : OpenSource NVMe Driver for Windows 8+
 // Author : Roy Wang(SmokingPC).
@@ -39,5 +38,3 @@
 // Enjoy it.
 // ================================================================
 
-
-bool BuildPrp(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, PVOID buffer, size_t buf_size);
