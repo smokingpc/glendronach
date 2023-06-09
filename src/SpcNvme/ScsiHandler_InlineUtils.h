@@ -145,4 +145,28 @@ inline void ParseReadWriteOffsetAndLen(CDB::_CDB16& rw, ULONG64& offset, ULONG &
     REVERSE_BYTES_8(&offset, &rw.LogicalBlock);
     REVERSE_BYTES_4(&len, &rw.TransferLength);
 }
+inline bool ParseReadWriteOffsetAndLen(CDB& cdb, ULONG64& offset, ULONG& len)
+{
+    switch (cdb.CDB6GENERIC.OperationCode)
+    {
+    case SCSIOP_READ6:
+    case SCSIOP_WRITE6:
+        ParseReadWriteOffsetAndLen(cdb.CDB6READWRITE, offset, len);
+        return true;
+    case SCSIOP_READ:
+    case SCSIOP_WRITE:
+        ParseReadWriteOffsetAndLen(cdb.CDB10, offset, len);
+        return true;
+    case SCSIOP_READ12:
+    case SCSIOP_WRITE12:
+        ParseReadWriteOffsetAndLen(cdb.CDB12, offset, len);
+        return true;
+    case SCSIOP_READ16:
+    case SCSIOP_WRITE16:
+        ParseReadWriteOffsetAndLen(cdb.CDB16, offset, len);
+        return true;
+    }
+
+    return false;
+}
 #pragma endregion 

@@ -45,17 +45,16 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
     ULONG flags = 0;
     UCHAR srb_status = SRB_STATUS_ERROR;
 
-    STOR_PNP_ACTION action;
+    STOR_PNP_ACTION action = STOR_PNP_ACTION::StorStartDevice;
     PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
 
-    ASSERT (NULL != srb_pnp);
+    ASSERT(NULL != srb_pnp);
     flags = srb_pnp->SrbPnPFlags;
     action = srb_pnp->PnPAction;
 
     //All unit control migrated to HwUnitControl callback...
     if(SRB_PNP_FLAGS_ADAPTER_REQUEST != (flags & SRB_PNP_FLAGS_ADAPTER_REQUEST))
     {
-        //KdBreakPoint();
         goto END;
     }
 
@@ -72,19 +71,21 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
                 KdBreakPoint();
                 //todo: log
             }
-            srb_status = AdapterPnp_RemoveHandler(srbext);
-
+            //srb_status = AdapterPnp_RemoveHandler(srbext);
+            srbext->DevExt->Teardown();
+            srb_status = SRB_STATUS_SUCCESS;
             break;
         case StorSurpriseRemoval:
             //surprise remove doesn't need to shutdown controller.
             //controller is already gone , access controller registers will make BSoD or other problem.
-            srb_status = AdapterPnp_RemoveHandler(srbext);
+            //srb_status = AdapterPnp_RemoveHandler(srbext);
+            srbext->DevExt->Teardown();
+            srb_status = SRB_STATUS_SUCCESS;
             break;
     }
 
 END:
-    srbext->SetStatus(srb_status);
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    srbext->CompleteSrb(srb_status);
     //always return FALSE. This event only handled in BuildIo.
     return FALSE;
 }

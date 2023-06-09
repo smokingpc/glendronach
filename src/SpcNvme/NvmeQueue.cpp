@@ -197,7 +197,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 }
 NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
 {
-    //max_count : max cmd completion done in this round in CompleteCmd().
+    //max_count : max cmd completion done in this round of CompleteCmd().
     //cpl_count : how mant cmd completion done in this round?
 
     NTSTATUS status = STATUS_SUCCESS;
@@ -238,8 +238,8 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
                 srbext->CompletionCB(srbext);
             else
             {
-                UCHAR srb_status = ToSrbStatus(srbext->NvmeCpl.DW3.Status);
-                srbext->CompleteSrbWithStatus(srb_status);
+                UCHAR srb_status = NvmeToSrbStatus(srbext->NvmeCpl.DW3.Status);
+                srbext->CompleteSrb(srb_status);
                 //srbext->ResetExtBuf(NULL);
             }
         }

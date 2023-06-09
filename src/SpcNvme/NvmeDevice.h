@@ -60,6 +60,15 @@ public:
     static const ULONG DEV_POOL_TAG = (ULONG) 'veDN';
 
     static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
+    static void RestartAdapterDpc(
+            IN PSTOR_DPC  Dpc,
+            IN PVOID  DevExt,
+            IN PVOID  Arg1,
+            IN PVOID  Arg2);
+    static void RestartAdapterWorker(
+        _In_ PVOID DevExt,
+        _In_ PVOID Context,
+        _In_ PVOID Worker);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     void Teardown();
@@ -68,7 +77,9 @@ public:
     NTSTATUS DisableController();
     NTSTATUS ShutdownController();  //set CC.SHN and wait CSTS.SHST==2
 
-    NTSTATUS InitController();      //for FindAdapter
+    NTSTATUS InitController();
+    NTSTATUS InitNvmeStage1();      //for FindAdapter
+    NTSTATUS InitNvmeStage2();      //for PassiveInitialize
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
     NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext);//, bool poll = false);
@@ -137,7 +148,10 @@ public:
     NVME_CONTROLLER_CAPABILITIES        CtrlCap;
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
     NVME_IDENTIFY_NAMESPACE_DATA        NsData[NVME_CONST::SUPPORT_NAMESPACES];
-
+    
+    //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
+    PVOID                               RestartWorker;
+    STOR_DPC                            RestartDpc;
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
     PPORT_CONFIGURATION_INFORMATION     PortCfg;

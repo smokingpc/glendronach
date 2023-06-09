@@ -17,15 +17,11 @@ UCHAR AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
     cap->NoDisplayInUI = 0;     //should this adapter be shown on DeviceManager UI?
     cap->Address = 0;
     cap->UINumber = 0xFFFFFFFF;
-//    srbext->SetStatus(SRB_STATUS_SUCCESS);
     return SRB_STATUS_SUCCESS;
 }
 
-UCHAR AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
-{
-    //NTSTATUS status = STATUS_UNSUCCESSFUL;
-    srbext->DevExt->Teardown();
-//    srbext->Srb->SrbStatus = SRB_STATUS_SUCCESS;
-//    srbext->SetStatus(SRB_STATUS_SUCCESS);
-    return SRB_STATUS_SUCCESS;
-}
+//UCHAR AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
+//{
+//    srbext->DevExt->Teardown();
+//    return SRB_STATUS_SUCCESS;
+//}

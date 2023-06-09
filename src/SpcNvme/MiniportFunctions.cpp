@@ -58,15 +58,11 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
 
-    status = nvme->InitController();
-    if (!NT_SUCCESS(status))
-        goto error;
-
-    status = nvme->InitIdentifyCtrl();
-    if (!NT_SUCCESS(status))
-        goto error;
-
     status = nvme->InitCreateIoQueues();
+    if (!NT_SUCCESS(status))
+        return status;
+
+    status = nvme->InitNvmeStage1();
     if (!NT_SUCCESS(status))
         return status;
 
@@ -134,31 +130,36 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
 
     if(!nvme->IsWorking())
         return FALSE;
+    
+    StorPortPause(devext, MAXULONG);
+    status = nvme->InitNvmeStage2();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+    //if (nvme->NvmeVer.MNR > 0)
+    //    nvme->InitIdentifyNS();
+    //else
+    //    nvme->InitIdentifyFirstNS();
 
-    if (nvme->NvmeVer.MNR > 0)
-        nvme->InitIdentifyNS();
-    else
-        nvme->InitIdentifyFirstNS();
+    //status = nvme->SetInterruptCoalescing();
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
+    //status = nvme->SetArbitration();
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
+    //status = nvme->SetSyncHostTime();
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
+    //status = nvme->SetPowerManagement();
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
+    //status = nvme->SetAsyncEvent();
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
+    //status = nvme->RegisterIoQ(NULL);
+    //if (!NT_SUCCESS(status))
+    //    return FALSE;
 
-    status = nvme->SetInterruptCoalescing();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-    status = nvme->SetArbitration();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-    status = nvme->SetSyncHostTime();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-    status = nvme->SetPowerManagement();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-    status = nvme->SetAsyncEvent();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-    status = nvme->RegisterIoQ(NULL);
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
+    StorPortResume(devext);
     return TRUE;
 }
 
@@ -181,13 +182,14 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         //skip these request currently. I didn't get any idea yet to handle them.
 
     case SRB_FUNCTION_RESET_BUS:
-    //MSDN said : it is possible for the HwScsiStartIo routine to be called 
-    //              with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
-    //              if a NT-based operating system storage class driver requests this operation. 
-    //              The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
-    //              to satisfy an incoming bus-reset request.
-    //But, I don't understand the difference.... Current Windows family are all NT-based system :p
-        DbgBreakPoint();
+    //MSDN said : 
+    //  it is possible for the HwScsiStartIo routine to be called 
+    //  with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
+    //  if a NT-based operating system storage class driver requests this operation. 
+    //  The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
+    //  to satisfy an incoming bus-reset request.
+    //  But, I don't understand the difference.... 
+    //  Current Windows family are already all NT-based system :p
         SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
         need_startio = FALSE;
         break;
@@ -248,7 +250,7 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 
     //todo: handle SCSI status for SRB
     if (srb_status != SRB_STATUS_PENDING)
-        srbext->CompleteSrbWithStatus(srb_status);
+        srbext->CompleteSrb(srb_status);
 
     //return TRUE indicates that "this driver handled this request, 
     //no matter succeed or fail..."
@@ -306,6 +308,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     case ScsiRestartAdapter:
     {
     //Device "entering" D0 state from D1 D2 D3 state
+    //This control code do similar things(exclude PerfConfig) as HwInitialize().
     //**running at DIRQL
         status = Handle_RestartAdapter(nvme);
         break;
@@ -314,7 +317,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     {
     //**running < DISPATCH_LEVEL
     //Device is surprise removed.
-    //**Is still SRB_PNP_xxx fired if this control code supported/implemented?
+    //**Will SRB_PNP_xxx still be fired if this control code supported/implemented?
     //***SurpriseRemove don't need unregister queues. Only need to delete queues.
         nvme->Teardown();
         status = ScsiAdapterControlSuccess;

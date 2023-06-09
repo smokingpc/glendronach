@@ -33,12 +33,11 @@ void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
         SrbSetSrbStatus(Srb, status);
     this->SrbStatus = status;
 }
-void _SPCNVME_SRBEXT::CompleteSrbWithStatus(UCHAR status)
+void _SPCNVME_SRBEXT::CompleteSrb(UCHAR status)
 {
-    this->SrbStatus = status;
     if (NULL != Srb)
     {
-        SrbSetSrbStatus(Srb, status);
+        this->SetStatus(status);
         StorPortNotification(RequestComplete, DevExt, Srb);
     }
 }

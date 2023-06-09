@@ -67,7 +67,7 @@ typedef struct _SPCNVME_SRBEXT
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
     void SetStatus(UCHAR status);
-    void CompleteSrbWithStatus(UCHAR status);
+    void CompleteSrb(UCHAR status);
     ULONG FuncCode();         //SRB Function Code
     ULONG ScsiQTag();
     PCDB Cdb();
@@ -82,7 +82,7 @@ typedef struct _SPCNVME_SRBEXT
     PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
-UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status);
+UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status);
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS &status);

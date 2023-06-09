@@ -22,7 +22,52 @@ BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
     }
     return TRUE;
 }
+void CNvmeDevice::RestartAdapterDpc(
+    IN PSTOR_DPC  Dpc,
+    IN PVOID  DevExt,
+    IN PVOID  Arg1,
+    IN PVOID  Arg2)
+{
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(Arg1);
+    CNvmeDevice *nvme = (CNvmeDevice*)DevExt;
+    ULONG stor_status = STOR_STATUS_SUCCESS;
+    if(!nvme->IsWorking())
+        return;
 
+    //todo: log error
+    //STOR_STATUS_BUSY : already queued this workitem.
+    //STOR_STATUS_INVALID_DEVICE_STATE : device is removing.
+    //STOR_STATUS_INVALID_IRQL: IRQL > DISPATCH_LEVEL
+    stor_status = StorPortQueueWorkItem(DevExt, CNvmeDevice::RestartAdapterWorker, nvme->RestartWorker, NULL);
+    ASSERT(stor_status == STOR_STATUS_SUCCESS);
+}
+void CNvmeDevice::RestartAdapterWorker(
+    _In_ PVOID DevExt,
+    _In_ PVOID Context,
+    _In_ PVOID Worker)
+{
+    UNREFERENCED_PARAMETER(Context);
+    UNREFERENCED_PARAMETER(Worker);
+
+    CNvmeDevice* nvme = (CNvmeDevice*)DevExt;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    ULONG stor_status = STOR_STATUS_SUCCESS;
+    if (!nvme->IsWorking())
+        return;
+
+    //In InitController, DisableController and EnableController could call 
+    //StorPortStallExecution(). It could cause system lag if called in DIRQL.
+    //So I move InitController() here...
+    status = nvme->InitNvmeStage1();
+    ASSERT(NT_SUCCESS(status));
+
+    status = nvme->InitNvmeStage2();
+    ASSERT(NT_SUCCESS(status));
+    //resume adapter AFTER restart controller done.
+    StorPortResume(DevExt);
+}
 
 #pragma region ======== CSpcNvmeDevice inline routines ======== 
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
@@ -192,16 +237,11 @@ void CNvmeDevice::Teardown()
     State = NVME_STATE::TEARDOWN;
     DeleteAdmQ();
     DeleteIoQ();
-    
+    StorPortFreeWorker(this, this->RestartWorker);
     State = NVME_STATE::STOP;
-    //if(shutdown)
-    //    ShutdownController();
 }
 NTSTATUS CNvmeDevice::EnableController()
 {
-    //if (!IsWorking())
-    //    return STATUS_INVALID_DEVICE_STATE;
-
     if (IsControllerReady())
         return STATUS_SUCCESS;
 
@@ -316,14 +356,65 @@ NTSTATUS CNvmeDevice::InitController()
     if (!NT_SUCCESS(status))
         return status;
     status = EnableController();
+    return status;
+}
+NTSTATUS CNvmeDevice::InitNvmeStage1()
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    status = InitController();
+    if (!NT_SUCCESS(status))
+        return status;
 
+    status = InitIdentifyCtrl();
+    return status;
+}
+NTSTATUS CNvmeDevice::InitNvmeStage2()
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    if (this->NvmeVer.MNR > 0)
+        status = InitIdentifyNS();
+    else
+        status = InitIdentifyFirstNS();
+
+    if (!NT_SUCCESS(status))
+        return status;
+
+    status = SetInterruptCoalescing();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = SetArbitration();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = SetSyncHostTime();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = SetPowerManagement();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = SetAsyncEvent();
+    if (!NT_SUCCESS(status))
+        return status;
+    status = RegisterIoQ(NULL);
     return status;
 }
 NTSTATUS CNvmeDevice::RestartController()
 {
+//***Running at DIRQL, called by HwAdapterControl
+    BOOLEAN ok = FALSE;
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
-    return STATUS_NOT_IMPLEMENTED;
+
+    //stop handling any request BEFORE restart HBA done.
+    StorPortPause(this, MAXULONG);
+
+    //[workaround]
+    //StorPortQueueWorkItem() only can be called at IRQL <= DISPATCH_LEVEL.
+    //And 
+    //CNvmeDevice::RegisterIoQueue() should be called at IRQL < DISPATCH_LEVEL.
+    //So I have to call DPC to do StorPortQueueWorkItem().
+    ok = StorPortIssueDpc(this, &this->RestartDpc, NULL, NULL);
+    ASSERT(ok);
+    return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::InitIdentifyCtrl()
 {
@@ -740,12 +831,12 @@ END:
     {
         status = STATUS_SUCCESS;
         if (NULL != srbext)
-            srbext->CompleteSrbWithStatus(SRB_STATUS_SUCCESS);
+            srbext->CompleteSrb(SRB_STATUS_SUCCESS);
     }
     else
     {
         if (NULL != srbext)
-            srbext->CompleteSrbWithStatus(SRB_STATUS_ERROR);
+            srbext->CompleteSrb(SRB_STATUS_ERROR);
     }
     return status;
 }
@@ -1055,6 +1146,9 @@ void CNvmeDevice::InitVars()
     {
         memset(NsData + i, 0xFF, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
     }
+    
+    StorPortInitializeWorker(this, &this->RestartWorker);
+    StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
 }
 void CNvmeDevice::LoadRegistry()
 {

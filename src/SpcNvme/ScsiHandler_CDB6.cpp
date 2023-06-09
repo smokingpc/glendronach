@@ -84,7 +84,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->DeviceType = DIRECT_ACCESS_DEVICE;
     page->DeviceTypeQualifier = DEVICE_CONNECTED;
     page->PageCode = VPD_DEVICE_IDENTIFIERS;
-    page->PageLength = (UCHAR) min(size, 255);
+    page->PageLength = (UCHAR) min(size, MAXUCHAR);
     desc = (PVPD_IDENTIFICATION_DESCRIPTOR)page->Descriptors;
 
     desc->CodeSet = VpdCodeSetAscii;
@@ -121,7 +121,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 
     //Refer to SCSI SBC3 doc or SCSI reference Block Limits VPD page_ptr.
     //http://www.13thmonkey.org/documentation/SCSI/sbc3r25.pdf
-    USHORT granularity = 0;
+    USHORT granularity = 4;
     REVERSE_BYTES_2(page->OptimalTransferLengthGranularity, &granularity);
 
     ret_size = min(srbext->DataBufLen(), buf_size);
@@ -313,16 +313,9 @@ UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext)
 }
 UCHAR Scsi_Verify6(PSPCNVME_SRBEXT srbext)
 {
+////VERIFY(6) seems obsoleted? I didn't see description in Seagate SCSI reference.
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
-
-////VERIFY(6) seems obsoleted? I didn't see description in Seagate SCSI reference.
-//    UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-//    UNREFERENCED_PARAMETER(srbext);
-//    //ULONG ret_size = 0;
-//
-//    //HandleCheckCondition(srbext->Srb, srb_status, ret_size);
-//    return srb_status;
 }
 UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
 {
@@ -373,13 +366,6 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
     SrbSetDataTransferLength(srbext->Srb, 0);
     return SRB_STATUS_SUCCESS;
 }
-#if 0
-UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
-{
-    UNREFERENCED_PARAMETER(srbext);
-    return SRB_STATUS_INVALID_REQUEST;
-}
-#endif
 
 UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
 {
