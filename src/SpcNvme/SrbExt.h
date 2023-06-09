@@ -83,7 +83,7 @@ typedef struct _SPCNVME_SRBEXT
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
 UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status);
-UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS status);
-UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS status);
-UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS status);
+UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS &status);
+UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS &status);
+UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS &status);
 

@@ -2,7 +2,7 @@
 
 UCHAR ToSrbStatus(NVME_COMMAND_STATUS& status)
 {
-//this is most frequently passed condition, so pull it out here.
+//this is most frequently passed condition, so pull it up here.
 //It make common route won't consume callstack too deep.
     if(0 == (status.SCT & status.SC))
         return SRB_STATUS_SUCCESS;
