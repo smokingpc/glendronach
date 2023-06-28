@@ -29,10 +29,13 @@ void _SPCNVME_SRBEXT::CleanUp()
 
 void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 {
-    if(NULL != Srb)
-        SrbSetSrbStatus(Srb, status | SRB_STATUS_AUTOSENSE_VALID);
-
     this->SrbStatus = status;
+    if(NULL != Srb)
+    {
+        if(status != SRB_STATUS_SUCCESS)
+            status |= SRB_STATUS_AUTOSENSE_VALID;
+        SrbSetSrbStatus(Srb, status);
+    }
 }
 void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 {
