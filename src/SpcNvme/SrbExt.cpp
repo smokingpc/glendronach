@@ -32,8 +32,11 @@ void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
     this->SrbStatus = status;
     if(NULL != Srb)
     {
-        if(status != SRB_STATUS_SUCCESS)
-            status |= SRB_STATUS_AUTOSENSE_VALID;
+    //don't set SRB_STATUS_AUTOSENSE_VALID for SRB_STATUS_SUCCESS.
+    //Storport.sys asm code only check if(srb_status == SRB_STATUS_SUCCESS)
+    //if set SRB_STATUS_AUTOSENSE_VALID , condition checking would have wrong result.
+
+    //Todo: for SRB_STATUS_ERROR, should I set SRB_STATUS_AUTOSENSE_VALID with ScsiStatus?
         SrbSetSrbStatus(Srb, status);
     }
 }
