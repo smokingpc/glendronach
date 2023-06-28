@@ -368,10 +368,10 @@ NTSTATUS CNvmeDevice::InitNvmeStage1()
 NTSTATUS CNvmeDevice::InitNvmeStage2()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    if (this->NvmeVer.MNR > 0)
-        status = InitIdentifyNS();
-    else
+    if (1 == this->NvmeVer.MJR && 0 == this->NvmeVer.MNR)
         status = InitIdentifyFirstNS();
+    else
+        status = InitIdentifyNS();
 
     if (!NT_SUCCESS(status))
         return status;
