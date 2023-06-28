@@ -48,7 +48,8 @@ typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
 typedef struct _SPCNVME_SRBEXT
 {
-    static _SPCNVME_SRBEXT *GetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb);
+    static _SPCNVME_SRBEXT *GetSrbExt(PSTORAGE_REQUEST_BLOCK srb);
+	static _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb);
 
     CNvmeDevice *DevExt;
     PSTORAGE_REQUEST_BLOCK Srb;
@@ -62,7 +63,15 @@ typedef struct _SPCNVME_SRBEXT
     PSPC_SRBEXT_COMPLETION CompletionCB;
     //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPage().
     //It should be freed in CompletionCB.
-    PVOID ExtBuf;        
+    PVOID ExtBuf;      
+    
+    #pragma region ======== for Debugging ========
+    class CNvmeQueue *SubmittedQ;
+    ULONG IoQueueIndex;
+    PNVME_COMMAND SubmittedCmd;
+    ULONG Tag;
+    ULONG SubIndex;
+    #pragma endregion
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();

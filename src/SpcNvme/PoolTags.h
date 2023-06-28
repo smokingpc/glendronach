@@ -46,5 +46,5 @@
 #define TAG_VPDPAGE     (ULONG)'PDPV'
 #define TAG_PRP2        (ULONG)'2PRP'
 #define TAG_LOG_PAGE    (ULONG)'PGOL'
-
 #define TAG_REG_BUFFER  (ULONG)'BGER'
+#define TAG_ISR_POLL_CPL (ULONG)'LPCC'

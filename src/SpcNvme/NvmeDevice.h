@@ -58,7 +58,6 @@ public:
     static const ULONG BUGCHECK_INVALID_STATE = BUGCHECK_BASE + 2;      //if action in invalid controller state, fire this bugcheck
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE + 10;
     static const ULONG DEV_POOL_TAG = (ULONG) 'veDN';
-
     static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
     static void RestartAdapterDpc(
             IN PSTOR_DPC  Dpc,
@@ -78,22 +77,22 @@ public:
     NTSTATUS ShutdownController();  //set CC.SHN and wait CSTS.SHST==2
 
     NTSTATUS InitController();
-    NTSTATUS InitNvmeStage1();      //for FindAdapter
-    NTSTATUS InitNvmeStage2();      //for PassiveInitialize
+    NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
+    NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
 
-    NTSTATUS RegisterIoQ(PSPCNVME_SRBEXT srbext);//, bool poll = false);
-    NTSTATUS UnregisterIoQ(PSPCNVME_SRBEXT srbext);//, bool poll = false);
+    NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
+    NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
 
-    NTSTATUS InitIdentifyCtrl();
-    NTSTATUS InitIdentifyNS();
-    NTSTATUS InitIdentifyFirstNS();
-    NTSTATUS InitCreateIoQueues();
+    //NTSTATUS InitIdentifyCtrl();
+    NTSTATUS IdentifyAllNamespaces();
+    NTSTATUS IdentifyFirstNamespace();
+    NTSTATUS CreateIoQueues(bool force = false);    //if(force) => delete exist queue objects and recreate again.
 
     NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA ident, bool poll = false);
-    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data, bool poll = false);
+    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);
     //nsid_list : variable to store query result. It's size should be PAGE_SIZE.(NVMe max support 1024 NameSpace)
-    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count, bool poll = false);
+    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count);
 
     NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
     NTSTATUS SetInterruptCoalescing();
@@ -106,6 +105,8 @@ public:
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
     NTSTATUS SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    void ResetOutstandingCmds();
+    NTSTATUS SetPerfOpts();
     bool IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
 
     bool IsWorking();
@@ -115,7 +116,6 @@ public:
 
     bool ReadCacheEnabled;
     bool WriteCacheEnabled;
-
     ULONG MinPageSize;
     ULONG MaxPageSize;
     ULONG MaxTxSize;
@@ -152,6 +152,7 @@ public:
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
     PVOID                               RestartWorker;
     STOR_DPC                            RestartDpc;
+    GROUP_AFFINITY                      MsgGroupAffinity[NVME_CONST::MAX_INT_COUNT];
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
     PPORT_CONFIGURATION_INFORMATION     PortCfg;

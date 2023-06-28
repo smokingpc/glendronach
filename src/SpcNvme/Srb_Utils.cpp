@@ -20,28 +20,39 @@ UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status)
 }
 void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status)
 {
-    PSENSE_DATA sdata = (PSENSE_DATA)SrbGetSenseInfoBuffer(srb);
-    UCHAR sdata_size = SrbGetSenseInfoBufferLength(srb);
-
-    if(SRB_STATUS_SUCCESS == status)
+//don't set ScsiStatus for other SRB_STATUS_xxx .
+//Only SRB_STATUS_ERROR need it.
+    switch (status)
     {
-        SrbSetScsiStatus(srb, SCSISTAT_GOOD);
-        return;
-    }
-    //if nvme_sc is not zero but no SendData buffer?
-    if (NULL == sdata || sdata_size == 0)
-    {
-        SrbSetScsiStatus(srb, SCSISTAT_CONDITION_MET);
-        return;
-    }
+        case SRB_STATUS_SUCCESS:
+            SrbSetScsiStatus(srb, SCSISTAT_GOOD);
+            break;
+        case SRB_STATUS_BUSY:   //SRB_STATUS_BUSY will check SCSISTAT....
+            SrbSetScsiStatus(srb, SCSISTAT_BUSY);
+            break;
+        case SRB_STATUS_ERROR:
+        {
+            //If SRB_STATUS_ERROR go with wrong ScsiStatus, storport could treat it as SRB_STATUS_SUCCESS.
 
-    RtlZeroMemory(sdata, sdata_size);
-    sdata->ErrorCode = SCSI_SENSE_ERRORCODE_FIXED_CURRENT;
-    sdata->Valid = 0;
-    sdata->AdditionalSenseLength = sizeof(SENSE_DATA) - 7;
-    sdata->AdditionalSenseCodeQualifier = 0;
-    sdata->SenseKey = SCSI_SENSE_ILLEGAL_REQUEST;
-    sdata->AdditionalSenseCode = SCSI_ADSENSE_ILLEGAL_COMMAND;
-    SrbSetScsiStatus(srb, SCSISTAT_CHECK_CONDITION);
+            PSENSE_DATA sdata = (PSENSE_DATA)SrbGetSenseInfoBuffer(srb);
+            UCHAR sdata_size = SrbGetSenseInfoBufferLength(srb);
+            if (NULL == sdata || sdata_size == 0)
+            {
+                SrbSetScsiStatus(srb, SCSISTAT_CONDITION_MET);
+            }
+            else
+            {
+                RtlZeroMemory(sdata, sdata_size);
+                sdata->ErrorCode = SCSI_SENSE_ERRORCODE_FIXED_CURRENT;
+                sdata->Valid = 0;
+                sdata->AdditionalSenseLength = sizeof(SENSE_DATA) - 7;
+                sdata->AdditionalSenseCodeQualifier = 0;
+                sdata->SenseKey = SCSI_SENSE_ILLEGAL_REQUEST;
+                sdata->AdditionalSenseCode = SCSI_ADSENSE_ILLEGAL_COMMAND;
+                SrbSetScsiStatus(srb, SCSISTAT_CHECK_CONDITION);
+            }
+        }
+			break;
+    }
 }
 

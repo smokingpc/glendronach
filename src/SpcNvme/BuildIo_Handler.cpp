@@ -3,9 +3,10 @@
 
 BOOLEAN BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {
-    srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
-    //todo: set log 
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    //srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
+    ////todo: set log 
+    //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
     return FALSE;
 }
 
@@ -19,21 +20,25 @@ BOOLEAN BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
 
 BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(srbext);
-    //srbext->Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
     //todo: set log 
-    //todo: build prp and dma
     DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
     
+    //spcnvme only support 1 disk in current stage.
+    //so check path/target/lun here.
+    UCHAR path = 0, target = 0, lun = 0;
+    SrbGetPathTargetLun(srbext->Srb, &path, &target, &lun);
+
+    if(!(0==path && 0==target && 0==lun))
+    {
+        srbext->CompleteSrb(SRB_STATUS_INVALID_LUN);
+        return FALSE;
+    }
     return TRUE;
 }
 
 BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 {
-//    srbext->Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
-    srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
-    //todo: set log 
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
 
 //always return FALSE. This event only handled in BuildIo.
     return FALSE;
@@ -71,7 +76,6 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
                 KdBreakPoint();
                 //todo: log
             }
-            //srb_status = AdapterPnp_RemoveHandler(srbext);
             srbext->DevExt->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;

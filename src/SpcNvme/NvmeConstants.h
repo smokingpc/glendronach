@@ -52,26 +52,28 @@ namespace NVME_CONST{
     static const ULONG DEFAULT_CTRLID = 1;
     static const UCHAR MAX_TARGETS = 1;
     static const UCHAR MAX_LU = 1;
-    static const ULONG MAX_IO_PER_LU = 1024;
+    static const ULONG MAX_IO_PER_LU = 512;
     static const UCHAR IOSQES = 6; //sizeof(NVME_COMMAND)==64 == 2^6, so IOSQES== 6.
     static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
     static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?
     
     static const USHORT CPL_INIT_PHASETAG = 1;  //CompletionQueue phase tag init value;
-    static const UCHAR IO_QUEUE_COUNT = 4;
-    static const UCHAR IO_QUEUE_DEPTH = 64;
+    static const UCHAR IO_QUEUE_COUNT = 16;
+    static const USHORT IO_QUEUE_DEPTH = MAX_IO_PER_LU / 2;
     static const ULONG DEFAULT_MAX_TXSIZE = 131072;
     static const USHORT MAX_CID = MAXUSHORT-1;  //0xFFFF is invalid 
     static const ULONG MAX_NS_COUNT = 1024;     //Max NameSpace count. defined in NVMe spec.
-
+    //static const ULONG MAX_CONCURRENT_IO = 1024;
     //static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
     //static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
     static const ULONG CPL_ALL_ENTRY = MAXULONG;
     static const ULONG INIT_DBL_VALUE = 0;
     static const ULONG INVALID_DBL_VALUE = (ULONG)MAXUSHORT;
-
-    static const ULONG STALL_TIME_US = 50;  //in micro-seconds
-    static const ULONG SLEEP_TIME_US = STALL_TIME_US*10;    //in micro-seconds
+    static const ULONG ISR_HANDLED_CPL = 8;     //how many cpl entries will be handled in each ISR call?
+    static const ULONG MAX_INT_COUNT = 64;
+    static const ULONG SAFE_SUBMIT_THRESHOLD = 8;
+    static const ULONG STALL_TIME_US = 100;  //in micro-seconds
+    static const ULONG SLEEP_TIME_US = STALL_TIME_US*5;    //in micro-seconds
 
     #pragma region ======== SetFeature default values ========
     static const UCHAR INTCOAL_TIME = 2;   //Interrupt Coalescing time threshold in 100us unit.

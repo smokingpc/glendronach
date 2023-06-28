@@ -4,7 +4,7 @@ SPC_SRBEXT_COMPLETION Complete_ScsiReadWrite;
 void Complete_ScsiReadWrite(SPCNVME_SRBEXT *srbext)
 {
     srbext->CleanUp();
-    srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
+    //srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
 }
 
 UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_write)
@@ -18,10 +18,16 @@ UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_
         return SRB_STATUS_ERROR;
 
     BuiildCmd_ReadWrite(srbext, offset, len, is_write);
-    srbext->CompletionCB = Complete_ScsiReadWrite;
+    //srbext->CompletionCB = NULL;
     status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
-        srb_status = SRB_STATUS_ERROR;
+    {
+        if(STATUS_DEVICE_BUSY == status)
+            srb_status = SRB_STATUS_BUSY;
+        else
+            srb_status = SRB_STATUS_ERROR;
+    
+    }
     else
         srb_status = SRB_STATUS_PENDING;
 
