@@ -40,6 +40,7 @@ void CNvmeDevice::RestartAdapterDpc(
     //STOR_STATUS_BUSY : already queued this workitem.
     //STOR_STATUS_INVALID_DEVICE_STATE : device is removing.
     //STOR_STATUS_INVALID_IRQL: IRQL > DISPATCH_LEVEL
+    StorPortInitializeWorker(nvme, &nvme->RestartWorker);
     stor_status = StorPortQueueWorkItem(DevExt, CNvmeDevice::RestartAdapterWorker, nvme->RestartWorker, NULL);
     ASSERT(stor_status == STOR_STATUS_SUCCESS);
 }
@@ -67,6 +68,8 @@ void CNvmeDevice::RestartAdapterWorker(
     ASSERT(NT_SUCCESS(status));
     //resume adapter AFTER restart controller done.
     StorPortResume(DevExt);
+    StorPortFreeWorker(nvme, &nvme->RestartWorker);
+    nvme->RestartWorker = NULL;
 }
 
 #pragma region ======== CSpcNvmeDevice inline routines ======== 
@@ -234,7 +237,7 @@ void CNvmeDevice::Teardown()
     State = NVME_STATE::TEARDOWN;
     DeleteAdmQ();
     DeleteIoQ();
-    StorPortFreeWorker(this, this->RestartWorker);
+    //StorPortFreeWorker(this, this->RestartWorker);
     State = NVME_STATE::STOP;
 }
 NTSTATUS CNvmeDevice::EnableController()
@@ -1144,7 +1147,7 @@ void CNvmeDevice::InitVars()
         memset(NsData + i, 0xFF, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
     }
     
-    StorPortInitializeWorker(this, &this->RestartWorker);
+    //StorPortInitializeWorker(this, &this->RestartWorker);
     StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
 }
 void CNvmeDevice::LoadRegistry()

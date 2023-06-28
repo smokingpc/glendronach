@@ -29,10 +29,16 @@ void _SPCNVME_SRBEXT::CleanUp()
 
 void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 {
-    if(NULL != Srb)
-        SrbSetSrbStatus(Srb, status | SRB_STATUS_AUTOSENSE_VALID);
-
     this->SrbStatus = status;
+    if(NULL != Srb)
+    {
+    //don't set SRB_STATUS_AUTOSENSE_VALID for SRB_STATUS_SUCCESS.
+    //Storport.sys asm code only check if(srb_status == SRB_STATUS_SUCCESS)
+    //if set SRB_STATUS_AUTOSENSE_VALID , condition checking would have wrong result.
+
+    //Todo: for SRB_STATUS_ERROR, should I set SRB_STATUS_AUTOSENSE_VALID with ScsiStatus?
+        SrbSetSrbStatus(Srb, status);
+    }
 }
 void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 {
