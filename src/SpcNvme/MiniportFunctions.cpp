@@ -135,29 +135,6 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     status = nvme->InitNvmeStage2();
     if (!NT_SUCCESS(status))
         return FALSE;
-    //if (nvme->NvmeVer.MNR > 0)
-    //    nvme->InitIdentifyNS();
-    //else
-    //    nvme->InitIdentifyFirstNS();
-
-    //status = nvme->SetInterruptCoalescing();
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
-    //status = nvme->SetArbitration();
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
-    //status = nvme->SetSyncHostTime();
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
-    //status = nvme->SetPowerManagement();
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
-    //status = nvme->SetAsyncEvent();
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
-    //status = nvme->RegisterIoQ(NULL);
-    //if (!NT_SUCCESS(status))
-    //    return FALSE;
 
     StorPortResume(devext);
     return TRUE;
