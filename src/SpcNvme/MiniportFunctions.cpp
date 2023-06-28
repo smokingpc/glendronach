@@ -58,11 +58,11 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
 
-    status = nvme->InitCreateIoQueues();
+    status = nvme->InitNvmeStage1();
     if (!NT_SUCCESS(status))
         return status;
 
-    status = nvme->InitNvmeStage1();
+    status = nvme->InitCreateIoQueues();
     if (!NT_SUCCESS(status))
         return status;
 

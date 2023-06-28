@@ -225,7 +225,9 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
         }
         else
         {
+        #if DBG
             DbgBreakPoint();
+        #endif
             continue;
         }
         SubHead = entry->DW2.SQHD;
@@ -237,11 +239,7 @@ NTSTATUS CNvmeQueue::CompleteCmd(ULONG max_count, ULONG& done_count)
             if (srbext->CompletionCB)
                 srbext->CompletionCB(srbext);
             else
-            {
-                UCHAR srb_status = NvmeToSrbStatus(srbext->NvmeCpl.DW3.Status);
-                srbext->CompleteSrb(srb_status);
-                //srbext->ResetExtBuf(NULL);
-            }
+                srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
         }
 
         if(done_count >= max_count)

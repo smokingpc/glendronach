@@ -30,7 +30,7 @@ void CNvmeDevice::RestartAdapterDpc(
 {
     UNREFERENCED_PARAMETER(Dpc);
     UNREFERENCED_PARAMETER(Arg1);
-    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(Arg2);
     CNvmeDevice *nvme = (CNvmeDevice*)DevExt;
     ULONG stor_status = STOR_STATUS_SUCCESS;
     if(!nvme->IsWorking())
@@ -53,7 +53,7 @@ void CNvmeDevice::RestartAdapterWorker(
 
     CNvmeDevice* nvme = (CNvmeDevice*)DevExt;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    ULONG stor_status = STOR_STATUS_SUCCESS;
+    //ULONG stor_status = STOR_STATUS_SUCCESS;
     if (!nvme->IsWorking())
         return;
 
@@ -209,9 +209,6 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
             sizeof(ACCESS_RANGE) * AccessRangeCount);
     if(!MapCtrlRegisters())
         return STATUS_NOT_MAPPED_DATA;
-
-    //if(!GetMsixTable())
-    //    return STATUS_INTERNAL_ERROR;
 
     ReadCtrlCap();
 

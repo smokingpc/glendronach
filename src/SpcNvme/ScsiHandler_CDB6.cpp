@@ -339,7 +339,9 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
     if(0 == select->PFBit)
         return SRB_STATUS_INVALID_REQUEST;
 
+#if DBG
     DbgBreakPoint();
+#endif
     if(0 == header->BlockDescriptorLength)
         param_block = NULL;
 
@@ -358,7 +360,9 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
         if(page->PageCode != MODE_PAGE_CACHING || page->PageLength != (sizeof(MODE_CACHING_PAGE)-2))
             continue;
 
+#if DBG
         DbgBreakPoint();
+#endif
         srbext->DevExt->ReadCacheEnabled = !page->ReadDisableCache;
         srbext->DevExt->WriteCacheEnabled = page->WriteCacheEnable;
     }

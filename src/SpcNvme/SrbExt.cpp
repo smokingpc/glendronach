@@ -30,14 +30,21 @@ void _SPCNVME_SRBEXT::CleanUp()
 void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 {
     if(NULL != Srb)
-        SrbSetSrbStatus(Srb, status);
+        SrbSetSrbStatus(Srb, status | SRB_STATUS_AUTOSENSE_VALID);
+
     this->SrbStatus = status;
+}
+void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
+{
+    UCHAR status = NvmeToSrbStatus(nvme_status);
+    this->CompleteSrb(status);
 }
 void _SPCNVME_SRBEXT::CompleteSrb(UCHAR status)
 {
+    this->SetStatus(status);
     if (NULL != Srb)
     {
-        this->SetStatus(status);
+        SetScsiSenseBySrbStatus(Srb, status);
         StorPortNotification(RequestComplete, DevExt, Srb);
     }
 }

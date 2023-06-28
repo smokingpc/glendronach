@@ -3,9 +3,8 @@ SPC_SRBEXT_COMPLETION Complete_ScsiReadWrite;
 
 void Complete_ScsiReadWrite(SPCNVME_SRBEXT *srbext)
 {
-    UCHAR srb_status = NvmeToSrbStatus(srbext->NvmeCpl.DW3.Status);
     srbext->CleanUp();
-    srbext->CompleteSrb(srb_status);
+    srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
 }
 
 UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_write)
