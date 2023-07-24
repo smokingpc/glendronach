@@ -39,7 +39,6 @@ BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 {
 	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
-
 //always return FALSE. This event only handled in BuildIo.
     return FALSE;
 }

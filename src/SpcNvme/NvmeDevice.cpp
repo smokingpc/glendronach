@@ -1191,7 +1191,7 @@ void CNvmeDevice::InitVars()
     {
         memset(NsData + i, 0xFF, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
     }
-    
+
     StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
 }
 void CNvmeDevice::LoadRegistry()
