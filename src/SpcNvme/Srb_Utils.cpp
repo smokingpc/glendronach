@@ -27,6 +27,9 @@ void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status)
         case SRB_STATUS_SUCCESS:
             SrbSetScsiStatus(srb, SCSISTAT_GOOD);
             break;
+        case SRB_STATUS_BUSY:   //SRB_STATUS_BUSY will check SCSISTAT....
+            SrbSetScsiStatus(srb, SCSISTAT_BUSY);
+            break;
         case SRB_STATUS_ERROR:
         {
             //If SRB_STATUS_ERROR go with wrong ScsiStatus, storport could treat it as SRB_STATUS_SUCCESS.
@@ -49,6 +52,7 @@ void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status)
                 SrbSetScsiStatus(srb, SCSISTAT_CHECK_CONDITION);
             }
         }
+			break;
     }
 }
 

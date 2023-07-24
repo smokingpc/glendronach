@@ -62,28 +62,28 @@ HKR,,TypesSupported,%REG_DWORD%,7
 ;HKR, "Parameters", "BusType", %REG_DWORD%, 0x00000005           ;
 
 [msi_addreg]
-HKR, Interrupt Management, 0x00000010
-HKR, Interrupt Management\MessageSignaledInterruptProperties, 0x00000010
-HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,       %REG_DWORD%,   1
-HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   4
-HKR, Interrupt Management\Affinity Policy, 0x00000010
-HKR, Interrupt Management\Affinity Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
-HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, 3
-HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
+HKR, "Interrupt Management", 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported,       %REG_DWORD%,   1
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   17
+HKR, "Interrupt Management\Affinity" Policy, 0x00000010
+HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
+HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3
+HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1
 
 [Parameters]
-;HKR, Parameters\Device, Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
-HKR, Parameters\Device, AdmQDepth,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
-HKR, Parameters\Device, IoQDepth,         %REG_DWORD%, 0x00000080 ; IO queue size (num of entries)
-HKR, Parameters\Device, IoQCount,         %REG_DWORD%, 0x00000004 ; How many I/O queue will be created?
+HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001
+HKR, Parameters, "BusType", %REG_DWORD%, 0x00000011           ;STORAGE_BUS_TYPE
+;HKR, "Parameters\Device", Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
+;HKR, "Parameters\Device", AdmQDepth,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
+;HKR, Parameters\Device, IoQDepth,         %REG_DWORD%, 0x00000100 ; IO queue size (num of entries)
+;HKR, Parameters\Device, IoQCount, %REG_DWORD%, 0x00000008 ; How many I/O queue will be created?
 
 ;Interrupt coalescing will decrease performance profiling result.
 ;So I turn it off by default.
 ;This feature can lower OS time cost and supress OS latency/rapid freeze issue.
-;HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0x00000001 ; coalescing time in 100-us unit.
-;HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0x0000000A ; # of coalescing interrupts
-HKR, Parameters\Device, IntCoalescingTime,      %REG_DWORD%, 0 ; coalescing time in 100-us unit.
-HKR, Parameters\Device, IntCoalescingEntries,       %REG_DWORD%, 0 ; # of coalescing interrupts
+;HKR, Parameters\Device, IntCoalescingTime, %REG_DWORD%, 0 ; coalescing time in 100-us unit.
+;HKR, Parameters\Device, IntCoalescingEntries, %REG_DWORD%, 0 ; # of coalescing interrupts
 
 [Strings]
 ManufacturerName="SmokingPC"

@@ -7,7 +7,6 @@ CSpinLock::CSpinLock(KSPIN_LOCK* lock, bool acquire)
     //It is more difficult to debug.
     this->Lock = lock;
     this->IsAcquired = false;
-
     if(acquire)
         DoAcquire();
 }

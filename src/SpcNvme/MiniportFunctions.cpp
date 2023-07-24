@@ -23,9 +23,13 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
-    portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_SUPPORTED;
+    portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_FULL64BIT_SUPPORTED;   //should set this value if MaxNumberOfIO > 1000.
     portcfg->MaxNumberOfIO = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
     portcfg->MaxIOsPerLun = NVME_CONST::MAX_IO_PER_LU;
+
+    //this will limit LUN i/o queue and affect HBA Gateway OutstandingMax.
+    //stornvme call StorPortSetDeviceQueueDepth() to adjust it dynamically.
+    portcfg->InitialLunQueueDepth = NVME_CONST::MAX_IO_PER_LU;
 
     //Dump is not supported now. Will be supported in future.
     portcfg->RequestedDumpBufferSize = 0;
@@ -33,6 +37,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->DumpRegion.VirtualBase = NULL;
     portcfg->DumpRegion.PhysicalBase.QuadPart = NULL;
     portcfg->DumpRegion.Length = 0;
+    portcfg->FeatureSupport = STOR_ADAPTER_DMA_V3_PREFERRED;
 }
 
 _Use_decl_annotations_ ULONG HwFindAdapter(
@@ -58,21 +63,19 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
 
-    status = nvme->InitNvmeStage1();
+    status = nvme->InitController();
     if (!NT_SUCCESS(status))
-        return status;
+        goto error;
 
-    status = nvme->InitCreateIoQueues();
+    //Todo: supports multiple controller of NVMe v2.0  
+    status = nvme->IdentifyController(NULL, &nvme->CtrlIdent, true);
     if (!NT_SUCCESS(status))
-        return status;
-
+        goto error;
+    
     //PCI bus related initialize
-    //this should be called AFTER identify controller , because 
+    //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
     FillPortConfiguration(port_cfg, nvme);
-
-    //register Storport DPC
-    //StorPortInitializeDpc(devext, &nvme->QueueCplDpc, NvmeDpcRoutine);
 
     return SP_RETURN_FOUND;
 
@@ -81,40 +84,22 @@ error:
 //I don't know why so fail this driver later....
     nvme->Teardown();
     //SP_RETURN_NOT_FOUND will cause driver installation hanging...?
-    return SP_RETURN_FOUND;
+    return SP_RETURN_ERROR;
 }
 
 _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
 {
 //Running at DIRQL
+    //in stornvme, it checks PPORT_CONFIGURATION_INFORMATION::DumpMode.
+    //If (DumpMode != 0) , stornvme will do all Initialize here....
+    //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
+
     CDebugCallInOut inout(__FUNCTION__);
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
-    if (!nvme->IsWorking())
+    NTSTATUS status = nvme->SetPerfOpts();
+
+    if(!NT_SUCCESS(status))
         return FALSE;
-
-    //initialize perf options
-    PERF_CONFIGURATION_DATA perf = { 0 };
-    ULONG stor_status;
-
-    perf.Version = STOR_PERF_VERSION;
-    perf.Size = sizeof(PERF_CONFIGURATION_DATA);
-    //Allow multiple I/O incoming concurrently. 
-    perf.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
-    perf.ConcurrentChannels = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-    //I don't use SGL...
-    perf.Flags |= STOR_PERF_NO_SGL;
-    //spread DPC to all cpu. don't make single cpu too busy.
-    perf.Flags |= STOR_PERF_DPC_REDIRECTION;  
-    //IF not set this flag, storport will attempt to fire completion DPC on
-    //original cpu which accept this I/O request.
-    perf.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
-    
-    //In generic case, miniport complete request in HwStartIo.
-    //So need this flag to optimize DPC Redirection.
-    //But in NVMe driver, request doesn't be completed in HwStartIo.
-    //They are completed later by ISR and DPC. So don't set this flag.
-    //perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
-    stor_status = StorPortInitializePerfOpts(devext, FALSE, &perf);
 
     StorPortEnablePassiveInitialization(devext, HwPassiveInitialize);
     return TRUE;
@@ -132,7 +117,21 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
         return FALSE;
     
     StorPortPause(devext, MAXULONG);
+
+    status = nvme->InitNvmeStage1();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
     status = nvme->InitNvmeStage2();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
+    //CreateIoQueues should be called AFTER IdentifyController.
+    status = nvme->CreateIoQueues();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
+    status = nvme->RegisterIoQueues(NULL);
     if (!NT_SUCCESS(status))
         return FALSE;
 
@@ -147,8 +146,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 //In this callback, also dispatch some behavior which need be handled very fast.
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
-
-    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
+    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::InitSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
     BOOLEAN need_startio = FALSE;
 
     switch (srbext->FuncCode())
@@ -157,7 +155,6 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     case SRB_FUNCTION_RESET_LOGICAL_UNIT: //handled by HwUnitControl?
     case SRB_FUNCTION_RESET_DEVICE:
         //skip these request currently. I didn't get any idea yet to handle them.
-
     case SRB_FUNCTION_RESET_BUS:
     //MSDN said : 
     //  it is possible for the HwScsiStartIo routine to be called 
@@ -165,9 +162,10 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     //  if a NT-based operating system storage class driver requests this operation. 
     //  The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
     //  to satisfy an incoming bus-reset request.
-    //  But, I don't understand the difference.... 
+    //  I don't understand the difference.... 
     //  Current Windows family are already all NT-based system :p
-        SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
+        //SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
+		srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
         need_startio = FALSE;
         break;
     //case SRB_FUNCTION_WMI:
@@ -186,7 +184,7 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         //should handle PNP remove adapter
         need_startio = BuildIo_SrbPnpHandler(srbext);
         break;
-    default:
+	default:
         need_startio = BuildIo_DefaultHandler(srbext);
         break;
 
@@ -197,7 +195,8 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
-    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
+    UNREFERENCED_PARAMETER(devext);
+    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt((PSTORAGE_REQUEST_BLOCK)srb);
     UCHAR srb_status = SRB_STATUS_ERROR;
 
     switch (srbext->FuncCode())
@@ -241,12 +240,12 @@ BOOLEAN HwResetBus(
 )
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
     UNREFERENCED_PARAMETER(PathId);
-
     //miniport driver is responsible for completing SRBs received by HwStorStartIo for 
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
-
+    CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
+    DbgBreakPoint();
+    nvme->ResetOutstandingCmds();
     return TRUE;
 }
 

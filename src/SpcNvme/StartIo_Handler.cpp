@@ -209,9 +209,8 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
         srb_status = Scsi_Verify12(srbext);
         break;
     case SCSIOP_SECURITY_PROTOCOL_IN:
-        
-        break;
     case SCSIOP_SECURITY_PROTOCOL_OUT:
+		srb_status = SRB_STATUS_INVALID_REQUEST;
         break;
         // 16-byte commands
 #if 0

@@ -3,9 +3,10 @@
 
 BOOLEAN BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {
-    srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
-    //todo: set log 
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    //srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
+    ////todo: set log 
+    //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
     return FALSE;
 }
 
@@ -37,10 +38,7 @@ BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 
 BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 {
-    srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
-    //todo: set log 
-    StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
-
+	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
 //always return FALSE. This event only handled in BuildIo.
     return FALSE;
 }

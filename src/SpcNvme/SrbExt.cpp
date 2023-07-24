@@ -1,10 +1,16 @@
 #include "pch.h"
 
-_SPCNVME_SRBEXT* _SPCNVME_SRBEXT::GetSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
+_SPCNVME_SRBEXT* _SPCNVME_SRBEXT::InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 {
-    PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
-    srbext->Init(devext, srb);
-    return srbext;
+	PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
+	srbext->Init(devext, srb);
+	return srbext;
+}
+_SPCNVME_SRBEXT* _SPCNVME_SRBEXT::GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
+{
+    PSPCNVME_SRBEXT ret = (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
+    ASSERT(ret->Srb != NULL);
+    return ret;
 }
 
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
@@ -15,6 +21,7 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     Srb = srb;
     SetStatus(SRB_STATUS_PENDING);
     InitOK = TRUE;
+    Tag = ScsiQTag();
 }
 
 void _SPCNVME_SRBEXT::CleanUp()
@@ -43,11 +50,11 @@ void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
 void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 {
     UCHAR status = NvmeToSrbStatus(nvme_status);
-    this->CompleteSrb(status);
+    CompleteSrb(status);
 }
 void _SPCNVME_SRBEXT::CompleteSrb(UCHAR status)
 {
-    this->SetStatus(status);
+    SetStatus(status);
     if (NULL != Srb)
     {
         SetScsiSenseBySrbStatus(Srb, status);
@@ -63,7 +70,7 @@ ULONG _SPCNVME_SRBEXT::FuncCode()
 ULONG _SPCNVME_SRBEXT::ScsiQTag()
 {
     if (NULL == Srb)
-        return INVALID_SRB_QUEUETAG;
+        return 0;
     return SrbGetQueueTag(Srb);
 }
 PCDB _SPCNVME_SRBEXT::Cdb()

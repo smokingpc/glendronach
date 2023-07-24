@@ -81,10 +81,12 @@ typedef enum class _IDENTIFY_CNS : UCHAR
 
 typedef enum _NVME_STATE {
     STOP = 0,
-    SETUP = 1,
-    RUNNING = 2,
-    TEARDOWN = 3,
-    RESET = 4,
-    SHUTDOWN = 5,   //CC.SHN==1
+    RUNNING = 1,
+    SETUP = 2,
+    INIT = 3,       //In InitStage1 and InitStage2
+    TEARDOWN = 4,
+    RESETCTRL = 5,
+    RESETBUS = 6,
+    SHUTDOWN = 10,   //CC.SHN==1
 }NVME_STATE;
 
