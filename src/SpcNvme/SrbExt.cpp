@@ -19,7 +19,7 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 
     DevExt = (CNvmeDevice*)devext;
     Srb = srb;
-    SetStatus(SRB_STATUS_PENDING);
+    SrbStatus = SRB_STATUS_PENDING;
     InitOK = TRUE;
     Tag = ScsiQTag();
 }
@@ -33,20 +33,6 @@ void _SPCNVME_SRBEXT::CleanUp()
         Prp2VA = NULL;
     }
 }
-
-void _SPCNVME_SRBEXT::SetStatus(UCHAR status)
-{
-    this->SrbStatus = status;
-    if(NULL != Srb)
-    {
-    //don't set SRB_STATUS_AUTOSENSE_VALID for SRB_STATUS_SUCCESS.
-    //Storport.sys asm code only check if(srb_status == SRB_STATUS_SUCCESS)
-    //if set SRB_STATUS_AUTOSENSE_VALID , condition checking would have wrong result.
-
-    //Todo: for SRB_STATUS_ERROR, should I set SRB_STATUS_AUTOSENSE_VALID with ScsiStatus?
-        SrbSetSrbStatus(Srb, status);
-    }
-}
 void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 {
     UCHAR status = NvmeToSrbStatus(nvme_status);
@@ -54,10 +40,11 @@ void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 }
 void _SPCNVME_SRBEXT::CompleteSrb(UCHAR status)
 {
-    SetStatus(status);
+    this->SrbStatus = status;
     if (NULL != Srb)
     {
         SetScsiSenseBySrbStatus(Srb, status);
+        SrbSetSrbStatus(Srb, status);
         StorPortNotification(RequestComplete, DevExt, Srb);
     }
 }

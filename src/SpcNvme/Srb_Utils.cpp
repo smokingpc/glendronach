@@ -18,7 +18,7 @@ UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status)
     }
     return SRB_STATUS_INTERNAL_ERROR;
 }
-void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status)
+void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR &status)
 {
 //don't set ScsiStatus for other SRB_STATUS_xxx .
 //Only SRB_STATUS_ERROR need it.
@@ -45,11 +45,12 @@ void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status)
                 RtlZeroMemory(sdata, sdata_size);
                 sdata->ErrorCode = SCSI_SENSE_ERRORCODE_FIXED_CURRENT;
                 sdata->Valid = 0;
-                sdata->AdditionalSenseLength = sizeof(SENSE_DATA) - 7;
+                sdata->AdditionalSenseLength = sdata_size - FIELD_OFFSET(SENSE_DATA, AdditionalSenseLength);
                 sdata->AdditionalSenseCodeQualifier = 0;
                 sdata->SenseKey = SCSI_SENSE_ILLEGAL_REQUEST;
                 sdata->AdditionalSenseCode = SCSI_ADSENSE_ILLEGAL_COMMAND;
                 SrbSetScsiStatus(srb, SCSISTAT_CHECK_CONDITION);
+                status = status | SRB_STATUS_AUTOSENSE_VALID;
             }
         }
 			break;
