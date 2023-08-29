@@ -116,6 +116,7 @@ public:
 
     bool ReadCacheEnabled;
     bool WriteCacheEnabled;
+    BOOLEAN RebalancingPnp;
     ULONG MinPageSize;
     ULONG MaxPageSize;
     ULONG MaxTxSize;

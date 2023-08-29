@@ -228,6 +228,8 @@ void CNvmeDevice::Teardown()
     DeleteIoQ();
     DeleteAdmQ();
     State = NVME_STATE::STOP;
+    if(this->CtrlReg != NULL)
+        StorPortFreeDeviceBase(this, this->CtrlReg);
 }
 NTSTATUS CNvmeDevice::EnableController()
 {

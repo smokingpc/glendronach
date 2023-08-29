@@ -58,7 +58,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto error;
@@ -76,7 +75,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
     FillPortConfiguration(port_cfg, nvme);
-
+    nvme->RebalancingPnp = FALSE;
     return SP_RETURN_FOUND;
 
 error:

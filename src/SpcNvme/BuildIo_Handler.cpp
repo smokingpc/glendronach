@@ -85,6 +85,20 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             srbext->DevExt->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
+        case StorStopDevice:
+        //StopDevice is used for some special case. e.g. PnpRebalanceResource event.
+        //This is rare case that could happen when hotplug.
+        //To handle rebalance resource event, just release all PNP resource then 
+        //Storport will call HwFindAdapter again to re-assign resource to us.
+            status = srbext->DevExt->DisableController();
+            if (!NT_SUCCESS(status))
+            {
+                KdBreakPoint();
+                //todo: log
+            }
+            srbext->DevExt->Teardown();
+            srbext->DevExt->RebalancingPnp = TRUE;
+            break;
     }
 
 END:
