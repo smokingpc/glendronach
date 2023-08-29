@@ -75,7 +75,6 @@ typedef struct _SPCNVME_SRBEXT
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
-    void SetStatus(UCHAR status);
     void CompleteSrb(UCHAR status);
     void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);
     ULONG FuncCode();         //SRB Function Code
@@ -97,4 +96,4 @@ UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS &status);
 
-void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR status);
+void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR &status);

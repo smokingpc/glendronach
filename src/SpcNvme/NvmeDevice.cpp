@@ -947,9 +947,9 @@ END:
     if (NULL != srbext)
     {
         if (NT_SUCCESS(status))
-            srbext->SetStatus(SRB_STATUS_SUCCESS);
+            srbext->CompleteSrb(SRB_STATUS_SUCCESS);
         else
-            srbext->SetStatus(SRB_STATUS_ERROR);
+            srbext->CompleteSrb(SRB_STATUS_ERROR);
     }
     return status;
 }
