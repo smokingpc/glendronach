@@ -39,7 +39,7 @@ CopyFiles=DiskCopyfiles
 AddReg = msi_addreg
 
 [NVMeInstall.NT$ARCH$.Services]
-AddService = spcnvme, 0x00000002 , NVMeInstall.InstallService, NVMeInstall.InstallEventLog
+AddService = spcnvme, 0x00000002 , NVMeInstall.InstallService;, NVMeInstall.InstallEventLog
 
 [NVMeInstall.InstallService]
 ServiceType    = %SERVICE_KERNEL_DRIVER%
@@ -47,19 +47,14 @@ StartType      = %SERVICE_BOOT_START%
 ErrorControl   = %SERVICE_ERROR_NORMAL%
 ServiceBinary  = %13%\SpcNvme.sys
 LoadOrderGroup = SCSI miniport
-;AddReg         = NVMeInstall.PnpAddReg
 AddReg         = Parameters
 
-[NVMeInstall.InstallEventLog]
-AddReg = NVMeInstall.EventLogAddReg
+;[NVMeInstall.InstallEventLog]
+;AddReg = NVMeInstall.EventLogAddReg
 
-[NVMeInstall.EventLogAddReg]
-HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll"
-HKR,,TypesSupported,%REG_DWORD%,7
-
-;[NVMeInstall.PnpAddReg]
-;HKR, "Parameters\PnpInterface", "5", %REG_DWORD%, 0x00000001    ;PCIBus
-;HKR, "Parameters", "BusType", %REG_DWORD%, 0x00000005           ;
+;[NVMeInstall.EventLogAddReg]
+;HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll"
+;HKR,,TypesSupported,%REG_DWORD%,7
 
 [msi_addreg]
 HKR, "Interrupt Management", 0x00000010
@@ -68,11 +63,11 @@ HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported,   
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   17
 HKR, "Interrupt Management\Affinity" Policy, 0x00000010
 HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
-HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3
-HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1
+HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 2 ;IrqPriorityNormal
+HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
 
 [Parameters]
-HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001
+HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001    ;PCIBus
 HKR, Parameters, "BusType", %REG_DWORD%, 0x00000011           ;STORAGE_BUS_TYPE
 ;HKR, "Parameters\Device", Namespaces,         %REG_DWORD%, 0x00000010 ; max number of namespaces supported
 ;HKR, "Parameters\Device", AdmQDepth,         %REG_DWORD%, 0x00000040 ; admin queue size (num of entries)
