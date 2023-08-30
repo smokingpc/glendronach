@@ -39,7 +39,7 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE;
     init_data.TaggedQueuing = TRUE;
     init_data.MultipleRequestPerLu = TRUE;
-    init_data.NumberOfAccessRanges = 2;
+    init_data.NumberOfAccessRanges = ACCESS_RANGE_COUNT;
     // Specify support/use SRB Extension for Windows 8 and up
     init_data.SrbTypeFlags = SRB_TYPE_FLAG_STORAGE_REQUEST_BLOCK;
     

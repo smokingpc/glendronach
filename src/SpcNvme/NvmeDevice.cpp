@@ -380,13 +380,17 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     status = SetArbitration();
     if (!NT_SUCCESS(status))
         return status;
-    status = SetSyncHostTime();
-    if (!NT_SUCCESS(status))
-        return status;
     status = SetPowerManagement();
     if (!NT_SUCCESS(status))
         return status;
     status = SetAsyncEvent();
+    if (!NT_SUCCESS(status))
+        return status;
+
+    //no need to check optional feature
+    SetHostBuffer();
+    SetSyncHostTime();
+
     return status;
 }
 NTSTATUS CNvmeDevice::RestartController()
@@ -656,16 +660,57 @@ NTSTATUS CNvmeDevice::SetArbitration()
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetArbitration() still not implemented yet!!\n");
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT my_srbext = NULL;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    
+    my_srbext = new SPCNVME_SRBEXT();
+    srbext_ptr.Reset(my_srbext);
+    srbext_ptr->Init(this, NULL);
+
+    BuildCmd_SetArbitration(my_srbext);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+
+    do
+    {
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+
+    //It doesn't matter if this SetFeature failed.
+    //Just return succees back...
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetSyncHostTime()
+NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 {
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT my_srbext = srbext;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() still not implemented yet!!\n");
-    return STATUS_SUCCESS;
+    if (!CtrlIdent.ONCS.Timestamp)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetSyncHostTime() is not supported!!\n");
+        return STATUS_NOT_SUPPORTED;
+    }
+
+    if (NULL == srbext)
+    {
+        srbext_ptr.Reset(new SPCNVME_SRBEXT());
+        srbext_ptr->Init(this, NULL);
+        my_srbext = srbext_ptr.Get();
+    }
+
+    BuildCmd_SyncHostTime(my_srbext);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+
+    do
+    {
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+
+    return (SRB_STATUS_SUCCESS == my_srbext->SrbStatus);
 }
 NTSTATUS CNvmeDevice::SetPowerManagement()
 {
@@ -673,6 +718,14 @@ NTSTATUS CNvmeDevice::SetPowerManagement()
         return STATUS_INVALID_DEVICE_STATE;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetPowerManagement() still not implemented yet!!\n");
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::SetHostBuffer()
+{
+    if (!IsWorking())
+        return STATUS_INVALID_DEVICE_STATE;
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetHostBuffer() still not implemented yet!!\n");
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT& format)
@@ -1151,47 +1204,11 @@ bool CNvmeDevice::WaitForCtrlerShst(ULONG time_us)
 }
 void CNvmeDevice::InitVars()
 {
-    CtrlReg = NULL;
-    PortCfg = NULL;
-    Doorbells = NULL;
-
-    VendorID = 0;
-    DeviceID = 0;
-    State = NVME_STATE::STOP;
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-    TotalNumaNodes = 0;     //todo: query total numa nodes.
-    RegisteredIoQ = 0;
-    AllocatedIoQ = 0;
-    DesiredIoQ = NVME_CONST::IO_QUEUE_COUNT;
-    DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;        //should be updated by CAP, unit in micro-seconds
-    StallDelay = NVME_CONST::STALL_TIME_US;
-    AccessRangeCount = 0;
-    NamespaceCount = 0;
-    CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;
-    CoalescingTime = DEFAULT_INT_COALESCE_TIME;
-
-    ReadCacheEnabled = WriteCacheEnabled = false;
-
-    RtlZeroMemory(AccessRanges, sizeof(ACCESS_RANGE)* ACCESS_RANGE_COUNT);
-
-    MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
-    AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
-    IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
-    AdmQueue = NULL;
-    RtlZeroMemory(IoQueue, sizeof(CNvmeQueue*) * MAX_IO_QUEUE_COUNT);
     RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
-    RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
-    RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
-    RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
-    RtlZeroMemory(MsgGroupAffinity, sizeof(MsgGroupAffinity));
     for(ULONG i=0; i< NVME_CONST::MAX_INT_COUNT; i++)
     {
         MsgGroupAffinity[i].Mask = MAXULONG_PTR;
-    }
-
-    for(ULONG i=0; i< NVME_CONST::SUPPORT_NAMESPACES; i++)
-    {
-        memset(NsData + i, 0xFF, sizeof(NVME_IDENTIFY_NAMESPACE_DATA));
     }
 
     StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);

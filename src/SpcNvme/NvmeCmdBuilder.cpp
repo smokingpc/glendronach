@@ -153,9 +153,8 @@ void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext)
     cmd->u.SETFEATURES.CDW11.Arbitration.MPW = NVME_CONST::AB_MPW;
     cmd->u.SETFEATURES.CDW11.Arbitration.LPW = NVME_CONST::AB_LPW;
 }
-void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER *timestamp)
+void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext)
 {
-    UNREFERENCED_PARAMETER(timestamp);
     //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
     LARGE_INTEGER systime = { 0 };
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
@@ -170,21 +169,6 @@ void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER *timestamp)
     cmd->CDW0.CID = srbext->ScsiQTag();
     cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
-
-    //PVOID timestamp = NULL;
-    //ULONG size = PAGE_SIZE;
-    //ULONG status = StorPortAllocatePool(devext, size, TAG_GENBUF, &timestamp);
-    //if (STOR_STATUS_SUCCESS != status)
-    //    return FALSE;
-    //RtlZeroMemory(timestamp, size);
-    //RtlCopyMemory(timestamp, &elapsed, sizeof(LARGE_INTEGER));
-
-    //cmd.PRP1 = StorPortGetPhysicalAddress(devext, NULL, timestamp, &size).QuadPart;
-
-    ////implement wait
-    //return STATUS_INTERNAL_ERROR;
-    ////submit command
-    //bool ok = devext->AdminQueue->SubmitCmd(&cmd, NULL, CMD_CTX_TYPE::WAIT_EVENT);
 }
 
 void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info)

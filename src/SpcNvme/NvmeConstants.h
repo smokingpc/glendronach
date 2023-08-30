@@ -80,9 +80,9 @@ namespace NVME_CONST{
     static const UCHAR INTCOAL_THRESHOLD = 8;   //Interrupt Coalescing trigger threshold.
 
     static const UCHAR AB_BURST = 7;        //Arbitration Burst. 111b(0n7) is Unlimit.
-    static const UCHAR AB_HPW = 32 - 1;     //High Priority Weight. it is 0-based so need substract 1.
-    static const UCHAR AB_MPW = 16 - 1;     //Medium Priority Weight. it is 0-based so need substract 1.
-    static const UCHAR AB_LPW = 8 - 1;      //Low Priority Weight. it is 0-based so need substract 1.
+    static const UCHAR AB_HPW = 128 - 1;     //High Priority Weight. it is 0-based so need substract 1.
+    static const UCHAR AB_MPW = 64 - 1;     //Medium Priority Weight. it is 0-based so need substract 1.
+    static const UCHAR AB_LPW = 32 - 1;      //Low Priority Weight. it is 0-based so need substract 1.
 
     #pragma endregion
 };

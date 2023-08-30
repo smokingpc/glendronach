@@ -98,8 +98,9 @@ public:
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
     NTSTATUS SetArbitration();
-    NTSTATUS SetSyncHostTime();
+    NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
     NTSTATUS SetPowerManagement();
+    NTSTATUS SetHostBuffer();
     NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);
     NTSTATUS GetNamespaceBlockSize(ULONG nsid, ULONG& size);    //get LBA block size in Bytes
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
@@ -114,53 +115,53 @@ public:
     bool IsTeardown();
     bool IsStop();
 
-    bool ReadCacheEnabled;
-    bool WriteCacheEnabled;
-    BOOLEAN RebalancingPnp;
-    ULONG MinPageSize;
-    ULONG MaxPageSize;
-    ULONG MaxTxSize;
-    ULONG MaxTxPages;
-    NVME_STATE State;
+    bool ReadCacheEnabled = false;
+    bool WriteCacheEnabled = false;
+    BOOLEAN RebalancingPnp = FALSE;
+    ULONG MinPageSize = PAGE_SIZE;
+    ULONG MaxPageSize = PAGE_SIZE;
+    ULONG MaxTxSize = 0;
+    ULONG MaxTxPages = 0;
+    NVME_STATE State = NVME_STATE::STOP;
     ULONG RegisteredIoQ = 0;
     ULONG AllocatedIoQ = 0;
-    ULONG DesiredIoQ = 0;
+    ULONG DesiredIoQ = NVME_CONST::IO_QUEUE_COUNT;
 
-    ULONG DeviceTimeout;        //should be updated by CAP, unit in micro-seconds
-    ULONG StallDelay;
+    ULONG DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay = NVME_CONST::STALL_TIME_US;
 
-    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];         //AccessRange from miniport HwFindAdapter.
-    ULONG AccessRangeCount;
-    ULONG Bar0Size;
-    UCHAR MaxNamespaces;
-    USHORT IoDepth;
-    USHORT AdmDepth;
-    ULONG TotalNumaNodes;
-    ULONG NamespaceCount;       //how many namespace active in current device?
+    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = {0};         //AccessRange from miniport HwFindAdapter.
+    ULONG AccessRangeCount = 0;
+    ULONG Bar0Size = 0;
+    UCHAR MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
+    USHORT IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
+    USHORT AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    ULONG TotalNumaNodes = 0;
+    ULONG NamespaceCount = 0;       //how many namespace active in current device?
     
-    UCHAR CoalescingThreshold;  //how many interrupt should be coalesced into one interrupt?
-    UCHAR CoalescingTime;       //how long(time) should interrupts be coalesced?
+    UCHAR CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;  //how many interrupt should be coalesced into one interrupt?
+    UCHAR CoalescingTime = DEFAULT_INT_COALESCE_TIME;       //how long(100us unit) should interrupts be coalesced?
 
-    USHORT  VendorID;
-    USHORT  DeviceID;
-    ULONG   CpuCount;
+    USHORT  VendorID = 0;
+    USHORT  DeviceID = 0;
+    ULONG   CpuCount = 0;
 
-    NVME_VERSION                        NvmeVer;
-    NVME_CONTROLLER_CAPABILITIES        CtrlCap;
-    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent;
-    NVME_IDENTIFY_NAMESPACE_DATA        NsData[NVME_CONST::SUPPORT_NAMESPACES];
+    NVME_VERSION                        NvmeVer = {0};
+    NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
+    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};
+    NVME_IDENTIFY_NAMESPACE_DATA        NsData[NVME_CONST::SUPPORT_NAMESPACES] = {0};
     
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
-    PVOID                               RestartWorker;
+    PVOID                               RestartWorker = NULL;
     STOR_DPC                            RestartDpc;
-    GROUP_AFFINITY                      MsgGroupAffinity[NVME_CONST::MAX_INT_COUNT];
+    GROUP_AFFINITY                      MsgGroupAffinity[NVME_CONST::MAX_INT_COUNT] = {0};
 private:
-    PNVME_CONTROLLER_REGISTERS          CtrlReg;
-    PPORT_CONFIGURATION_INFORMATION     PortCfg;
-    ULONG *Doorbells;
-    PMSIX_TABLE_ENTRY MsixTable;
-    CNvmeQueue* AdmQueue;
-    CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
+    PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
+    PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;
+    ULONG *Doorbells = NULL;
+    PMSIX_TABLE_ENTRY MsixTable = NULL;
+    CNvmeQueue* AdmQueue = NULL;
+    CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT] = {0};
 
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
