@@ -63,9 +63,6 @@ namespace NVME_CONST{
     static const ULONG DEFAULT_MAX_TXSIZE = 131072;
     static const USHORT MAX_CID = MAXUSHORT-1;  //0xFFFF is invalid 
     static const ULONG MAX_NS_COUNT = 1024;     //Max NameSpace count. defined in NVMe spec.
-    //static const ULONG MAX_CONCURRENT_IO = 1024;
-    //static const USHORT SQ_CMD_SIZE = sizeof(NVME_COMMAND);
-    //static const USHORT SQ_CMD_SIZE_SHIFT = 6; //sizeof(NVME_COMMAND) is 64 bytes == 2^6
     static const ULONG CPL_ALL_ENTRY = MAXULONG;
     static const ULONG INIT_DBL_VALUE = 0;
     static const ULONG INVALID_DBL_VALUE = (ULONG)MAXUSHORT;
@@ -84,5 +81,6 @@ namespace NVME_CONST{
     static const UCHAR AB_MPW = 64 - 1;     //Medium Priority Weight. it is 0-based so need substract 1.
     static const UCHAR AB_LPW = 32 - 1;      //Low Priority Weight. it is 0-based so need substract 1.
 
+    static const UCHAR ASYNC_EVENT_LIMIT = 3;
     #pragma endregion
 };

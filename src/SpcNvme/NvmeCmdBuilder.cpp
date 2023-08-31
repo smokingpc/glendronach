@@ -163,7 +163,6 @@ void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER &timestamp)
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
     BuildPrp(srbext, cmd, &timestamp.QuadPart, sizeof(LARGE_INTEGER));
 }
-
 void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;

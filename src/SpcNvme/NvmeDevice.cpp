@@ -380,12 +380,14 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     ASSERT(NT_SUCCESS(status));
     status = SetPowerManagement();
     ASSERT(NT_SUCCESS(status));
-    status = SetAsyncEvent();
-    ASSERT(NT_SUCCESS(status));
+    //status = SetAsyncEvent();
+    //ASSERT(NT_SUCCESS(status));
     status = SetHostBuffer();
     ASSERT(NT_SUCCESS(status));
     status = SetSyncHostTime();
     ASSERT(NT_SUCCESS(status));
+
+    RequestAsyncEvent();
 
     return STATUS_SUCCESS;
 }
@@ -650,6 +652,20 @@ NTSTATUS CNvmeDevice::SetAsyncEvent()
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
     return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::RequestAsyncEvent()
+{
+    if (!IsWorking())
+        return STATUS_INVALID_DEVICE_STATE;
+
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> my_srbext(new SPCNVME_SRBEXT());
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    my_srbext->Init(this, NULL);
+    my_srbext->NvmeCmd.CDW0.OPC = NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST;
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    if(NT_SUCCESS(status))
+        InterlockedIncrement(&OutstandAsyncEvent);
+    return status;
 }
 NTSTATUS CNvmeDevice::SetArbitration()
 {
@@ -1236,6 +1252,8 @@ void CNvmeDevice::InitVars()
     VendorID = 0;
     DeviceID = 0;
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+    OutstandAsyncEvent = 0;
+    MaxAsyncEvent = NVME_CONST::ASYNC_EVENT_LIMIT;
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
     RestartWorker = NULL;
     RestartDpc;

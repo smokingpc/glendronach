@@ -97,6 +97,7 @@ public:
     NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
+    NTSTATUS RequestAsyncEvent();
     NTSTATUS SetArbitration();
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
     NTSTATUS SetPowerManagement();
@@ -145,6 +146,8 @@ public:
     USHORT  VendorID = 0;
     USHORT  DeviceID = 0;
     ULONG   CpuCount = 0;
+    long    OutstandAsyncEvent = 0;
+    volatile long    MaxAsyncEvent = 0;
 
     NVME_VERSION                        NvmeVer = {0};
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
