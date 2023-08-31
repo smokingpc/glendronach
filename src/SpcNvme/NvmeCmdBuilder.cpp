@@ -153,22 +153,15 @@ void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext)
     cmd->u.SETFEATURES.CDW11.Arbitration.MPW = NVME_CONST::AB_MPW;
     cmd->u.SETFEATURES.CDW11.Arbitration.LPW = NVME_CONST::AB_LPW;
 }
-void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext)
+void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER &timestamp)
 {
-    //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
-    LARGE_INTEGER systime = { 0 };
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
-    LARGE_INTEGER elapsed = { 0 };
-
-    KeQuerySystemTime(&systime);
-    RtlTimeToSecondsSince1970(&systime, &elapsed.LowPart);
-    elapsed.QuadPart = elapsed.LowPart * 1000;
-
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
     cmd->CDW0.CID = srbext->ScsiQTag();
     cmd->NSID = NVME_CONST::UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
+    BuildPrp(srbext, cmd, &timestamp.QuadPart, sizeof(LARGE_INTEGER));
 }
 
 void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info)

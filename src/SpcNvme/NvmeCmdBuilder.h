@@ -54,7 +54,7 @@ void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
 
 void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR interval);
 void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext);
-void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext);
+void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER& timestamp);
 void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
 void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
 

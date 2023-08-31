@@ -375,23 +375,19 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     //todo: add HostBuffer and AsyncEvent supports
     status = SetInterruptCoalescing();
-    if (!NT_SUCCESS(status))
-        return status;
+    ASSERT(NT_SUCCESS(status));
     status = SetArbitration();
-    if (!NT_SUCCESS(status))
-        return status;
+    ASSERT(NT_SUCCESS(status));
     status = SetPowerManagement();
-    if (!NT_SUCCESS(status))
-        return status;
+    ASSERT(NT_SUCCESS(status));
     status = SetAsyncEvent();
-    if (!NT_SUCCESS(status))
-        return status;
-
-    //no need to check optional feature
+    ASSERT(NT_SUCCESS(status));
     status = SetHostBuffer();
+    ASSERT(NT_SUCCESS(status));
     status = SetSyncHostTime();
+    ASSERT(NT_SUCCESS(status));
 
-    return status;
+    return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RestartController()
 {
@@ -702,7 +698,14 @@ NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
         my_srbext = srbext_ptr.Get();
     }
 
-    BuildCmd_SyncHostTime(my_srbext);
+    //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
+    LARGE_INTEGER systime = { 0 };
+    LARGE_INTEGER elapsed = { 0 };
+    KeQuerySystemTime(&systime);
+    RtlTimeToSecondsSince1970(&systime, &elapsed.LowPart);
+    elapsed.QuadPart = elapsed.LowPart * 1000;
+
+    BuildCmd_SyncHostTime(my_srbext, elapsed);
     status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
 
     do
