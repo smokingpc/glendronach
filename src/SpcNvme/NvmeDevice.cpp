@@ -388,8 +388,8 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
         return status;
 
     //no need to check optional feature
-    SetHostBuffer();
-    SetSyncHostTime();
+    status = SetHostBuffer();
+    status = SetSyncHostTime();
 
     return status;
 }

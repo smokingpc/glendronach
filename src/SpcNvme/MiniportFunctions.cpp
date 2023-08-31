@@ -78,10 +78,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     return SP_RETURN_FOUND;
 
 error:
-//any return code which is not SP_RETURN_FOUND causes driver installation hanging?
-//I don't know why so fail this driver later....
+//return SP_RETURN_NOT_FOUND causes driver installation hanging?
+//I don't know why ....
     nvme->Teardown();
-    //SP_RETURN_NOT_FOUND will cause driver installation hanging...?
     return SP_RETURN_ERROR;
 }
 
