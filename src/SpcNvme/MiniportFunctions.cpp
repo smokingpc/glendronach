@@ -75,7 +75,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
     FillPortConfiguration(port_cfg, nvme);
-    nvme->RebalancingPnp = FALSE;
     return SP_RETURN_FOUND;
 
 error:

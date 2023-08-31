@@ -193,7 +193,7 @@ bool CNvmeDevice::GetMsixTable()
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
-    if(NVME_STATE::STOP != State)
+    if(NVME_STATE::STOP != State && !this->RebalancingPnp)
         return STATUS_INVALID_DEVICE_STATE;
 
     State = NVME_STATE::SETUP;
@@ -1204,8 +1204,53 @@ bool CNvmeDevice::WaitForCtrlerShst(ULONG time_us)
 }
 void CNvmeDevice::InitVars()
 {
+    ReadCacheEnabled = false;
+    WriteCacheEnabled = false;
+    RebalancingPnp = FALSE;
+    MinPageSize = PAGE_SIZE;
+    MaxPageSize = PAGE_SIZE;
+    MaxTxSize = 0;
+    MaxTxPages = 0;
+    State = NVME_STATE::STOP;
+    RegisteredIoQ = 0;
+    AllocatedIoQ = 0;
+    DesiredIoQ = NVME_CONST::IO_QUEUE_COUNT;
+
+    DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
+    StallDelay = NVME_CONST::STALL_TIME_US;
+
+    AccessRangeCount = 0;
+    Bar0Size = 0;
+    MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
+    IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
+    AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    TotalNumaNodes = 0;
+    NamespaceCount = 0;       //how many namespace active in current device?
+
+    CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;  //how many interrupt should be coalesced into one interrupt?
+    CoalescingTime = DEFAULT_INT_COALESCE_TIME;       //how long(100us unit) should interrupts be coalesced?
+
+    VendorID = 0;
+    DeviceID = 0;
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+    //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
+    RestartWorker = NULL;
+    RestartDpc;
+    CtrlReg = NULL;
+    PortCfg = NULL;
+    Doorbells = NULL;
+    MsixTable = NULL;
+    AdmQueue = NULL;
+    
     RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
+    RtlZeroMemory(MsgGroupAffinity, sizeof(MsgGroupAffinity));
+    RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
+    RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
+    RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+    RtlZeroMemory(NsData, sizeof(NsData));
+    RtlZeroMemory(AccessRanges, sizeof(AccessRanges));
+    RtlZeroMemory(IoQueue, sizeof(IoQueue));
+
     for(ULONG i=0; i< NVME_CONST::MAX_INT_COUNT; i++)
     {
         MsgGroupAffinity[i].Mask = MAXULONG_PTR;
