@@ -214,8 +214,6 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 {
     //DPC is global scope mutex?
     PNVME_COMPLETION_ENTRY cpl = &CplQ_VA[CplHead];
-    PSPCNVME_SRBEXT srbext = NULL;
-    USHORT cid = 0;
     ULONG update_count = 0;
 
     if(0 == max_count)
@@ -223,25 +221,16 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 
     while(NewCplArrived(cpl, this->PhaseTag))
     {
-        cid = cpl->DW3.CID;
         SubHead = cpl->DW2.SQHD;
-        History.Pop(cid, srbext);
-
-        if (NULL != srbext)
-        {
-            RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
-            if (srbext->CompletionCB)
-                srbext->CompletionCB(srbext);
-
-            srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
-            srbext->CleanUp();
-            InterlockedDecrement(&InflightCmds);
-        }
+        if(QUEUE_TYPE::ADM_QUEUE == this->Type && 0 != cpl->DW0)
+            HandleAsyncEvent(cpl);
         else
-            DbgBreakPoint();
+        {
+            HandleSrbCmd(cpl);
+            update_count++; //only count the SrbCmd as completion
+        }
 
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
-        update_count++;
         cpl = &CplQ_VA[CplHead];
         if(max_count <= update_count)
             break;
@@ -249,6 +238,35 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 
     if(update_count != 0)
         WriteDbl(DevExt, CplDbl, CplHead);
+}
+void CNvmeQueue::HandleSrbCmd(PNVME_COMPLETION_ENTRY cpl)
+{
+    PSPCNVME_SRBEXT srbext = NULL;
+    USHORT cid = cpl->DW3.CID;
+
+    History.Pop(cid, srbext);
+    if (NULL != srbext)
+    {
+        RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
+        if (srbext->CompletionCB)
+            srbext->CompletionCB(srbext);
+
+        srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
+        srbext->CleanUp();
+        InterlockedDecrement(&InflightCmds);
+    }
+    else
+        DbgBreakPoint();
+}
+void CNvmeQueue::HandleAsyncEvent(PNVME_COMPLETION_ENTRY cpl)
+{
+    //todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
+    PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event = 
+        (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&cpl->DW0;
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => EventType=%d, EventInfo=%d, LogPage=%d\n",
+                event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
+    ((CNvmeDevice*)this->DevExt)->RequestAsyncEvent();
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  

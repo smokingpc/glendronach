@@ -151,11 +151,6 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
-inline void CNvmeDevice::UpdateMaxTxSize()
-{
-    this->MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * this->MinPageSize);
-    this->MaxTxPages = (ULONG)(this->MaxTxSize / PAGE_SIZE);
-}
 #if 0
 ULONG CNvmeDevice::MinPageSize()
 {
@@ -373,22 +368,21 @@ NTSTATUS CNvmeDevice::InitNvmeStage1()
 NTSTATUS CNvmeDevice::InitNvmeStage2()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    //todo: add HostBuffer and AsyncEvent supports
     status = SetInterruptCoalescing();
     ASSERT(NT_SUCCESS(status));
     status = SetArbitration();
     ASSERT(NT_SUCCESS(status));
     status = SetPowerManagement();
     ASSERT(NT_SUCCESS(status));
-    //status = SetAsyncEvent();
-    //ASSERT(NT_SUCCESS(status));
     status = SetHostBuffer();
     ASSERT(NT_SUCCESS(status));
     status = SetSyncHostTime();
     ASSERT(NT_SUCCESS(status));
+    status = SetAsyncEvent();
+    ASSERT(NT_SUCCESS(status));
 
-    RequestAsyncEvent();
-
+    for(; OutstandAsyncEvent < MaxAsyncEvent; OutstandAsyncEvent++)
+        RequestAsyncEvent();
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RestartController()
@@ -489,7 +483,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_
 
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
     {
-        UpdateMaxTxSize();
+        UpdateParamsByCtrlIdent();
         status = STATUS_SUCCESS;
     }
     else
@@ -616,11 +610,11 @@ END:
 }
 NTSTATUS CNvmeDevice::SetInterruptCoalescing()
 {
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
-    return STATUS_SUCCESS;
-#if 0
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
+
+    if (0 == CoalescingTime && 0 == CoalescingThreshold)
+        return STATUS_SUCCESS;
 
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> my_srbext(new SPCNVME_SRBEXT());
     NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -643,15 +637,36 @@ NTSTATUS CNvmeDevice::SetInterruptCoalescing()
         status = STATUS_UNSUCCESSFUL;
 
     return status;
-#endif
 }
 NTSTATUS CNvmeDevice::SetAsyncEvent()
 {
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "SetAsyncEvent() still not implemented yet!!\n");
-    return STATUS_SUCCESS;
+    //Only support SMART health / critical AsyncEvent now.
+    //No checking CtrlIdent.OAES fields.
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, DEV_POOL_TAG> srbext_ptr;
+    PSPCNVME_SRBEXT my_srbext = NULL;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+    my_srbext = new SPCNVME_SRBEXT();
+    srbext_ptr.Reset(my_srbext);
+    srbext_ptr->Init(this, NULL);
+
+    BuildCmd_SetAsyncEvent(my_srbext);
+    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+
+    do
+    {
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+
+    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+        status = STATUS_SUCCESS;
+    else
+        status = STATUS_UNSUCCESSFUL;
+
+    return status;
 }
 NTSTATUS CNvmeDevice::RequestAsyncEvent()
 {
@@ -688,9 +703,12 @@ NTSTATUS CNvmeDevice::SetArbitration()
         StorPortStallExecution(StallDelay);
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
-    //It doesn't matter if this SetFeature failed.
-    //Just return succees back...
-    return STATUS_SUCCESS;
+    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+        status = STATUS_SUCCESS;
+    else
+        status = STATUS_UNSUCCESSFUL;
+
+    return status;
 }
 NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
 {
@@ -729,7 +747,12 @@ NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
         StorPortStallExecution(StallDelay);
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
-    return (SRB_STATUS_SUCCESS == my_srbext->SrbStatus);
+    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+        status = STATUS_SUCCESS;
+    else
+        status = STATUS_UNSUCCESSFUL;
+
+    return status;
 }
 NTSTATUS CNvmeDevice::SetPowerManagement()
 {
@@ -1372,6 +1395,12 @@ NTSTATUS CNvmeDevice::DeleteIoQ()
 
     RtlZeroMemory(IoQueue, sizeof(CNvmeQueue*) * MAX_IO_QUEUE_COUNT);
     return STATUS_SUCCESS;
+}
+void CNvmeDevice::UpdateParamsByCtrlIdent()
+{
+    this->MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * this->MinPageSize);
+    this->MaxTxPages = (ULONG)(this->MaxTxSize / PAGE_SIZE);
+    this->MaxAsyncEvent = min(DEFAULT_ASYNC_EVENT_COUNT, this->CtrlIdent.AERL);
 }
 
 #pragma endregion

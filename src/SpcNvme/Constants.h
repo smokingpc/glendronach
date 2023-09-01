@@ -60,8 +60,9 @@
 #pragma endregion
 
 #pragma region  ======== NVME ========
-#define DEFAULT_INT_COALESCE_COUNT  10
-#define DEFAULT_INT_COALESCE_TIME   2    //in 100us unit
+#define DEFAULT_INT_COALESCE_COUNT  0
+#define DEFAULT_INT_COALESCE_TIME   0    //in 100us unit
+#define DEFAULT_ASYNC_EVENT_COUNT   3
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========

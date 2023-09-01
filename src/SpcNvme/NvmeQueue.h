@@ -110,6 +110,9 @@ public:
     
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
     void CompleteCmd(ULONG max_count = 0);
+    void HandleSrbCmd(PNVME_COMPLETION_ENTRY cpl);
+    void HandleAsyncEvent(PNVME_COMPLETION_ENTRY cpl);
+
     void ResetAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);
