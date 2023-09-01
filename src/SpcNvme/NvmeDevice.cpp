@@ -151,6 +151,12 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
     sub = (PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL)&Doorbells[qid*2];
     cpl = (PNVME_COMPLETION_QUEUE_HEAD_DOORBELL)&Doorbells[qid*2+1];
 }
+inline USHORT CNvmeDevice::NextAsyncEventCid()
+{
+    USHORT ret = (USHORT) ((InterlockedIncrement(&AsyncEventCid) 
+                                % NVME_CONST::MAX_IO_PER_LU) | 0x8000);
+    return ret;
+}
 #if 0
 ULONG CNvmeDevice::MinPageSize()
 {
@@ -381,8 +387,8 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     status = SetAsyncEvent();
     ASSERT(NT_SUCCESS(status));
 
-    for(; OutstandAsyncEvent < MaxAsyncEvent; OutstandAsyncEvent++)
-        RequestAsyncEvent();
+    //for(; OutstandAsyncEvent < MaxAsyncEvent; OutstandAsyncEvent++)
+    RequestAsyncEvent();
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RestartController()
@@ -677,7 +683,8 @@ NTSTATUS CNvmeDevice::RequestAsyncEvent()
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     my_srbext->Init(this, NULL);
     my_srbext->NvmeCmd.CDW0.OPC = NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST;
-    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    my_srbext->NvmeCmd.CDW0.CID = NextAsyncEventCid();
+    status = SubmitAdmCmd(NULL, &my_srbext->NvmeCmd);
     if(NT_SUCCESS(status))
         InterlockedIncrement(&OutstandAsyncEvent);
     return status;
@@ -822,7 +829,7 @@ NTSTATUS CNvmeDevice::SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
 }
 NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
 {
-    if (!IsWorking() || NULL == IoQueue)
+    if (!IsWorking() || NULL == IoQueue || 0 == RegisteredIoQ)
         return STATUS_DEVICE_NOT_READY;
 
     ULONG cpu_idx = KeGetCurrentProcessorNumberEx(NULL);
@@ -1277,6 +1284,7 @@ void CNvmeDevice::InitVars()
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
     OutstandAsyncEvent = 0;
     MaxAsyncEvent = NVME_CONST::ASYNC_EVENT_LIMIT;
+    AsyncEventCid = 1;
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
     RestartWorker = NULL;
     RestartDpc;

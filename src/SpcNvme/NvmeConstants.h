@@ -52,7 +52,7 @@ namespace NVME_CONST{
     static const ULONG DEFAULT_CTRLID = 1;
     static const UCHAR MAX_TARGETS = 1;
     static const UCHAR MAX_LU = 1;
-    static const ULONG MAX_IO_PER_LU = 512;
+    static const ULONG MAX_IO_PER_LU = 1024;
     static const UCHAR IOSQES = 6; //sizeof(NVME_COMMAND)==64 == 2^6, so IOSQES== 6.
     static const UCHAR IOCQES = 4; //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
     static const UCHAR ADMIN_QUEUE_DEPTH = 64;  //how many entries does the admin queue have?

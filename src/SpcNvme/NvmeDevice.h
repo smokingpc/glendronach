@@ -148,7 +148,7 @@ public:
     ULONG   CpuCount = 0;
     long    OutstandAsyncEvent = 0;
     volatile long    MaxAsyncEvent = 0;
-
+    volatile long    AsyncEventCid = 0;
     NVME_VERSION                        NvmeVer = {0};
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};
@@ -212,6 +212,7 @@ private:
     BOOLEAN IsControllerEnabled(bool barrier = true);
     BOOLEAN IsControllerReady(bool barrier = true);
     void UpdateParamsByCtrlIdent();
+    USHORT NextAsyncEventCid();
     //void DoQueueCompletion(CNvmeQueue* queue);
 };
 
