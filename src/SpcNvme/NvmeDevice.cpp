@@ -154,7 +154,8 @@ inline void CNvmeDevice::GetQueueDbl(ULONG qid, PNVME_SUBMISSION_QUEUE_TAIL_DOOR
 inline USHORT CNvmeDevice::NextAsyncEventCid()
 {
     USHORT ret = (USHORT) ((InterlockedIncrement(&AsyncEventCid) 
-                                % NVME_CONST::MAX_IO_PER_LU) | 0x8000);
+                                % DEFAULT_ASYNC_EVENT_COUNT) | ASYNC_EVENT_CID_FLAG);
+
     return ret;
 }
 #if 0

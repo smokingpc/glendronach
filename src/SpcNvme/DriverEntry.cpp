@@ -18,18 +18,18 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.HwInitialize = HwInitialize;
     init_data.HwBuildIo = HwBuildIo;
     init_data.HwStartIo = HwStartIo;
-    init_data.HwFindAdapter = HwFindAdapter;        //AddDevice() + IRP_MJ_PNP +  IRP_MN_READ_CONFIG
+    init_data.HwFindAdapter = HwFindAdapter;        //AddDevice() + IRP_MJ_PNP +  IRP_MN_READ_CONFIG...blahblah
     init_data.HwResetBus = HwResetBus;
     init_data.HwAdapterControl = HwAdapterControl;
     //init_data.HwUnitControl = HwUnitControl;
     init_data.HwTracingEnabled = HwTracingEnabled;
     init_data.HwCleanupTracing = HwCleanupTracing;
 
-    //IRP_MJ_DEVICE_CONTROL + IOCTL code == IOCTL_MINIPORT_PROCESS_SERVICE_IRP
+    //IRP_MJ_DEVICE_CONTROL + IOCTL code IOCTL_MINIPORT_PROCESS_SERVICE_IRP == IOCTL_MINIPORT_PROCESS_SERVICE_IRP
     //to prevent IOCTL request in DPC_LEVEL, define another IOCTL to make sure it is processed in PASSIVE.
     //so define this IOCTL_MINIPORT_PROCESS_SERVICE_IRP
     init_data.HwProcessServiceRequest = HwProcessServiceRequest;
-    //complete NOT FINISHED IRP received in HwProcessServiceRequest. it called when device removed
+    //complete NOT FINISHED IRP received in HwProcessServiceRequest. it called when device removing
     init_data.HwCompleteServiceIrp = HwCompleteServiceIrp;
 
     // Specifiy adapter specific information.
@@ -50,7 +50,11 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     //  STOR_FEATURE_DUMP_RESUME_CAPABLE
     //  STOR_FEATURE_DEVICE_NAME_NO_SUFFIX
     //  STOR_FEATURE_DUMP_POINTERS
-    init_data.FeatureSupport = STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES | STOR_FEATURE_NVME;
+    init_data.FeatureSupport =
+            STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER |
+            STOR_FEATURE_EXTRA_IO_INFORMATION |         //what is this?
+            STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES | 
+            STOR_FEATURE_NVME;
 
     /* Set required extension sizes. */
     init_data.DeviceExtensionSize = sizeof(CNvmeDevice);

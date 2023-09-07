@@ -241,7 +241,7 @@ BOOLEAN HwResetBus(
     //miniport driver is responsible for completing SRBs received by HwStorStartIo for 
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
     CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
-    DbgBreakPoint();
+    KdBreakPoint();
     nvme->ResetOutstandingCmds();
     return TRUE;
 }

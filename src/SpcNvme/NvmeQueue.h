@@ -110,9 +110,6 @@ public:
     
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
     void CompleteCmd(ULONG max_count = 0);
-    void HandleSrbCmd(PNVME_COMPLETION_ENTRY cpl);
-    void HandleAsyncEvent(PNVME_COMPLETION_ENTRY cpl);
-
     void ResetAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);
@@ -145,6 +142,8 @@ public:
     QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
     USHORT HistoryDepth = 0;
     CCmdHistory History;
+    CCmdHistory AseHistory;
+//    PSPCNVME_SRBEXT AsyncEventHistory[DEFAULT_ASYNC_EVENT_COUNT] = {0};
 
     ULONG SubTail = NVME_CONST::INIT_DBL_VALUE;
     ULONG SubHead = NVME_CONST::INIT_DBL_VALUE;
@@ -154,7 +153,6 @@ public:
     PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
 
     KSPIN_LOCK SubLock;
-    //bool IsDoingCpl;
 
     bool IsSafeForSubmit();
     ULONG ReadSubTail();

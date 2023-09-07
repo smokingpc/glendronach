@@ -90,7 +90,6 @@ VOID CNvmeQueue::QueueCplDpcRoutine(
 
 CNvmeQueue::CNvmeQueue()
 {
-    KeInitializeSpinLock(&SubLock);
 }
 CNvmeQueue::CNvmeQueue(QUEUE_PAIR_CONFIG* config)
     : CNvmeQueue()
@@ -118,6 +117,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     HistoryDepth = config->HistoryDepth;
     //Todo: StorPortNotification(SetTargetProcessorDpc)
     StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
+    KeInitializeSpinLock(&SubLock);
 
     if(NULL == Buffer)
     {
@@ -143,10 +143,11 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
 
     status = History.Setup(this, this->DevExt, this->HistoryDepth, this->NumaNode);
     if (!NT_SUCCESS(status))
-    {
-        //status = STATUS_INTERNAL_ERROR;
         goto ERROR;
-    }
+
+    status = AseHistory.Setup(this, this->DevExt, DEFAULT_ASYNC_EVENT_COUNT, this->NumaNode);
+    if (!NT_SUCCESS(status))
+        goto ERROR;
 
     IsReady = true;
     return STATUS_SUCCESS;
@@ -159,6 +160,7 @@ void CNvmeQueue::Teardown()
     this->IsReady = false;
     DeallocQueueBuffer();
     History.Teardown();
+    AseHistory.Teardown();
 }
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
@@ -174,11 +176,20 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         return STATUS_DEVICE_BUSY;
 
     cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
-    ASSERT(cid == src_cmd->CDW0.CID);
-    status = History.Push(cid, srbext);
+
+    if(0 != (cid & ASYNC_EVENT_CID_FLAG))
+    {
+        cid = (cid ^ ASYNC_EVENT_CID_FLAG);
+        status = AseHistory.Push(cid, srbext);
+    }
+    else
+    {
+        status = History.Push(cid, srbext);
+    }
+
     if (STATUS_ALREADY_COMMITTED == status)
     {
-        DbgBreakPoint();
+        KdBreakPoint();
         //old cmd is timed out, release it...
         PSPCNVME_SRBEXT old_srbext = NULL;
         History.Pop(cid, old_srbext);
@@ -221,13 +232,45 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 
     while(NewCplArrived(cpl, this->PhaseTag))
     {
+        PSPCNVME_SRBEXT srbext = NULL;
+        USHORT cid = cpl->DW3.CID;
+        BOOLEAN IsAsyncEvent = FALSE;
         SubHead = cpl->DW2.SQHD;
-        if(QUEUE_TYPE::ADM_QUEUE == this->Type && 0 != cpl->DW0)
-            HandleAsyncEvent(cpl);
+        if(QUEUE_TYPE::ADM_QUEUE == this->Type && 0 != (cid & ASYNC_EVENT_CID_FLAG))
+        { 
+            cid = (cid ^ ASYNC_EVENT_CID_FLAG);
+            AseHistory.Pop(cid, srbext);
+            IsAsyncEvent = TRUE;
+
+            //todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
+            PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event =
+                (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&cpl->DW0;
+
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => EventType=%d, EventInfo=%d, LogPage=%d\n",
+                event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
+            ((CNvmeDevice*)this->DevExt)->RequestAsyncEvent();
+        }
         else
         {
-            HandleSrbCmd(cpl);
+            History.Pop(cid, srbext);
             update_count++; //only count the SrbCmd as completion
+        }
+
+        if (NULL != srbext)
+        {
+            RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
+            if (srbext->CompletionCB)
+                srbext->CompletionCB(srbext);
+
+            srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
+            srbext->CleanUp();
+
+            if(!IsAsyncEvent)
+                InterlockedDecrement(&InflightCmds);
+        }
+        else
+        {
+            KdBreakPoint();
         }
 
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
@@ -238,35 +281,6 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 
     if(update_count != 0)
         WriteDbl(DevExt, CplDbl, CplHead);
-}
-void CNvmeQueue::HandleSrbCmd(PNVME_COMPLETION_ENTRY cpl)
-{
-    PSPCNVME_SRBEXT srbext = NULL;
-    USHORT cid = cpl->DW3.CID;
-
-    History.Pop(cid, srbext);
-    if (NULL != srbext)
-    {
-        RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
-        if (srbext->CompletionCB)
-            srbext->CompletionCB(srbext);
-
-        srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
-        srbext->CleanUp();
-        InterlockedDecrement(&InflightCmds);
-    }
-    else
-        DbgBreakPoint();
-}
-void CNvmeQueue::HandleAsyncEvent(PNVME_COMPLETION_ENTRY cpl)
-{
-    //todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
-    PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event = 
-        (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&cpl->DW0;
-
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => EventType=%d, EventInfo=%d, LogPage=%d\n",
-                event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
-    ((CNvmeDevice*)this->DevExt)->RequestAsyncEvent();
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  
@@ -470,14 +484,14 @@ NTSTATUS CCmdHistory::Pop(ULONG index, PSPCNVME_SRBEXT& srbext)
 {
     if (index >= Depth)
     {
-        DbgBreakPoint();
+        KdBreakPoint();
         return STATUS_UNSUCCESSFUL;
     }
 
     srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer((volatile PVOID*)&History[index], NULL);
     if(NULL == srbext)
     {
-        DbgBreakPoint();
+        KdBreakPoint();
         return STATUS_INVALID_DEVICE_STATE;
     }
     return STATUS_SUCCESS;

@@ -213,6 +213,5 @@ private:
     BOOLEAN IsControllerReady(bool barrier = true);
     void UpdateParamsByCtrlIdent();
     USHORT NextAsyncEventCid();
-    //void DoQueueCompletion(CNvmeQueue* queue);
 };
 
