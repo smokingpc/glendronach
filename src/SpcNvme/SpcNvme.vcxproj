@@ -275,6 +275,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AdapterPnpHandler.cpp" />
+    <ClCompile Include="HandleUnitControl.cpp" />
     <ClCompile Include="IoctlScsiMiniport_Handlers.cpp" />
     <ClCompile Include="HandleAdapterControl.cpp" />
     <ClCompile Include="Ioctl_FirmwareFunctions.cpp" />

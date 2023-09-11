@@ -95,6 +95,9 @@
     <ClCompile Include="Ioctl_FirmwareFunctions.cpp">
       <Filter>StartIo_Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="HandleUnitControl.cpp">
+      <Filter>MiniportFunction</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">

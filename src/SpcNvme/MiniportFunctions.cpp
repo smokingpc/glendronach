@@ -254,7 +254,6 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
 )
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(ControlType);
     UNREFERENCED_PARAMETER(Parameters);
     SCSI_ADAPTER_CONTROL_STATUS status = ScsiAdapterControlUnsuccessful;
     CNvmeDevice *nvme = (CNvmeDevice*)DeviceExtension;
@@ -317,6 +316,25 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
       status = ScsiAdapterControlSuccess;
       break;
     }
+
+    case ScsiSetBootConfig:
+    case ScsiSetRunningConfig:
+    case ScsiAdapterPoFxPowerRequired:
+    case ScsiAdapterPoFxPowerActive:
+    case ScsiAdapterPoFxPowerSetFState:
+    case ScsiAdapterPoFxPowerControl:
+    case ScsiAdapterPrepareForBusReScan:
+    case ScsiAdapterSystemPowerHints:
+    case ScsiAdapterFilterResourceRequirements:
+    case ScsiAdapterPoFxMaxOperationalPower:
+    case ScsiAdapterPoFxSetPerfState:
+    case ScsiAdapterSerialNumber:
+    case ScsiAdapterCryptoOperation:
+    case ScsiAdapterQueryFruId:
+    case ScsiAdapterSetEventLogging:
+        status = ScsiAdapterControlSuccess;
+        break;
+
 
 #pragma region === Some explain of un-implemented control codes ===
     //If STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER is set in HW_INITIALIZATION_DATA of DriverEntry,
@@ -398,13 +416,36 @@ SCSI_UNIT_CONTROL_STATUS HwUnitControl(
     _In_ PVOID Parameters
 )
 {
-    UNREFERENCED_PARAMETER(DeviceExtension);
-    UNREFERENCED_PARAMETER(ControlType);
     UNREFERENCED_PARAMETER(Parameters);
+    SCSI_UNIT_CONTROL_STATUS status = ScsiUnitControlUnsuccessful;
+    CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
+    UNREFERENCED_PARAMETER(nvme);
 
     //UnitControl is very similar as AdapterControl.
     //First call will query "ScsiQuerySupportedControlTypes", then 
     //miniport need fill corresponding element to report.
+    switch(ControlType)
+    {
+    case ScsiQuerySupportedUnitControlTypes:
+        status = ScsiUnitControlSuccess;
+        break;
+    case ScsiUnitUsage:
+    case ScsiUnitStart:
+    case ScsiUnitPower:
+    case ScsiUnitPoFxPowerInfo:
+    case ScsiUnitPoFxPowerRequired:
+    case ScsiUnitPoFxPowerActive:
+    case ScsiUnitPoFxPowerSetFState:
+    case ScsiUnitPoFxPowerControl:
+    case ScsiUnitRemove:
+    case ScsiUnitSurpriseRemoval:
+    case ScsiUnitRichDescription:
+    case ScsiUnitQueryBusType:
+    case ScsiUnitQueryFruId:
+        status = ScsiUnitControlSuccess;
+        break;
+    }
+
 
     //ScsiUnitStart => a unit is starting up (disk spin up?)
     //ScsiUnitPower => unit power on or off, [Parameters] arg is STOR_UNIT_CONTROL_POWER*
@@ -415,7 +456,7 @@ SCSI_UNIT_CONTROL_STATUS HwUnitControl(
     //1.Power States
     //2.Device Start
     //3.Device Remove and Surprise Remove
-    return ScsiUnitControlSuccess;
+    return status;
 }
 
 _Use_decl_annotations_

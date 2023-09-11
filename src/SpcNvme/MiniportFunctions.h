@@ -58,3 +58,6 @@ HW_CLEANUP_TRACING HwCleanupTracing;
 SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
     PSCSI_SUPPORTED_CONTROL_TYPE_LIST list);
 SCSI_ADAPTER_CONTROL_STATUS Handle_RestartAdapter(CNvmeDevice* devext);
+
+SCSI_UNIT_CONTROL_STATUS Handle_QuerySupportedUnitControl(
+    PSCSI_SUPPORTED_CONTROL_TYPE_LIST list);
