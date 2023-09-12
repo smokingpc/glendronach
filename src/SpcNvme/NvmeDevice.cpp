@@ -388,7 +388,6 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     status = SetAsyncEvent();
     ASSERT(NT_SUCCESS(status));
 
-    //for(; OutstandAsyncEvent < MaxAsyncEvent; OutstandAsyncEvent++)
     RequestAsyncEvent();
     return STATUS_SUCCESS;
 }

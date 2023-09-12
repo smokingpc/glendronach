@@ -145,10 +145,6 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     if (!NT_SUCCESS(status))
         goto ERROR;
 
-    status = AseHistory.Setup(this, this->DevExt, DEFAULT_ASYNC_EVENT_COUNT, this->NumaNode);
-    if (!NT_SUCCESS(status))
-        goto ERROR;
-
     IsReady = true;
     return STATUS_SUCCESS;
 ERROR:
@@ -160,7 +156,6 @@ void CNvmeQueue::Teardown()
     this->IsReady = false;
     DeallocQueueBuffer();
     History.Teardown();
-    AseHistory.Teardown();
 }
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
@@ -175,36 +170,30 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     if(!IsSafeForSubmit())
         return STATUS_DEVICE_BUSY;
 
-    cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
-
-    if(0 != (cid & ASYNC_EVENT_CID_FLAG))
+    if(NULL != srbext)
     {
-        cid = (cid ^ ASYNC_EVENT_CID_FLAG);
-        status = AseHistory.Push(cid, srbext);
-    }
-    else
-    {
+        cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
         status = History.Push(cid, srbext);
+
+        if (STATUS_ALREADY_COMMITTED == status)
+        {
+            KdBreakPoint();
+            //old cmd is timed out, release it...
+            PSPCNVME_SRBEXT old_srbext = NULL;
+            History.Pop(cid, old_srbext);
+            old_srbext->CompleteSrb(SRB_STATUS_BUSY);
+
+            //after release old cmd, push current cmd again...
+            History.Push(cid, srbext);
+        }
+        else if (!NT_SUCCESS(status))
+            return status;
+
+        srbext->SubIndex = SubTail;
+        srbext->SubmittedCmd = (SubQ_VA + SubTail);
+        srbext->SubmittedQ = this;
     }
-
-    if (STATUS_ALREADY_COMMITTED == status)
-    {
-        KdBreakPoint();
-        //old cmd is timed out, release it...
-        PSPCNVME_SRBEXT old_srbext = NULL;
-        History.Pop(cid, old_srbext);
-        old_srbext->CompleteSrb(SRB_STATUS_BUSY);
-
-        //after release old cmd, push current cmd again...
-        History.Push(cid, srbext);
-    }
-    else if (!NT_SUCCESS(status))
-        return status;
-
-    srbext->SubIndex = SubTail;
     RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
-    srbext->SubmittedCmd = (SubQ_VA + SubTail);
-    srbext->SubmittedQ = this;
     InterlockedIncrement(&InflightCmds);
     SubTail = (SubTail + 1) % Depth;
     WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
@@ -239,15 +228,15 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
         if(QUEUE_TYPE::ADM_QUEUE == this->Type && 0 != (cid & ASYNC_EVENT_CID_FLAG))
         { 
             cid = (cid ^ ASYNC_EVENT_CID_FLAG);
-            AseHistory.Pop(cid, srbext);
             IsAsyncEvent = TRUE;
 
             //todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
             PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event =
                 (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&cpl->DW0;
 
-            DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => EventType=%d, EventInfo=%d, LogPage=%d\n",
-                event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => Cid=%d, EventType=%d, EventInfo=%d, LogPage=%d\n",
+                cid, event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
+            KdBreakPoint();
             ((CNvmeDevice*)this->DevExt)->RequestAsyncEvent();
         }
         else
@@ -256,7 +245,7 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
             update_count++; //only count the SrbCmd as completion
         }
 
-        if (NULL != srbext)
+        if (NULL != srbext && !IsAsyncEvent)
         {
             RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
             if (srbext->CompletionCB)
@@ -265,14 +254,14 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
             srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
             srbext->CleanUp();
 
-            if(!IsAsyncEvent)
-                InterlockedDecrement(&InflightCmds);
         }
         else
         {
             KdBreakPoint();
         }
 
+        //AsyncEvent still count in InflightCmds.
+        InterlockedDecrement(&InflightCmds);
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
         cpl = &CplQ_VA[CplHead];
         if(max_count <= update_count)
