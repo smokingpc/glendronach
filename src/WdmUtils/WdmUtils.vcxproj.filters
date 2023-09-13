@@ -41,5 +41,11 @@
     <ClCompile Include="AutoLock.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="HwAdapterControlDebug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HwUnitControlDebug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

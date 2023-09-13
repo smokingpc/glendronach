@@ -230,12 +230,14 @@
     <ClInclude Include="WdmUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="HwAdapterControlDebug.cpp" />
     <ClCompile Include="AutoLock.cpp" />
     <ClCompile Include="CppSupport.cpp" />
     <ClCompile Include="DebugUtils.cpp" />
     <ClCompile Include="OS_Utils.cpp" />
     <ClCompile Include="ScsiDebugFunction.cpp" />
     <ClCompile Include="SrbDebugFunction.cpp" />
+    <ClCompile Include="HwUnitControlDebug.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

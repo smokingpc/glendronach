@@ -248,21 +248,22 @@ BOOLEAN HwResetBus(
 
 _Use_decl_annotations_
 SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
-    PVOID DeviceExtension,
-    SCSI_ADAPTER_CONTROL_TYPE ControlType,
-    PVOID Parameters
+    PVOID devext,
+    SCSI_ADAPTER_CONTROL_TYPE ctrlcode,
+    PVOID param
 )
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(Parameters);
+    UNREFERENCED_PARAMETER(param);
     SCSI_ADAPTER_CONTROL_STATUS status = ScsiAdapterControlUnsuccessful;
-    CNvmeDevice *nvme = (CNvmeDevice*)DeviceExtension;
+    CNvmeDevice *nvme = (CNvmeDevice*)devext;
+    DebugAdapterControlCode(ctrlcode);
 
-    switch (ControlType)
+    switch (ctrlcode)
     {
     case ScsiQuerySupportedControlTypes:
     {
-        status = Handle_QuerySupportedControlTypes((PSCSI_SUPPORTED_CONTROL_TYPE_LIST)Parameters);
+        status = Handle_QuerySupportedControlTypes((PSCSI_SUPPORTED_CONTROL_TYPE_LIST)param);
         break;
     }
     case ScsiStopAdapter:
@@ -272,8 +273,8 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
         //this is post event of DeviceRemove. 
         //In normal procedure of removing device, we don't have to do anything here.
         //BuildIo SRB_FUNCTION_PNP should handle DEVICE_REMOVE teardown.
-        //ScsiStopAdapter is just a power state handler, we have no idea that
-        //"is this call from a device remove? or sleep? or hibernation? or power down?"
+        //ScsiStopAdapter is just a power state handler.
+        //Only power state changing will call this control code.
         status = ScsiAdapterControlSuccess;
         break;
     }
@@ -300,7 +301,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     case ScsiPowerSettingNotification:
     {
      //**running at PASSIVE_LEVEL
-        STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) Parameters;
+        STOR_POWER_SETTING_INFO* info = (STOR_POWER_SETTING_INFO*) param;
         UNREFERENCED_PARAMETER(info);
         status = ScsiAdapterControlSuccess;
         break;
@@ -311,35 +312,32 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     case ScsiAdapterPower:
     {
      //**running <= DISPATCH_LEVEL
-      STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)Parameters;
-      UNREFERENCED_PARAMETER(power);
-      status = ScsiAdapterControlSuccess;
-      break;
+        STOR_ADAPTER_CONTROL_POWER *power = (STOR_ADAPTER_CONTROL_POWER *)param;
+        UNREFERENCED_PARAMETER(power);
+        status = ScsiAdapterControlSuccess;
+        break;
     }
 
-    case ScsiSetBootConfig:
-    case ScsiSetRunningConfig:
-    case ScsiAdapterPoFxPowerRequired:
-    case ScsiAdapterPoFxPowerActive:
-    case ScsiAdapterPoFxPowerSetFState:
-    case ScsiAdapterPoFxPowerControl:
-    case ScsiAdapterPrepareForBusReScan:
-    case ScsiAdapterSystemPowerHints:
-    case ScsiAdapterFilterResourceRequirements:
-    case ScsiAdapterPoFxMaxOperationalPower:
-    case ScsiAdapterPoFxSetPerfState:
-    case ScsiAdapterSerialNumber:
-    case ScsiAdapterCryptoOperation:
-    case ScsiAdapterQueryFruId:
-    case ScsiAdapterSetEventLogging:
+    case ScsiSetBootConfig: //**running at PASSIVE_LEVEL, called AFTER ScsiStopAdapter ??
+    case ScsiSetRunningConfig://**running at PASSIVE_LEVEL, called BEFORE ScsiRestartAdapter ??
+    case ScsiAdapterPoFxPowerRequired://**running <= DISPATCH_LEVEL
+    case ScsiAdapterPoFxPowerActive://**running <= DISPATCH_LEVEL
+    case ScsiAdapterPoFxPowerSetFState://**running <= DISPATCH_LEVEL
+    case ScsiAdapterPoFxPowerControl://**running <= DISPATCH_LEVEL
+    case ScsiAdapterPrepareForBusReScan://**running at PASSIVE_LEVEL
+    case ScsiAdapterSystemPowerHints://**running at PASSIVE_LEVEL
+    case ScsiAdapterFilterResourceRequirements://**running < DISPATCH_LEVEL
+    case ScsiAdapterPoFxMaxOperationalPower://**running at PASSIVE_LEVEL
+    case ScsiAdapterPoFxSetPerfState:       //**running <= DISPATCH_LEVEL
+    case ScsiAdapterSerialNumber:       //**running < DISPATCH_LEVEL
+    case ScsiAdapterCryptoOperation:    //**running at PASSIVE_LEVEL
+    case ScsiAdapterQueryFruId: //**running at PASSIVE_LEVEL
+    case ScsiAdapterSetEventLogging:    //**running at PASSIVE_LEVEL
         status = ScsiAdapterControlSuccess;
         break;
 
 
 #pragma region === Some explain of un-implemented control codes ===
-    //If STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER is set in HW_INITIALIZATION_DATA of DriverEntry,
-    // storport will fire this control code when handling IRP_MN_FILTER_RESOURCE_REQUIREMENTS.
-    // **In this control code, DeviceExtension is STILL NOT initialized because HwFindAdapter not called yet.
     //case ScsiAdapterFilterResourceRequirements:
     //{
     //  //**running < DISPATCH_LEVEL
@@ -369,16 +367,16 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
 
 _Use_decl_annotations_
 void HwProcessServiceRequest(
-    PVOID DeviceExtension,
-    PVOID Irp
+    PVOID devext,
+    PVOID request_irp
 )
 {
     //If there are DeviceIoControl use IOCTL_MINIPORT_PROCESS_SERVICE_IRP, 
     //we should implement this callback.
     
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
-    PIRP irp = (PIRP) Irp;
+    UNREFERENCED_PARAMETER(devext);
+    PIRP irp = (PIRP)request_irp;
     //UNREFERENCED_PARAMETER(Irp);
     ////ioctl interface for miniport
     //PSMOKY_EXT devext = (PSMOKY_EXT)DeviceExtension;
@@ -389,11 +387,11 @@ void HwProcessServiceRequest(
 
     irp->IoStatus.Information = 0;
     irp->IoStatus.Status = STATUS_SUCCESS;
-    StorPortCompleteServiceIrp(DeviceExtension, irp);
+    StorPortCompleteServiceIrp(devext, irp);
 }
 
 _Use_decl_annotations_
-void HwCompleteServiceIrp(PVOID DeviceExtension)
+void HwCompleteServiceIrp(PVOID devext)
 {
     //If HwProcessServiceRequest()is implemented, this HwCompleteServiceIrp 
     // wiill be called before stop to retrieve any new IOCTL_MINIPORT_PROCESS_SERVICE_IRP requests.
@@ -404,27 +402,28 @@ void HwCompleteServiceIrp(PVOID DeviceExtension)
     //          and cleanup that IRP in this callback.
 
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(DeviceExtension);
+    UNREFERENCED_PARAMETER(devext);
     //if any async request in HwProcessServiceRequest, 
     //we should complete them here and let them go back asap.
 }
 
 _Use_decl_annotations_
 SCSI_UNIT_CONTROL_STATUS HwUnitControl(
-    _In_ PVOID DeviceExtension,
-    _In_ SCSI_UNIT_CONTROL_TYPE ControlType,
-    _In_ PVOID Parameters
+    _In_ PVOID devext,
+    _In_ SCSI_UNIT_CONTROL_TYPE ctrlcode,
+    _In_ PVOID param
 )
 {
-    UNREFERENCED_PARAMETER(Parameters);
+    UNREFERENCED_PARAMETER(param);
     SCSI_UNIT_CONTROL_STATUS status = ScsiUnitControlUnsuccessful;
-    CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
+    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     UNREFERENCED_PARAMETER(nvme);
 
+    DebugUnitControlCode(ctrlcode);
     //UnitControl is very similar as AdapterControl.
     //First call will query "ScsiQuerySupportedControlTypes", then 
     //miniport need fill corresponding element to report.
-    switch(ControlType)
+    switch(ctrlcode)
     {
     case ScsiQuerySupportedUnitControlTypes:
         status = ScsiUnitControlSuccess;
@@ -461,12 +460,12 @@ SCSI_UNIT_CONTROL_STATUS HwUnitControl(
 
 _Use_decl_annotations_
 VOID HwTracingEnabled(
-    _In_ PVOID HwDeviceExtension,
-    _In_ BOOLEAN Enabled
+    _In_ PVOID devext,
+    _In_ BOOLEAN is_enabled
 )
 {
-    UNREFERENCED_PARAMETER(HwDeviceExtension);
-    UNREFERENCED_PARAMETER(Enabled);
+    UNREFERENCED_PARAMETER(devext);
+    UNREFERENCED_PARAMETER(is_enabled);
 
     //miniport should write its own ETW log via StorPortEtwEventXXX API (refer to storport.h)
     // So HwTracingEnabled and HwCleanupTracing are used to "turn on" and "turn off" its own ETW logging mechanism.
@@ -474,8 +473,8 @@ VOID HwTracingEnabled(
 
 _Use_decl_annotations_
 VOID HwCleanupTracing(
-    _In_ PVOID  Arg1
+    _In_ PVOID  arg1
 )
 {
-    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(arg1);
 }

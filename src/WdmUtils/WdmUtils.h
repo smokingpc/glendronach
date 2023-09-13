@@ -46,6 +46,9 @@ void* operator new[](size_t size, POOL_TYPE type, ULONG tag = CPP_TAG);
 
 void DebugSrbFunctionCode(ULONG code);
 void DebugScsiOpCode(UCHAR opcode);
+void DebugAdapterControlCode(SCSI_ADAPTER_CONTROL_TYPE code);
+void DebugUnitControlCode(SCSI_UNIT_CONTROL_TYPE code);
+
 bool IsSupportedOS(ULONG major, ULONG minor = 0);
 
 class CDebugCallInOut
