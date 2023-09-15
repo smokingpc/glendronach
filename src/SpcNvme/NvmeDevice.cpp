@@ -400,7 +400,7 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     status = SetAsyncEvent();
     ASSERT(NT_SUCCESS(status));
 
-    //RequestAsyncEvent();
+    RequestAsyncEvent();
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RestartController()
