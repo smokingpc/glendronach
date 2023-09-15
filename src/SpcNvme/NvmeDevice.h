@@ -57,7 +57,6 @@ public:
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE + 1;            //adapter has some problem. e.g. CSTS.CFS==1
     static const ULONG BUGCHECK_INVALID_STATE = BUGCHECK_BASE + 2;      //if action in invalid controller state, fire this bugcheck
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE + 10;
-    static const ULONG DEV_POOL_TAG = (ULONG) 'veDN';
     static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
     static void RestartAdapterDpc(
             IN PSTOR_DPC  Dpc,
@@ -68,6 +67,14 @@ public:
         _In_ PVOID DevExt,
         _In_ PVOID Context,
         _In_ PVOID Worker);
+    static VOID HandleAsyncEvent(
+        _In_ PSPCNVME_SRBEXT srbext);
+    static VOID HandleErrorInfoLogPage(
+        _In_ PSPCNVME_SRBEXT srbext);
+    static VOID PrintSmartInfoLogPage(
+        _In_ PSPCNVME_SRBEXT srbext);
+    static VOID PrintFwSlotInfoLogPage(
+        _In_ PSPCNVME_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     void Teardown();
@@ -98,6 +105,7 @@ public:
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
     NTSTATUS RequestAsyncEvent();
+    NTSTATUS GetLogPage(UCHAR logid);
     NTSTATUS SetArbitration();
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
     NTSTATUS SetPowerManagement();
@@ -109,7 +117,8 @@ public:
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     void ResetOutstandingCmds();
     NTSTATUS SetPerfOpts();
-    bool IsInValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
+    USHORT GetAdmCmdCid();
+    bool IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
 
     bool IsWorking();
     bool IsSetup();
@@ -146,9 +155,9 @@ public:
     USHORT  VendorID = 0;
     USHORT  DeviceID = 0;
     ULONG   CpuCount = 0;
-    long    OutstandAsyncEvent = 0;
-    volatile long    MaxAsyncEvent = 0;
-    volatile long    AsyncEventCid = 0;
+    volatile long    OutstandAsyncEvent = 0;
+    volatile long    AdmCmdCid = 0;
+    USHORT  AsyncEventCid = 0;
     NVME_VERSION                        NvmeVer = {0};
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};
@@ -212,6 +221,5 @@ private:
     BOOLEAN IsControllerEnabled(bool barrier = true);
     BOOLEAN IsControllerReady(bool barrier = true);
     void UpdateParamsByCtrlIdent();
-    USHORT NextAsyncEventCid();
 };
 

@@ -56,6 +56,8 @@ typedef struct _SPCNVME_SRBEXT
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
     BOOLEAN InitOK;
     BOOLEAN FreePrp2List;
+    BOOLEAN DeleteInComplete;
+    BOOLEAN IsCompleted;
     NVME_COMMAND NvmeCmd;
     NVME_COMPLETION_ENTRY NvmeCpl;
     PVOID Prp2VA;
@@ -64,7 +66,6 @@ typedef struct _SPCNVME_SRBEXT
     //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPage().
     //It should be freed in CompletionCB.
     PVOID ExtBuf;      
-    
     #pragma region ======== for Debugging ========
     class CNvmeQueue *SubmittedQ;
     ULONG IoQueueIndex;

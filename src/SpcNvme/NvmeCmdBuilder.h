@@ -62,3 +62,6 @@ void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT
 void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb);
 void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb);
 
+void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext);
+void BuildCmd_GetLogPage(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
+void BuildCmd_GetLogPageV13(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);

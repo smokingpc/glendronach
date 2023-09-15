@@ -98,7 +98,7 @@ public:
         _In_opt_ PVOID sysarg1,
         _In_opt_ PVOID sysarg2
     );
-    
+
     CNvmeQueue();
     CNvmeQueue(QUEUE_PAIR_CONFIG* config);
     ~CNvmeQueue();

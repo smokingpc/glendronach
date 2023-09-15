@@ -48,3 +48,4 @@
 #define TAG_LOG_PAGE    (ULONG)'PGOL'
 #define TAG_REG_BUFFER  (ULONG)'BGER'
 #define TAG_ISR_POLL_CPL (ULONG)'LPCC'
+#define TAG_DEV_POOL    (ULONG)'veDN'

@@ -62,8 +62,7 @@
 #pragma region  ======== NVME ========
 #define DEFAULT_INT_COALESCE_COUNT  0
 #define DEFAULT_INT_COALESCE_TIME   0    //in 100us unit
-#define DEFAULT_ASYNC_EVENT_COUNT   3
-#define ASYNC_EVENT_CID_FLAG        (USHORT)0x8000
+#define ADM_CMD_CID_FLAG        (USHORT)0x8000
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========

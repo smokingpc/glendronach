@@ -20,8 +20,3 @@ UCHAR AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
     return SRB_STATUS_SUCCESS;
 }
 
-//UCHAR AdapterPnp_RemoveHandler(PSPCNVME_SRBEXT srbext)
-//{
-//    srbext->DevExt->Teardown();
-//    return SRB_STATUS_SUCCESS;
-//}

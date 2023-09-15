@@ -87,7 +87,6 @@ VOID CNvmeQueue::QueueCplDpcRoutine(
     CNvmeQueue* queue = CONTAINING_RECORD(dpc, CNvmeQueue, QueueCplDpc);
     queue->CompleteCmd();
 }
-
 CNvmeQueue::CNvmeQueue()
 {
 }
@@ -170,29 +169,36 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     if(!IsSafeForSubmit())
         return STATUS_DEVICE_BUSY;
 
-    if(NULL != srbext)
+    ASSERT(NULL != srbext);
+    
+    cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
+    if (this->Type == QUEUE_TYPE::ADM_QUEUE)
     {
-        cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
-        status = History.Push(cid, srbext);
-
-        if (STATUS_ALREADY_COMMITTED == status)
-        {
-            KdBreakPoint();
-            //old cmd is timed out, release it...
-            PSPCNVME_SRBEXT old_srbext = NULL;
-            History.Pop(cid, old_srbext);
-            old_srbext->CompleteSrb(SRB_STATUS_BUSY);
-
-            //after release old cmd, push current cmd again...
-            History.Push(cid, srbext);
-        }
-        else if (!NT_SUCCESS(status))
-            return status;
-
-        srbext->SubIndex = SubTail;
-        srbext->SubmittedCmd = (SubQ_VA + SubTail);
-        srbext->SubmittedQ = this;
+        ASSERT((cid & ADM_CMD_CID_FLAG) == ADM_CMD_CID_FLAG);
+        cid = cid ^ ADM_CMD_CID_FLAG;
     }
+    status = History.Push(cid, srbext);
+
+    if (STATUS_ALREADY_COMMITTED == status)
+    {
+        KdBreakPoint();
+        //old cmd is timed out, release it...
+        PSPCNVME_SRBEXT old_srbext = NULL;
+        History.Pop(cid, old_srbext);
+        old_srbext->CompleteSrb(SRB_STATUS_BUSY);
+
+        //after release old cmd, push current cmd again...
+        History.Push(cid, srbext);
+    }
+    else if (!NT_SUCCESS(status))
+    {
+        KdBreakPoint();
+        return status;
+    }
+    srbext->SubIndex = SubTail;
+    srbext->SubmittedCmd = (SubQ_VA + SubTail);
+    srbext->SubmittedQ = this;
+
     RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
     InterlockedIncrement(&InflightCmds);
     SubTail = (SubTail + 1) % Depth;
@@ -223,44 +229,29 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
     {
         PSPCNVME_SRBEXT srbext = NULL;
         USHORT cid = cpl->DW3.CID;
-        BOOLEAN IsAsyncEvent = FALSE;
         SubHead = cpl->DW2.SQHD;
-        if(QUEUE_TYPE::ADM_QUEUE == this->Type && 0 != (cid & ASYNC_EVENT_CID_FLAG))
-        { 
-            cid = (cid ^ ASYNC_EVENT_CID_FLAG);
-            IsAsyncEvent = TRUE;
 
-            //todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
-            PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event =
-                (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&cpl->DW0;
-
-            DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => Cid=%d, EventType=%d, EventInfo=%d, LogPage=%d\n",
-                cid, event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
-            KdBreakPoint();
-            ((CNvmeDevice*)this->DevExt)->RequestAsyncEvent();
-        }
-        else
+        if(QUEUE_TYPE::ADM_QUEUE == this->Type)// && ADM_CMD_CID_FLAG == (cid & ADM_CMD_CID_FLAG))
         {
-            History.Pop(cid, srbext);
-            update_count++; //only count the SrbCmd as completion
+            ASSERT(ADM_CMD_CID_FLAG == (cid & ADM_CMD_CID_FLAG));
+            cid = (cid & (~ADM_CMD_CID_FLAG));
         }
 
-        if (NULL != srbext && !IsAsyncEvent)
+        History.Pop(cid, srbext);
+        if(NULL != srbext)
         {
+            update_count++;
             RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
             if (srbext->CompletionCB)
                 srbext->CompletionCB(srbext);
 
             srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
             srbext->CleanUp();
-
+            if (srbext->DeleteInComplete)
+                delete srbext;
         }
         else
-        {
             KdBreakPoint();
-        }
-
-        //AsyncEvent still count in InflightCmds.
         InterlockedDecrement(&InflightCmds);
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
         cpl = &CplQ_VA[CplHead];

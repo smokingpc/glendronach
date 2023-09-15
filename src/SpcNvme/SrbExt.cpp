@@ -16,14 +16,12 @@ _SPCNVME_SRBEXT* _SPCNVME_SRBEXT::GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
-
     DevExt = (CNvmeDevice*)devext;
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
     InitOK = TRUE;
     Tag = ScsiQTag();
 }
-
 void _SPCNVME_SRBEXT::CleanUp()
 {
     ResetExtBuf(NULL);
@@ -40,6 +38,8 @@ void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
 }
 void _SPCNVME_SRBEXT::CompleteSrb(UCHAR status)
 {
+    ASSERT(!this->IsCompleted);
+    this->IsCompleted = TRUE;
     this->SrbStatus = status;
     if (NULL != Srb)
     {
@@ -102,14 +102,12 @@ void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
     if(NULL != Srb)
         SrbSetDataTransferLength(Srb, length);
 }
-
 void _SPCNVME_SRBEXT::ResetExtBuf(PVOID new_buffer)
 {
     if(NULL != ExtBuf)
         delete[] ExtBuf;
     ExtBuf = new_buffer;
 }
-
 PSRBEX_DATA_PNP _SPCNVME_SRBEXT::SrbDataPnp()
 {
     if (NULL != Srb)

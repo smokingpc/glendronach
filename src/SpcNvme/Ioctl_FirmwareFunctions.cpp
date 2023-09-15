@@ -95,6 +95,12 @@ VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
     UCHAR srb_status = SRB_STATUS_INTERNAL_ERROR;
     ULONG fw_status = FIRMWARE_STATUS_ERROR;
 
+    if(NvmeToSrbStatus(srbext->NvmeCpl.DW3.Status) != SRB_STATUS_SUCCESS)
+    {
+        fw_status = FIRMWARE_STATUS_ERROR;
+        goto END;
+    }
+
     if (0 == request->DataBufferOffset)
     {
         fw_status = FIRMWARE_STATUS_OUTPUT_BUFFER_TOO_SMALL;
@@ -128,8 +134,6 @@ VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
 
 END:
     ioctl->ReturnCode = fw_status;
-    srbext->CleanUp();
-    srbext->CompleteSrb(srb_status);
 }
 
 UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
@@ -141,7 +145,7 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     srbext->ResetExtBuf(logpage);
     srbext->CompletionCB = Complete_FirmwareInfo;
 
-    if(srbext->DevExt->NvmeVer.MNR > 0)
+    if(srbext->DevExt->NvmeVer.AsUlong > 0x10000)
         BuildCmd_GetFirmwareSlotsInfo(srbext, logpage);
     else
         BuildCmd_GetFirmwareSlotsInfoV1(srbext, logpage);
