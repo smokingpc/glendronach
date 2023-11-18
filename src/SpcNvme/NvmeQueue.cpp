@@ -174,7 +174,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
     if (this->Type == QUEUE_TYPE::ADM_QUEUE)
     {
-        ASSERT((cid & ADM_CMD_CID_FLAG) == ADM_CMD_CID_FLAG);
+        ASSERT(IsAdmCid(cid));
         cid = cid ^ ADM_CMD_CID_FLAG;
     }
     status = History.Push(cid, srbext);
@@ -185,7 +185,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         //old cmd is timed out, release it...
         PSPCNVME_SRBEXT old_srbext = NULL;
         History.Pop(cid, old_srbext);
-        old_srbext->CompleteSrb(SRB_STATUS_BUSY);
+        old_srbext->CompleteSrb(SRB_STATUS_TIMEOUT);
 
         //after release old cmd, push current cmd again...
         History.Push(cid, srbext);

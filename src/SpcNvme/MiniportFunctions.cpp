@@ -11,11 +11,11 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
     portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
-    portcfg->MaximumNumberOfTargets = NVME_CONST::MAX_TARGETS;
+    portcfg->MaximumNumberOfTargets = MAX_SCSI_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
     portcfg->DeviceExtensionSize = sizeof(CNvmeDevice);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
-    portcfg->MaximumNumberOfLogicalUnits = NVME_CONST::MAX_LU;
+    portcfg->MaximumNumberOfLogicalUnits = MAX_SCSI_LOGICAL_UNIT;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = CNvmeDevice::NvmeMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
@@ -24,12 +24,12 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
     portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_FULL64BIT_SUPPORTED;   //should set this value if MaxNumberOfIO > 1000.
-    portcfg->MaxNumberOfIO = NVME_CONST::MAX_IO_PER_LU * NVME_CONST::MAX_LU;
-    portcfg->MaxIOsPerLun = NVME_CONST::MAX_IO_PER_LU;
+    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_SCSI_LOGICAL_UNIT;
+    portcfg->MaxIOsPerLun = MAX_IO_PER_LU;
 
     //this will limit LUN i/o queue and affect HBA Gateway OutstandingMax.
     //stornvme call StorPortSetDeviceQueueDepth() to adjust it dynamically.
-    portcfg->InitialLunQueueDepth = NVME_CONST::MAX_IO_PER_LU;
+    portcfg->InitialLunQueueDepth = MAX_IO_PER_LU;
 
     //Dump is not supported now. Will be supported in future.
     portcfg->RequestedDumpBufferSize = 0;

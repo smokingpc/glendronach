@@ -40,9 +40,9 @@
 // ================================================================
 
 
-#define NVME_INVALID_ID     ((ULONG)-1)
-#define NVME_INVALID_CID    ((USHORT)-1)        //should align to NVME CID size
-#define NVME_INVALID_QID    ((USHORT)-1)
+#define NVME_INVALID_ID     (MAXULONG)
+#define NVME_INVALID_CID    (MAXUSHORT)        //should align to NVME CID size
+#define NVME_INVALID_QID    (MAXUSHORT)
 
 #define MAX_LOGIC_UNIT      1
 #define MAX_IO_QUEUE_COUNT  64
@@ -53,18 +53,28 @@
 
 #pragma region  ======== SCSI and SRB ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF
-#define INVALID_PORT_ID       ((UCHAR)~0)
-#define INVALID_PATH_ID      ((UCHAR)~0)
-#define INVALID_TARGET_ID    ((UCHAR)~0)
-#define INVALID_LUN_ID       ((UCHAR)~0)
-#define INVALID_SCSI_TAG     ((UCHAR)~0)
-#define INVALID_SRB_QUEUETAG ((ULONG)~0)
+#define INVALID_PORT_ID      (MAXUSHORT)
+#define INVALID_PATH_ID      (MAXUCHAR)
+#define INVALID_TARGET_ID    (MAXUCHAR)
+#define INVALID_LUN_ID       (MAXUCHAR)
+#define INVALID_SCSI_TAG     (MAXULONG)
+#define INVALID_SRB_QUEUETAG (MAXULONG)
+#define SCSI_TAG_SHIFT       10
+#define MAX_SCSI_TARGETS        1
+#define MAX_SCSI_LOGICAL_UNIT   1
+#define MAX_SCSI_LU_SHIFT       5
+static_assert(((1<< MAX_SCSI_LU_SHIFT) >= MAX_SCSI_LOGICAL_UNIT), 
+                    "Incorrect definition of MAX_SCSI_LU_SHIFT");
 #pragma endregion
-
 #pragma region  ======== NVME ========
 #define DEFAULT_INT_COALESCE_COUNT  0
 #define DEFAULT_INT_COALESCE_TIME   0    //in 100us unit
-#define ADM_CMD_CID_FLAG        (USHORT)0x8000
+#define MAX_ADM_CMD_COUNT           256
+//#define ADM_CMD_CID_FLAG        (USHORT)0x8000
+#pragma endregion
+
+#pragma region  ======== STORPORT MINIPORT ========
+#define MAX_IO_PER_LU           (1<<SCSI_TAG_SHIFT)-1//1024-1 = 1023 
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========

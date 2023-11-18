@@ -39,10 +39,17 @@
 // Enjoy it.
 // ================================================================
 
+typedef union _SPCNVME_CID {
+    struct {
+        USHORT ScsiTag : SCSI_TAG_SHIFT;
+        USHORT Lun : MAX_SCSI_LU_SHIFT;
+        USHORT IsAdmCmd : 1;
+    }u;
+    USHORT  AsUshort;
+}SPCNVME_CID;
 
 class CNvmeDevice;
 struct _SPCNVME_SRBEXT;
-
 typedef VOID SPC_SRBEXT_COMPLETION(struct _SPCNVME_SRBEXT *srbext);
 typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
@@ -68,31 +75,25 @@ typedef struct _SPCNVME_SRBEXT
     UCHAR ScsiTarget;
     UCHAR ScsiLun;
     ULONG ScsiTag;          //scsi tag from storport, unique id for each LU
-    ULONG SubmitCid;        //CID value in submit queue entry. unique id in each queue.
-
+    //ULONG SubmitCid;        //CID value in submit queue entry. unique id in each queue.
+    SPCNVME_CID NvmeCid;
     #pragma region ======== for Debugging ========
     class CNvmeQueue *SubmittedQ;
     ULONG IoQueueIndex;
     ULONG SubTail;
     PNVME_COMMAND SubmittedCmd;
-//    ULONG Tag;
-//    ULONG SubIndex;
     #pragma endregion
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
-    void ReadStorAddr();
     void CompleteSrb(UCHAR status);
     void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);
     ULONG FuncCode();         //SRB Function Code
-    ULONG ScsiQTag();
     PCDB Cdb();
     UCHAR CdbLen();
-    //UCHAR PathID();           //SCSI Path (bus) ID
-    //UCHAR TargetID();         //SCSI Device ID
-    //UCHAR Lun();              //SCSI Logical UNit ID
     PVOID DataBuf();
     ULONG DataBufLen();
+    USHORT GetCid();
     void SetTransferLength(ULONG length);
     void ResetExtBuf(PVOID new_buffer = NULL);
     PSRBEX_DATA_PNP SrbDataPnp();

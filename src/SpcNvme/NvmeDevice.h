@@ -117,7 +117,6 @@ public:
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     void ReleaseOutstandingSrbs();
     NTSTATUS SetPerfOpts();
-    USHORT GetAdmCmdCid();
     bool IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
     bool IsNsExist(ULONG nsid);
     bool IsLunExist(UCHAR lun);
@@ -157,8 +156,6 @@ public:
     USHORT  DeviceID = 0;
     ULONG   CpuCount = 0;
     volatile long    OutstandAsyncEvent = 0;
-    volatile long    AdmCmdCid = 0;
-    USHORT  AsyncEventCid = 0;
     NVME_VERSION                        NvmeVer = {0};
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};

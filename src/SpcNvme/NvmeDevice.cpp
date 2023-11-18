@@ -918,16 +918,18 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
     //I don't use SGL... but Win10 don't support this flag
     if (0 != (supported.Flags & STOR_PERF_NO_SGL))
         set_perf.Flags |= STOR_PERF_NO_SGL;
-    //IF not set this flag, storport will attempt to fire completion DPC on
-    //original cpu which accept this I/O request.
-    if (0 != (supported.Flags & STOR_PERF_DPC_REDIRECTION_CURRENT_CPU))
-    {
-        set_perf.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
-    }
 
     //spread DPC to all cpu. don't make single cpu too busy.
     if (0 != (supported.Flags & STOR_PERF_DPC_REDIRECTION))
         set_perf.Flags |= STOR_PERF_DPC_REDIRECTION;
+
+    //IF not set this flag, storport will attempt to fire completion DPC on
+    //original cpu which accept this I/O request.
+    if (0 != (supported.Flags & STOR_PERF_DPC_REDIRECTION_CURRENT_CPU))
+        set_perf.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
+
+    if (0 != (supported.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO))
+        set_perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
 
     stor_status = StorPortInitializePerfOpts(this, FALSE, &set_perf);
     if(STOR_STATUS_SUCCESS != stor_status)
@@ -935,19 +937,12 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
 
     return STATUS_SUCCESS;
 }
-USHORT CNvmeDevice::GetAdmCmdCid()
-{
-    USHORT ret = (USHORT)((InterlockedIncrement(&AdmCmdCid)
-        % NVME_CONST::MAX_IO_PER_LU) | ADM_CMD_CID_FLAG);
-
-    return ret;
-}
 bool CNvmeDevice::IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
 {
     //namespace id should be 1 based.
     //** according NVME_COMMAND::CDW0, NSID==0 if not used in command.
     //   So I guess the NSID is 1 based index....
-    if (0 == nsid || 0 == NamespaceCount)
+    if(!IsNsExist(nsid))
         return false;
 
     ULONG64 total_blocks = 0;
@@ -1131,7 +1126,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     cfg.Type = QUEUE_TYPE::ADM_QUEUE;
 
     //AdmQ histroy depth should reserve one more element for AsyncEvent.
-    cfg.HistoryDepth = 1 + NVME_CONST::MAX_IO_PER_LU;
+    cfg.HistoryDepth = 1 + MAX_IO_PER_LU;
     GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
     AdmQueue = new CNvmeQueue(&cfg);
     if(!AdmQueue->IsInitOK())
@@ -1345,8 +1340,6 @@ void CNvmeDevice::InitVars()
     DeviceID = 0;
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
     OutstandAsyncEvent = 0;
-    AsyncEventCid = NVME_CONST::MAX_IO_PER_LU | ADM_CMD_CID_FLAG;
-    AdmCmdCid = 0;
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
     RestartWorker = NULL;
     RestartDpc;
@@ -1429,7 +1422,7 @@ NTSTATUS CNvmeDevice::CreateIoQ()
     cfg.Depth = IoDepth;
     cfg.NumaNode = 0;
     cfg.Type = QUEUE_TYPE::IO_QUEUE;
-    cfg.HistoryDepth = NVME_CONST::MAX_IO_PER_LU;    //HistoryDepth should equal to MaxScsiTag (ScsiTag Depth).
+    cfg.HistoryDepth = MAX_IO_PER_LU;    //HistoryDepth should equal to MaxScsiTag (ScsiTag Depth).
 
     for(USHORT i=0; i<DesiredIoQ; i++)
     {
