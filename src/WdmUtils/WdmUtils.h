@@ -75,6 +75,19 @@ protected:
     KIRQL OldIrql = PASSIVE_LEVEL;
     bool IsAcquired = false;
 };
+class CQueuedSpinLock {
+public:
+    CQueuedSpinLock(KSPIN_LOCK* lock, bool acquire = true);
+    ~CQueuedSpinLock();
+
+    void DoAcquire();
+    void DoRelease();
+protected:
+    KSPIN_LOCK* Lock = NULL;
+    KIRQL OldIrql = PASSIVE_LEVEL;
+    KLOCK_QUEUE_HANDLE QueueHandle;
+    bool IsAcquired = false;
+};
 
 //StorSpinLock stands for "StorPort SpinLock".
 //This is used in storport miniport driver.
