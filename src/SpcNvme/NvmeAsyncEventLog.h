@@ -39,46 +39,17 @@
 // Enjoy it.
 // ================================================================
 
+//This class stores AsyncEvent in a circular queue.
+//some events are UNRECOVER-ABLE so only log them in queue for debugging.
+class CNvmeAsyncEventLog {
+public:
+    CNvmeAsyncEventLog();
+    ~CNvmeAsyncEventLog();
 
-#include <string.h>
-#include <ntifs.h>
-#include <wdm.h>
-#include <ntddscsi.h>
-#include <ntdddisk.h>
-#include <nvme.h>
+    BOOLEAN Setup();
+    void Teardown();
 
-EXTERN_C_START
-#include <storport.h>
-#include <srbhelper.h>
-EXTERN_C_END
+    
 
-#include "..\WdmUtils\WdmUtils.h"
-#include "..\WdmUtils\AutoPtr.hpp"
-#include "PoolTags.h"
-#include "Constants.h"
-#include "Inline_Utils.h"
-#include "NvmeConstants.h"
-#include "NvmeEnums.h"
-#include "PCIe_Msix.h"
-#include "SrbExt.h"
-#include "NvmeAsyncEventLog.h"
-#include "NvmeQueue.h"
-#include "NvmeDevice.h"
-#include "MiniportFunctions.h"
-#include "NvmePrpBuilder.h"
-#include "NvmeCmdBuilder.h"
-#include "BuildIo_Handlers.h"
-#include "StartIo_Handler.h"
+};
 
-#include "Scsi_Utils.h"
-#include "ScsiHandler_CDB6.h"
-#include "ScsiHandler_CDB10.h"
-#include "ScsiHandler_CDB12.h"
-#include "ScsiHandler_CDB16.h"
-#include "ScsiHandler_InlineUtils.h"
-
-#include "IoctlScsiMiniport_Handlers.h"
-#include "IoctlStorageQuery_Handlers.h"
-#include "Ioctl_FirmwareFunctions.h"
-
-using SPC::CAutoPtr;

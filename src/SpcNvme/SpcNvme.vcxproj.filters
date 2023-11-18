@@ -170,5 +170,8 @@
     <ClInclude Include="LicenseTemplate.h">
       <Filter>Driver Files</Filter>
     </ClInclude>
+    <ClInclude Include="NvmeAsyncEventLog.h">
+      <Filter>Nvme_Device</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

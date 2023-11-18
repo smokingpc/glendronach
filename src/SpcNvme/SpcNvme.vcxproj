@@ -304,6 +304,7 @@
     <ClInclude Include="Ioctl_FirmwareFunctions.h" />
     <ClInclude Include="IoctlStorageQuery_Handlers.h" />
     <ClInclude Include="LicenseTemplate.h" />
+    <ClInclude Include="NvmeAsyncEventLog.h" />
     <ClInclude Include="NvmeCmdBuilder.h" />
     <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
