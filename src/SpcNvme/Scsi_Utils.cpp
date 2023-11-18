@@ -11,7 +11,7 @@ UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_
     //the SCSI I/O are based for BLOCKs of device, not bytes....
     UCHAR srb_status = SRB_STATUS_PENDING;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    ULONG nsid = srbext->Lun() + 1;
+    ULONG nsid = LunToNsId(srbext->ScsiLun);
 
     if (!srbext->DevExt->IsFitValidIoRange(nsid, offset, len))
         return SRB_STATUS_ERROR;

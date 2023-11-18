@@ -20,7 +20,7 @@ void BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, b
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
-    ULONG nsid = srbext->Lun() + 1;
+    ULONG nsid = LunToNsId(srbext->ScsiLun);
 
     cmd->CDW0.OPC = (is_write)? NVME_NVM_COMMAND_WRITE : NVME_NVM_COMMAND_READ;
     cmd->CDW0.CID = srbext->ScsiQTag();

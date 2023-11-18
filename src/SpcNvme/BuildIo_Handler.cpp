@@ -1,49 +1,49 @@
 #include "pch.h"
 #include "AdapterPnpHandler.h"
 
-BOOLEAN BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
+UCHAR BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {
     //srbext->SetStatus(SRB_STATUS_INVALID_REQUEST);
     ////todo: set log 
-    //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
-	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
-    return FALSE;
+    UNREFERENCED_PARAMETER(srbext);
+    return SRB_STATUS_INVALID_REQUEST;
 }
 
-BOOLEAN BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
+UCHAR BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
 {
     //Handle IOCTL only in StartIo.
     //I don't like to handle IOCTL in DISPATCH_LEVEL...
     UNREFERENCED_PARAMETER(srbext);
-    return TRUE;
+    return SRB_STATUS_PENDING;
 }
 
-BOOLEAN BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
+UCHAR BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
     //todo: set log 
     DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
     
-    //spcnvme only support 1 disk in current stage.
-    //so check path/target/lun here.
+    //check path/target/lun here. Only accept request which has valid BTL address.
     UCHAR path = 0, target = 0, lun = 0;
     SrbGetPathTargetLun(srbext->Srb, &path, &target, &lun);
-
-    if(!(0==path && 0==target && 0==lun))
+    if(FALSE == (0==srbext->ScsiPath && 
+                0==srbext->ScsiTarget && 
+                srbext->DevExt->IsLunExist(srbext->ScsiLun))
+        )
     {
-        srbext->CompleteSrb(SRB_STATUS_INVALID_LUN);
-        return FALSE;
+        return SRB_STATUS_INVALID_LUN;
     }
-    return TRUE;
+
+    return SRB_STATUS_PENDING;
 }
 
-BOOLEAN BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
+UCHAR BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 {
-	srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
 //always return FALSE. This event only handled in BuildIo.
-    return FALSE;
+    UNREFERENCED_PARAMETER(srbext);
+    return SRB_STATUS_INVALID_REQUEST;
 }
 
-BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
+UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG flags = 0;
@@ -98,11 +98,10 @@ BOOLEAN BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             }
             srbext->DevExt->Teardown();
             srbext->DevExt->RebalancingPnp = TRUE;
+            srb_status = SRB_STATUS_SUCCESS;
             break;
     }
 
 END:
-    srbext->CompleteSrb(srb_status);
-    //always return FALSE. This event only handled in BuildIo.
-    return FALSE;
+    return srb_status;
 }

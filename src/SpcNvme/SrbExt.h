@@ -48,9 +48,6 @@ typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
 typedef struct _SPCNVME_SRBEXT
 {
-    static _SPCNVME_SRBEXT *GetSrbExt(PSTORAGE_REQUEST_BLOCK srb);
-	static _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb);
-
     CNvmeDevice *DevExt;
     PSTORAGE_REQUEST_BLOCK Srb;
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
@@ -65,26 +62,35 @@ typedef struct _SPCNVME_SRBEXT
     PSPC_SRBEXT_COMPLETION CompletionCB;
     //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPage().
     //It should be freed in CompletionCB.
-    PVOID ExtBuf;      
+    PVOID ExtBuf;
+    USHORT StoragePort;
+    UCHAR ScsiPath;
+    UCHAR ScsiTarget;
+    UCHAR ScsiLun;
+    ULONG ScsiTag;          //scsi tag from storport, unique id for each LU
+    ULONG SubmitCid;        //CID value in submit queue entry. unique id in each queue.
+
     #pragma region ======== for Debugging ========
     class CNvmeQueue *SubmittedQ;
     ULONG IoQueueIndex;
+    ULONG SubTail;
     PNVME_COMMAND SubmittedCmd;
-    ULONG Tag;
-    ULONG SubIndex;
+//    ULONG Tag;
+//    ULONG SubIndex;
     #pragma endregion
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
+    void ReadStorAddr();
     void CompleteSrb(UCHAR status);
     void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);
     ULONG FuncCode();         //SRB Function Code
     ULONG ScsiQTag();
     PCDB Cdb();
     UCHAR CdbLen();
-    UCHAR PathID();           //SCSI Path (bus) ID
-    UCHAR TargetID();         //SCSI Device ID
-    UCHAR Lun();              //SCSI Logical UNit ID
+    //UCHAR PathID();           //SCSI Path (bus) ID
+    //UCHAR TargetID();         //SCSI Device ID
+    //UCHAR Lun();              //SCSI Logical UNit ID
     PVOID DataBuf();
     ULONG DataBufLen();
     void SetTransferLength(ULONG length);
@@ -92,9 +98,19 @@ typedef struct _SPCNVME_SRBEXT
     PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
+inline _SPCNVME_SRBEXT* GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
+{
+    return (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
+}
+inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
+{
+    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
+    srbext->Init(devext, srb);
+    return srbext;
+}
+
 UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status);
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeCmdSpecificToSrbStatus(NVME_COMMAND_STATUS &status);
 UCHAR NvmeMediaErrorToSrbStatus(NVME_COMMAND_STATUS &status);
-
 void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR &status);

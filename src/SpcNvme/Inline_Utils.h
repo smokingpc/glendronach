@@ -60,3 +60,15 @@ FORCEINLINE bool IsAddrEqual(PHYSICAL_ADDRESS& a, PHYSICAL_ADDRESS& b)
 {
     return IsAddrEqual(&a, &b);
 }
+
+FORCEINLINE ULONG LunToNsId(UCHAR lun)
+{
+//LUN is zero-based, Namespace ID is 1-based.
+    return (ULONG)(lun+1);
+}
+
+FORCEINLINE UCHAR NsIdToLun(ULONG nsid)
+{
+    //LUN is zero-based, Namespace ID is 1-based.
+    return (UCHAR)(nsid-1);
+}

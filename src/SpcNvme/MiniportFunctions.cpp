@@ -143,13 +143,13 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 //In this callback, also dispatch some behavior which need be handled very fast.
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
-    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::InitSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
-    BOOLEAN need_startio = FALSE;
+    PSPCNVME_SRBEXT srbext = InitSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
+    UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
 
     switch (srbext->FuncCode())
     {
+    case SRB_FUNCTION_RESET_LOGICAL_UNIT:
     case SRB_FUNCTION_ABORT_COMMAND:
-    case SRB_FUNCTION_RESET_LOGICAL_UNIT: //handled by HwUnitControl?
     case SRB_FUNCTION_RESET_DEVICE:
         //skip these request currently. I didn't get any idea yet to handle them.
     case SRB_FUNCTION_RESET_BUS:
@@ -161,39 +161,42 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
     //  to satisfy an incoming bus-reset request.
     //  I don't understand the difference.... 
     //  Current Windows family are already all NT-based system :p
-        //SrbSetSrbStatus(srb, SRB_STATUS_INVALID_REQUEST);
-		srbext->CompleteSrb(SRB_STATUS_INVALID_REQUEST);
-        need_startio = FALSE;
+        srb_status = SRB_STATUS_INVALID_REQUEST;
         break;
     //case SRB_FUNCTION_WMI:
 
     case SRB_FUNCTION_POWER:
-        need_startio = BuildIo_SrbPowerHandler(srbext);
+        srb_status = BuildIo_SrbPowerHandler(srbext);
         break;
     case SRB_FUNCTION_EXECUTE_SCSI:
-        need_startio = BuildIo_ScsiHandler(srbext);
+        srb_status = BuildIo_ScsiHandler(srbext);
         break;
     case SRB_FUNCTION_IO_CONTROL:
         //should check signature to determine incoming IOCTL
-        need_startio = BuildIo_IoctlHandler(srbext);
+        srb_status = BuildIo_IoctlHandler(srbext);
         break;
     case SRB_FUNCTION_PNP:
         //should handle PNP remove adapter
-        need_startio = BuildIo_SrbPnpHandler(srbext);
+        srb_status = BuildIo_SrbPnpHandler(srbext);
         break;
 	default:
-        need_startio = BuildIo_DefaultHandler(srbext);
+        srb_status = BuildIo_DefaultHandler(srbext);
         break;
 
     }
-    return need_startio;
+
+    if(SRB_STATUS_PENDING != srb_status)
+        srbext->CompleteSrb(srb_status);
+
+    //if srbstatus is pending, it need StartIo to following process.
+    return (SRB_STATUS_PENDING == srb_status);
 }
 
 _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     UNREFERENCED_PARAMETER(devext);
-    PSPCNVME_SRBEXT srbext = SPCNVME_SRBEXT::GetSrbExt((PSTORAGE_REQUEST_BLOCK)srb);
+    PSPCNVME_SRBEXT srbext = GetSrbExt((PSTORAGE_REQUEST_BLOCK)srb);
     UCHAR srb_status = SRB_STATUS_ERROR;
 
     switch (srbext->FuncCode())
@@ -242,7 +245,7 @@ BOOLEAN HwResetBus(
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
     CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
     KdBreakPoint();
-    nvme->ResetOutstandingCmds();
+    nvme->ReleaseOutstandingSrbs();
     return TRUE;
 }
 
@@ -270,12 +273,16 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     {
     //Device "entering" D1 / D2 / D3 from D0
     //**running at DIRQL
-        //this is post event of DeviceRemove. 
+        //this is post event of DeviceRemove and PreEvent of PCI rebalance.
+        //In PCI rebalance, we should disable controller and free all resources
+        //here and stoport will call HwFindAdapter again.
+        
+
         //In normal procedure of removing device, we don't have to do anything here.
         //BuildIo SRB_FUNCTION_PNP should handle DEVICE_REMOVE teardown.
         //ScsiStopAdapter is just a power state handler.
         //Only power state changing will call this control code.
-        status = ScsiAdapterControlSuccess;
+        status = Handle_StopAdapter(nvme);
         break;
     }
     case ScsiRestartAdapter:
@@ -426,18 +433,27 @@ SCSI_UNIT_CONTROL_STATUS HwUnitControl(
     switch(ctrlcode)
     {
     case ScsiQuerySupportedUnitControlTypes:
-        status = ScsiUnitControlSuccess;
+        status = Handle_QuerySupportedUnitControl(
+                (PSCSI_SUPPORTED_CONTROL_TYPE_LIST)param);
+        break;
+    case ScsiUnitStart:
+        status = Handle_UnitStart((PSTOR_ADDR_BTL8)param);
+        break;
+    case ScsiUnitPower:
+        status = Handle_UnitPower((PSTOR_UNIT_CONTROL_POWER)param);
+        break;
+    case ScsiUnitRemove:
+        status = Handle_UnitRemove((PSTOR_ADDR_BTL8)param);
+        break;
+    case ScsiUnitSurpriseRemoval:
+        status = Handle_UnitSurpriseRemove((PSTOR_ADDR_BTL8)param);
         break;
     case ScsiUnitUsage:
-    case ScsiUnitStart:
-    case ScsiUnitPower:
     case ScsiUnitPoFxPowerInfo:
     case ScsiUnitPoFxPowerRequired:
     case ScsiUnitPoFxPowerActive:
     case ScsiUnitPoFxPowerSetFState:
     case ScsiUnitPoFxPowerControl:
-    case ScsiUnitRemove:
-    case ScsiUnitSurpriseRemoval:
     case ScsiUnitRichDescription:
     case ScsiUnitQueryBusType:
     case ScsiUnitQueryFruId:

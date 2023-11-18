@@ -53,6 +53,12 @@ SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
     return ScsiAdapterControlSuccess;
 }
 
+SCSI_ADAPTER_CONTROL_STATUS Handle_StopAdapter(CNvmeDevice* devext)
+{
+    devext->DisableController();
+    return ScsiAdapterControlSuccess;
+}
+
 SCSI_ADAPTER_CONTROL_STATUS Handle_RestartAdapter(CNvmeDevice* devext)
 {
     devext->RestartController();

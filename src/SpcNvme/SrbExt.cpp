@@ -1,18 +1,5 @@
 #include "pch.h"
 
-_SPCNVME_SRBEXT* _SPCNVME_SRBEXT::InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
-{
-	PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
-	srbext->Init(devext, srb);
-	return srbext;
-}
-_SPCNVME_SRBEXT* _SPCNVME_SRBEXT::GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
-{
-    PSPCNVME_SRBEXT ret = (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
-    ASSERT(ret->Srb != NULL);
-    return ret;
-}
-
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
@@ -20,7 +7,8 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
     InitOK = TRUE;
-    Tag = ScsiQTag();
+    ScsiTag = ScsiQTag();
+    ReadStorAddr();
 }
 void _SPCNVME_SRBEXT::CleanUp()
 {
@@ -29,6 +17,26 @@ void _SPCNVME_SRBEXT::CleanUp()
     { 
         ExFreePoolWithTag(Prp2VA, TAG_PRP2);
         Prp2VA = NULL;
+    }
+}
+void _SPCNVME_SRBEXT::ReadStorAddr()
+{
+    if (NULL != Srb)
+    {
+        PSTOR_ADDR_BTL8 addr = (PSTOR_ADDR_BTL8)SrbGetAddress(Srb);
+        ASSERT(STOR_ADDRESS_TYPE_BTL8 == addr->Type);
+        ASSERT(STOR_ADDR_BTL8_ADDRESS_LENGTH == addr->AddressLength);
+        ScsiPath = addr->Path;
+        ScsiTarget = addr->Target;
+        ScsiLun = addr->Lun;
+        StoragePort = addr->Port;   //miniport RaidPortXX number. dispatched by storport.
+    }
+    else
+    {
+        ScsiPath = INVALID_PATH_ID;
+        ScsiTarget = INVALID_TARGET_ID;
+        ScsiLun = INVALID_LUN_ID;
+        StoragePort = INVALID_PORT_ID;
     }
 }
 void _SPCNVME_SRBEXT::CompleteSrb(NVME_COMMAND_STATUS &nvme_status)
@@ -57,7 +65,7 @@ ULONG _SPCNVME_SRBEXT::FuncCode()
 ULONG _SPCNVME_SRBEXT::ScsiQTag()
 {
     if (NULL == Srb)
-        return 0;
+        return INVALID_SCSI_TAG;
     return SrbGetQueueTag(Srb);
 }
 PCDB _SPCNVME_SRBEXT::Cdb()
@@ -71,21 +79,21 @@ UCHAR _SPCNVME_SRBEXT::CdbLen() {
         return 0;
     return SrbGetCdbLength(Srb);
 }
-UCHAR _SPCNVME_SRBEXT::PathID() {
-    if (NULL == Srb)
-        return INVALID_PATH_ID;
-    return SrbGetPathId(Srb);
-}
-UCHAR _SPCNVME_SRBEXT::TargetID() {
-    if (NULL == Srb)
-        return INVALID_TARGET_ID;
-    return SrbGetTargetId(Srb);
-}
-UCHAR _SPCNVME_SRBEXT::Lun() {
-    if (NULL == Srb)
-        return INVALID_LUN_ID;
-    return SrbGetLun(Srb);
-}
+//UCHAR _SPCNVME_SRBEXT::PathID() {
+//    if (NULL == Srb)
+//        return INVALID_PATH_ID;
+//    return SrbGetPathId(Srb);
+//}
+//UCHAR _SPCNVME_SRBEXT::TargetID() {
+//    if (NULL == Srb)
+//        return INVALID_TARGET_ID;
+//    return SrbGetTargetId(Srb);
+//}
+//UCHAR _SPCNVME_SRBEXT::Lun() {
+//    if (NULL == Srb)
+//        return INVALID_LUN_ID;
+//    return SrbGetLun(Srb);
+//}
 PVOID _SPCNVME_SRBEXT::DataBuf() {
     if (NULL == Srb)
         return NULL;

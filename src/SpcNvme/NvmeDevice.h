@@ -87,7 +87,7 @@ public:
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
-
+    NTSTATUS InitNsExt();   //init namespace extension for exposed disks
     NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
     NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
 
@@ -115,11 +115,12 @@ public:
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
     NTSTATUS SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
-    void ResetOutstandingCmds();
+    void ReleaseOutstandingSrbs();
     NTSTATUS SetPerfOpts();
     USHORT GetAdmCmdCid();
     bool IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
-
+    bool IsNsExist(ULONG nsid);
+    bool IsLunExist(UCHAR lun);
     bool IsWorking();
     bool IsSetup();
     bool IsTeardown();

@@ -53,9 +53,11 @@
 
 #pragma region  ======== SCSI and SRB ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF
+#define INVALID_PORT_ID       ((UCHAR)~0)
 #define INVALID_PATH_ID      ((UCHAR)~0)
 #define INVALID_TARGET_ID    ((UCHAR)~0)
 #define INVALID_LUN_ID       ((UCHAR)~0)
+#define INVALID_SCSI_TAG     ((UCHAR)~0)
 #define INVALID_SRB_QUEUETAG ((ULONG)~0)
 #pragma endregion
 

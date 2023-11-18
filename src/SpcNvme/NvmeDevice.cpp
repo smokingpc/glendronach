@@ -878,7 +878,7 @@ NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
     srbext->IoQueueIndex = (cpu_idx % RegisteredIoQ);
     return IoQueue[srbext->IoQueueIndex]->SubmitCmd(srbext, cmd);
 }
-void CNvmeDevice::ResetOutstandingCmds()
+void CNvmeDevice::ReleaseOutstandingSrbs()
 {
     if (!IsWorking() || NULL == IoQueue || NULL == AdmQueue)
         return;
@@ -960,6 +960,17 @@ bool CNvmeDevice::IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
     if((offset + len - 1) > max_block_id)
         return false;
     return true;
+}
+bool CNvmeDevice::IsNsExist(ULONG nsid)
+{
+    if (0 == nsid || nsid > NamespaceCount)
+        return false;
+
+    return (NsData[nsid-1].NSZE > 0);
+}
+bool CNvmeDevice::IsLunExist(UCHAR lun)
+{
+    return IsNsExist(LunToNsId(lun));
 }
 NTSTATUS CNvmeDevice::RegisterIoQueues(PSPCNVME_SRBEXT srbext)
 {

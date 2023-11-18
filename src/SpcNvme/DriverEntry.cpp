@@ -21,7 +21,7 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.HwFindAdapter = HwFindAdapter;        //AddDevice() + IRP_MJ_PNP +  IRP_MN_READ_CONFIG...blahblah
     init_data.HwResetBus = HwResetBus;
     init_data.HwAdapterControl = HwAdapterControl;
-    //init_data.HwUnitControl = HwUnitControl;
+    init_data.HwUnitControl = HwUnitControl;
     init_data.HwTracingEnabled = HwTracingEnabled;
     init_data.HwCleanupTracing = HwCleanupTracing;
 

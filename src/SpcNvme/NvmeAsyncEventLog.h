@@ -48,8 +48,5 @@ public:
 
     BOOLEAN Setup();
     void Teardown();
-
-    
-
 };
 

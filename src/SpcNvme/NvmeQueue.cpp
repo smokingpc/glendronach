@@ -195,9 +195,12 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         KdBreakPoint();
         return status;
     }
-    srbext->SubIndex = SubTail;
+
+    //For Debugging
+    srbext->SubTail = SubTail;
     srbext->SubmittedCmd = (SubQ_VA + SubTail);
     srbext->SubmittedQ = this;
+    srbext->SubmitCid = srbext->SubmittedCmd->CDW0.CID;
 
     RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
     InterlockedIncrement(&InflightCmds);
