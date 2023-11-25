@@ -72,7 +72,7 @@ UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext)
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
-    BuildCmd_AdminSecurityRecv(srbext, NVME_CONST::DEFAULT_CTRLID, srbext->Cdb());
+    BuildCmd_AdminSecurityRecv(srbext, DEFAULT_CTRLID, srbext->Cdb());
     status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;
@@ -92,7 +92,7 @@ UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext)
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
-    BuildCmd_AdminSecuritySend(srbext, NVME_CONST::DEFAULT_CTRLID, srbext->Cdb());
+    BuildCmd_AdminSecuritySend(srbext, DEFAULT_CTRLID, srbext->Cdb());
     status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;

@@ -1,12 +1,5 @@
 #include "pch.h"
 
-static volatile long AdmCmdScsiTag = 0;
-static USHORT GetNextAdmCmdTag()
-{
-    long ret = InterlockedIncrement(&AdmCmdScsiTag);
-    return (USHORT)((ULONG)ret & (MAX_ADM_CMD_COUNT-1));
-}
-
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
@@ -25,10 +18,6 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
         ScsiLun = addr->Lun;
         StoragePort = addr->Port;   //miniport RaidPortXX number. dispatched by storport.
         ScsiTag = SrbGetQueueTag(srb);
-
-        NvmeCid.u.IsAdmCmd = FALSE;
-        NvmeCid.u.Lun = ScsiLun;
-        NvmeCid.u.ScsiTag = ScsiTag;
     }
     else
     {
@@ -37,10 +26,6 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
         ScsiLun = INVALID_LUN_ID;
         StoragePort = INVALID_PORT_ID;
         ScsiTag = INVALID_SCSI_TAG;
-
-        NvmeCid.u.IsAdmCmd = FALSE;
-        NvmeCid.u.Lun = 0;
-        NvmeCid.u.ScsiTag = GetNextAdmCmdTag();
     }
 }
 void _SPCNVME_SRBEXT::CleanUp()
@@ -116,10 +101,6 @@ ULONG _SPCNVME_SRBEXT::DataBufLen() {
     if (NULL == Srb)
         return 0;
     return SrbGetDataTransferLength(Srb);
-}
-USHORT _SPCNVME_SRBEXT::GetCid()
-{
-    return NvmeCid.AsUshort;    
 }
 void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
 {

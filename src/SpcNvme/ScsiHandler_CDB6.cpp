@@ -71,7 +71,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 {
     char *subnqn = (char*)srbext->DevExt->CtrlIdent.SUBNQN;
     ULONG nqn_size = (ULONG)strlen((char*)subnqn);
-    ULONG vid_size = (ULONG)strlen((char*)NVME_CONST::VENDOR_ID);
+    ULONG vid_size = (ULONG)strlen((char*)VENDOR_ID);
     size_t buf_size = (ULONG)sizeof(VPD_IDENTIFICATION_PAGE) +
                         (ULONG)sizeof(VPD_IDENTIFICATION_DESCRIPTOR)
                         + nqn_size + vid_size + 1;      //1 more byte for "_"
@@ -92,7 +92,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     desc->Association = VpdAssocDevice;
     size = size - sizeof(VPD_IDENTIFICATION_DESCRIPTOR);
     desc->IdentifierLength = (UCHAR)min(size, 255);
-    RtlCopyMemory(desc->Identifier, NVME_CONST::VENDOR_ID, vid_size);
+    RtlCopyMemory(desc->Identifier, VENDOR_ID, vid_size);
     RtlCopyMemory(&desc->Identifier[vid_size], "_", 1);
     RtlCopyMemory(&desc->Identifier[vid_size + 1], subnqn, nqn_size);
 
@@ -299,9 +299,9 @@ UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext)
             if(size >= INQUIRYDATABUFFERSIZE)
             {
                 RtlZeroMemory(srbext->DataBuf(), srbext->DataBufLen());
-                BuildInquiryData(data, (char*)NVME_CONST::VENDOR_ID,
-                                (char*)NVME_CONST::PRODUCT_ID, 
-                                (char*)NVME_CONST::PRODUCT_REV);
+                BuildInquiryData(data, (char*)VENDOR_ID,
+                                (char*)PRODUCT_ID, 
+                                (char*)PRODUCT_REV);
                 srb_status = SRB_STATUS_SUCCESS;
                 ret_size = size;
             }

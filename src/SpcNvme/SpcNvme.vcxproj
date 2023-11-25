@@ -306,7 +306,6 @@
     <ClInclude Include="LicenseTemplate.h" />
     <ClInclude Include="NvmeAsyncEventLog.h" />
     <ClInclude Include="NvmeCmdBuilder.h" />
-    <ClInclude Include="NvmeConstants.h" />
     <ClInclude Include="NvmeEnums.h" />
     <ClInclude Include="NvmePrpBuilder.h" />
     <ClInclude Include="PCIe_Msix.h" />

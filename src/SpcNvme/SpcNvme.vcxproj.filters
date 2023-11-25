@@ -127,9 +127,6 @@
     <ClInclude Include="StartIo_Handler.h">
       <Filter>StartIo_Handlers</Filter>
     </ClInclude>
-    <ClInclude Include="NvmeConstants.h">
-      <Filter>Nvme_Device</Filter>
-    </ClInclude>
     <ClInclude Include="NvmeEnums.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>

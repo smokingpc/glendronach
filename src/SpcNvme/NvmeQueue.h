@@ -53,44 +53,9 @@ typedef struct _QUEUE_PAIR_CONFIG {
     size_t PreAllocBufSize = 0; 
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
-typedef struct _COMPLETED_BLOCK {
-    NVME_COMPLETION_ENTRY NvmeCpl;
-    PVOID SrbExt;
-}COMPLETED_BLOCK, *PCOMPLETED_BLOCK;
-
-class CCmdHistory
-{
-    friend class CNvmeQueue;
-public:
-    const ULONG BufferTag = (ULONG)'HBRS';
-
-    CCmdHistory();
-    CCmdHistory(class CNvmeQueue*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
-    ~CCmdHistory();
-
-    NTSTATUS Setup(class CNvmeQueue*parent, PVOID devext, USHORT depth, ULONG numa_node = 0);
-    void Teardown();
-    void Reset();
-    NTSTATUS Push(ULONG index, PSPCNVME_SRBEXT srbext);
-    NTSTATUS Pop(ULONG index, PSPCNVME_SRBEXT &srbext);
-
-private:
-    PVOID DevExt = NULL;
-    PVOID Buffer = NULL;
-    size_t BufferSize = 0;
-    PSPCNVME_SRBEXT *History = NULL; //Cast of RawBuffer
-    ULONG Depth = 0;                   //how many items in this->History ?
-    USHORT QueueID = NVME_INVALID_QID;
-    ULONG NumaNode = MM_ANY_NODE_OK;
-
-    //KSPIN_LOCK CmdLock;
-    class CNvmeQueue* Parent = NULL;
-};
-
 class CNvmeQueue
 {
 public:
-    const static ULONG BufferTag = (ULONG)'QMVN';
     const static MEMORY_CACHING_TYPE CacheType = MEMORY_CACHING_TYPE::MmNonCached;
     static VOID QueueCplDpcRoutine(
         _In_ PSTOR_DPC dpc,
@@ -110,7 +75,7 @@ public:
     
     NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
     void CompleteCmd(ULONG max_count = 0);
-    void ResetAllCmd();
+    void GiveupAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
     void GetQueueAddr(PVOID *subq, PVOID* cplq);
     void GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
@@ -123,6 +88,18 @@ public:
     USHORT Depth = 0;       //how many entries in both SubQ and CplQ?
     ULONG NumaNode = MM_ANY_NODE_OK;
     bool IsReady = false;
+
+    QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
+    ULONG SubTail = INIT_DBL_VALUE;
+    ULONG SubHead = INIT_DBL_VALUE;
+    ULONG CplHead = INIT_DBL_VALUE;
+    USHORT PhaseTag = CPL_INIT_PHASETAG;
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
+
+    KSPIN_LOCK SubLock;
+
+    volatile LONG InflightCmds = 0;
     bool UseExtBuffer = false; //Is this Queue use "external allocated buffer" ?
     //In CNvmeQueuePair, it allocates SubQ and CplQ in one large continuous block.
     //QueueBuffer is pointer of this large block.
@@ -130,7 +107,7 @@ public:
     PVOID Buffer = NULL;
     PHYSICAL_ADDRESS BufferPA = {0};
     size_t BufferSize = 0;      //total size of entire queue buffer, BufferSize >= (SubQ_Size + CplQ_Size)
-    volatile LONG InflightCmds = 0;
+
     PNVME_COMMAND SubQ_VA = NULL;       //Virtual address of SubQ Buffer.
     PHYSICAL_ADDRESS SubQ_PA = { 0 }; 
     size_t SubQ_Size = 0;       //total length of SubQ Buffer.
@@ -139,25 +116,42 @@ public:
     PHYSICAL_ADDRESS CplQ_PA = { 0 }; 
     size_t CplQ_Size = 0;       //total length of CplQ Buffer.
 
-    QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
-    USHORT HistoryDepth = 0;
-    CCmdHistory History;
+    volatile USHORT InternalCid = 0;
+    PSPCNVME_SRBEXT *OrigSrbExt;
 
-    ULONG SubTail = NVME_CONST::INIT_DBL_VALUE;
-    ULONG SubHead = NVME_CONST::INIT_DBL_VALUE;
-    ULONG CplHead = NVME_CONST::INIT_DBL_VALUE;
-    USHORT PhaseTag = NVME_CONST::CPL_INIT_PHASETAG;
-    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
-    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
-
-    KSPIN_LOCK SubLock;
-
-    bool IsSafeForSubmit();
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
     ULONG ReadCplHead();
     void WriteCplHead(ULONG value);
     bool InitQueueBuffer();    //init contents of this queue
     bool AllocQueueBuffer();    //allocate memory of this queue
+    bool AllocOrigSrbExtHistory();
+    void DeallocOrigSrbExtHistory();
     void DeallocQueueBuffer();
+
+    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, PSPCNVME_SRBEXT orig_srbexts[], ULONG idx)
+    {
+        PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
+            (volatile PVOID*)orig_srbexts + idx, srbext, NULL);
+
+        if (NULL != old_srbext)
+            old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
+    }
+    inline PSPCNVME_SRBEXT PopSrbExt(PSPCNVME_SRBEXT orig_srbexts[], ULONG idx)
+    {
+        PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
+            (volatile PVOID*)orig_srbexts + idx, NULL);
+
+        ASSERT(srbext != NULL);
+        return srbext;
+    }
+    inline bool IsSafeForSubmit()
+    {
+        return ((Depth - SAFE_SUBMIT_THRESHOLD) > (USHORT)InflightCmds) ? true : false;
+    }
+    inline USHORT GetNextCid()
+    {
+        ULONG new_cid = (ULONG)InterlockedIncrement((volatile LONG*) &InternalCid);
+        return 1+(new_cid % Depth); //let CID be 1-based index so add 1.
+    }
 };

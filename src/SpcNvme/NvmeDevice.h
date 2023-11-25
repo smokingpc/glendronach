@@ -135,17 +135,17 @@ public:
     NVME_STATE State = NVME_STATE::STOP;
     ULONG RegisteredIoQ = 0;
     ULONG AllocatedIoQ = 0;
-    ULONG DesiredIoQ = NVME_CONST::IO_QUEUE_COUNT;
+    ULONG DesiredIoQ = IO_QUEUE_COUNT;
 
-    ULONG DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
-    ULONG StallDelay = NVME_CONST::STALL_TIME_US;
+    ULONG DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay = STALL_TIME_US;
 
     ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = {0};         //AccessRange from miniport HwFindAdapter.
     ULONG AccessRangeCount = 0;
     ULONG Bar0Size = 0;
-    UCHAR MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
-    USHORT IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
-    USHORT AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    UCHAR MaxNamespaces = SUPPORT_NAMESPACES;
+    USHORT IoDepth = IO_QUEUE_DEPTH;
+    USHORT AdmDepth = ADMIN_QUEUE_DEPTH;
     ULONG TotalNumaNodes = 0;
     ULONG NamespaceCount = 0;       //how many namespace active in current device?
     
@@ -159,12 +159,12 @@ public:
     NVME_VERSION                        NvmeVer = {0};
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};
-    NVME_IDENTIFY_NAMESPACE_DATA        NsData[NVME_CONST::SUPPORT_NAMESPACES] = {0};
+    NVME_IDENTIFY_NAMESPACE_DATA        NsData[SUPPORT_NAMESPACES] = {0};
     
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
     PVOID                               RestartWorker = NULL;
     STOR_DPC                            RestartDpc;
-    GROUP_AFFINITY                      MsgGroupAffinity[NVME_CONST::MAX_INT_COUNT] = {0};
+    GROUP_AFFINITY                      MsgGroupAffinity[MAX_INT_COUNT] = {0};
 private:
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
     PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;

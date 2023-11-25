@@ -72,17 +72,3 @@ FORCEINLINE UCHAR NsIdToLun(ULONG nsid)
     //LUN is zero-based, Namespace ID is 1-based.
     return (UCHAR)(nsid-1);
 }
-
-FORCEINLINE bool IsAdmCid(USHORT cid)
-{
-    SPCNVME_CID check;
-    check.AsUshort = cid;
-    return (TRUE == check.u.IsAdmCmd);
-}
-
-FORCEINLINE USHORT GetHistroyIdxFromCid(USHORT cid)
-{
-    SPCNVME_CID check;
-    check.AsUshort = cid;
-    return check.u. ;
-}

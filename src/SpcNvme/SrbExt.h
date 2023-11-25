@@ -39,15 +39,6 @@
 // Enjoy it.
 // ================================================================
 
-typedef union _SPCNVME_CID {
-    struct {
-        USHORT ScsiTag : SCSI_TAG_SHIFT;
-        USHORT Lun : MAX_SCSI_LU_SHIFT;
-        USHORT IsAdmCmd : 1;
-    }u;
-    USHORT  AsUshort;
-}SPCNVME_CID;
-
 class CNvmeDevice;
 struct _SPCNVME_SRBEXT;
 typedef VOID SPC_SRBEXT_COMPLETION(struct _SPCNVME_SRBEXT *srbext);
@@ -64,6 +55,8 @@ typedef struct _SPCNVME_SRBEXT
     BOOLEAN IsCompleted;
     NVME_COMMAND NvmeCmd;
     NVME_COMPLETION_ENTRY NvmeCpl;
+    PVOID Prp1VA;
+    PHYSICAL_ADDRESS Prp1PA;
     PVOID Prp2VA;
     PHYSICAL_ADDRESS Prp2PA;
     PSPC_SRBEXT_COMPLETION CompletionCB;
@@ -75,13 +68,10 @@ typedef struct _SPCNVME_SRBEXT
     UCHAR ScsiTarget;
     UCHAR ScsiLun;
     ULONG ScsiTag;          //scsi tag from storport, unique id for each LU
-    //ULONG SubmitCid;        //CID value in submit queue entry. unique id in each queue.
-    SPCNVME_CID NvmeCid;
     #pragma region ======== for Debugging ========
     class CNvmeQueue *SubmittedQ;
-    ULONG IoQueueIndex;
     ULONG SubTail;
-    PNVME_COMMAND SubmittedCmd;
+    PNVME_COMMAND SubmitCmdPtr;
     #pragma endregion
 
     void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
@@ -93,9 +83,9 @@ typedef struct _SPCNVME_SRBEXT
     UCHAR CdbLen();
     PVOID DataBuf();
     ULONG DataBufLen();
-    USHORT GetCid();
     void SetTransferLength(ULONG length);
     void ResetExtBuf(PVOID new_buffer = NULL);
+    bool BuildPrpForNvme();
     PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 

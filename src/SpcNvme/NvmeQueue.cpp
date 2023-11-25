@@ -113,10 +113,16 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     BufferSize = config->PreAllocBufSize;
     SubDbl = config->SubDbl;
     CplDbl = config->CplDbl;
-    HistoryDepth = config->HistoryDepth;
     //Todo: StorPortNotification(SetTargetProcessorDpc)
     StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
     KeInitializeSpinLock(&SubLock);
+
+    ok = AllocOrigSrbExtHistory();
+    if (!ok)
+    {
+        status = STATUS_MEMORY_NOT_ALLOCATED;
+        goto ERROR;
+    }
 
     if(NULL == Buffer)
     {
@@ -140,10 +146,6 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
         goto ERROR;
     }
 
-    status = History.Setup(this, this->DevExt, this->HistoryDepth, this->NumaNode);
-    if (!NT_SUCCESS(status))
-        goto ERROR;
-
     IsReady = true;
     return STATUS_SUCCESS;
 ERROR:
@@ -153,14 +155,11 @@ ERROR:
 void CNvmeQueue::Teardown()
 {
     this->IsReady = false;
+    DeallocOrigSrbExtHistory();
     DeallocQueueBuffer();
-    History.Teardown();
 }
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
-    CSpinLock lock(&SubLock);
-    NTSTATUS status = STATUS_SUCCESS;
-    ULONG cid = 0;
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
 
@@ -169,50 +168,39 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     if(!IsSafeForSubmit())
         return STATUS_DEVICE_BUSY;
 
-    ASSERT(NULL != srbext);
-    
-    cid = (ULONG)(src_cmd->CDW0.CID & 0xFFFF);
-    if (this->Type == QUEUE_TYPE::ADM_QUEUE)
     {
-        ASSERT(IsAdmCid(cid));
-        cid = cid ^ ADM_CMD_CID_FLAG;
+        CQueuedSpinLock lock(&SubLock);
+
+        ASSERT(NULL != srbext);
+        src_cmd->CDW0.CID = GetNextCid();
+        PushSrbExt(srbext, OrigSrbExt, src_cmd->CDW0.CID);
+
+        //For Debugging
+        srbext->SubTail = SubTail;
+        srbext->SubmitCmdPtr = (SubQ_VA + SubTail);
+        srbext->SubmittedQ = this;
+
+        RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
+        InterlockedIncrement(&InflightCmds);
+        SubTail = (SubTail + 1) % Depth;
+        WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
     }
-    status = History.Push(cid, srbext);
-
-    if (STATUS_ALREADY_COMMITTED == status)
-    {
-        KdBreakPoint();
-        //old cmd is timed out, release it...
-        PSPCNVME_SRBEXT old_srbext = NULL;
-        History.Pop(cid, old_srbext);
-        old_srbext->CompleteSrb(SRB_STATUS_TIMEOUT);
-
-        //after release old cmd, push current cmd again...
-        History.Push(cid, srbext);
-    }
-    else if (!NT_SUCCESS(status))
-    {
-        KdBreakPoint();
-        return status;
-    }
-
-    //For Debugging
-    srbext->SubTail = SubTail;
-    srbext->SubmittedCmd = (SubQ_VA + SubTail);
-    srbext->SubmittedQ = this;
-    srbext->SubmitCid = srbext->SubmittedCmd->CDW0.CID;
-
-    RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
-    InterlockedIncrement(&InflightCmds);
-    SubTail = (SubTail + 1) % Depth;
-    WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
 
     return STATUS_SUCCESS;
 }
-void CNvmeQueue::ResetAllCmd()
+void CNvmeQueue::GiveupAllCmd()
 {
-    CSpinLock lock(&SubLock);
-    History.Reset();
+    CQueuedSpinLock lock(&SubLock);
+
+    for (ULONG i = 0; i < Depth; i++)
+    {
+        if (OrigSrbExt[i] != NULL)
+        {
+            OrigSrbExt[i]->CompleteSrb(SRB_STATUS_BUS_RESET);
+            OrigSrbExt[i] = NULL;
+        }
+    }
+
     InflightCmds = 0;
     while(CplHead != SubTail)
     {
@@ -223,27 +211,20 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 {
     //DPC is global scope mutex?
     PNVME_COMPLETION_ENTRY cpl = &CplQ_VA[CplHead];
-    ULONG update_count = 0;
+    ULONG done_count = 0;
 
     if(0 == max_count)
         max_count = this->Depth;
 
-    while(NewCplArrived(cpl, this->PhaseTag))
+    while(NewCplArrived(cpl, this->PhaseTag) && max_count > done_count)
     {
-        PSPCNVME_SRBEXT srbext = NULL;
         USHORT cid = cpl->DW3.CID;
+        PSPCNVME_SRBEXT srbext = PopSrbExt(OrigSrbExt, cid);
         SubHead = cpl->DW2.SQHD;
 
-        if(QUEUE_TYPE::ADM_QUEUE == this->Type)// && ADM_CMD_CID_FLAG == (cid & ADM_CMD_CID_FLAG))
-        {
-            ASSERT(ADM_CMD_CID_FLAG == (cid & ADM_CMD_CID_FLAG));
-            cid = (cid & (~ADM_CMD_CID_FLAG));
-        }
-
-        History.Pop(cid, srbext);
         if(NULL != srbext)
         {
-            update_count++;
+            done_count++;
             RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
             if (srbext->CompletionCB)
                 srbext->CompletionCB(srbext);
@@ -258,11 +239,9 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
         InterlockedDecrement(&InflightCmds);
         UpdateCplHeadAndPhase(CplHead, PhaseTag, Depth);
         cpl = &CplQ_VA[CplHead];
-        if(max_count <= update_count)
-            break;
     }
 
-    if(update_count != 0)
+    if(done_count != 0)
         WriteDbl(DevExt, CplDbl, CplHead);
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
@@ -291,16 +270,12 @@ void CNvmeQueue::GetCplQAddr(PHYSICAL_ADDRESS* cplq)
 {
     cplq->QuadPart = CplQ_PA.QuadPart;
 }
-bool CNvmeQueue::IsSafeForSubmit()
-{
-    return ((Depth - NVME_CONST::SAFE_SUBMIT_THRESHOLD) > (USHORT)InflightCmds)? true : false;
-}
 ULONG CNvmeQueue::ReadSubTail()
 {
     if (IsValidQid(QueueID) && NULL != SubDbl)
         return ReadDbl(DevExt, SubDbl);
     KdBreakPoint();
-    return NVME_CONST::INVALID_DBL_VALUE;
+    return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteSubTail(ULONG value)
 {
@@ -313,7 +288,7 @@ ULONG CNvmeQueue::ReadCplHead()
     if (IsValidQid(QueueID) && NULL != CplDbl)
         return ReadDbl(DevExt, CplDbl);
     KdBreakPoint();
-    return NVME_CONST::INVALID_DBL_VALUE;
+    return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteCplHead(ULONG value)
 {
@@ -324,11 +299,10 @@ void CNvmeQueue::WriteCplHead(ULONG value)
 
 bool CNvmeQueue::AllocQueueBuffer()
 {
-    PHYSICAL_ADDRESS low = { 0 }; //I want to allocate it above 4G...
+    PHYSICAL_ADDRESS low = { 0 };
     PHYSICAL_ADDRESS high = { 0 };
     PHYSICAL_ADDRESS align = { 0 };
-    
-    low.HighPart = 0X000000001;
+    low.QuadPart = ABOVE_4G_ADDR; //I want to allocate it above 4G...
     high.QuadPart = (LONGLONG)-1;
 
     //I am too lazy to check if NVMe device request continuous page or not, so.... 
@@ -347,7 +321,6 @@ bool CNvmeQueue::AllocQueueBuffer()
     }
 
     BufferPA = MmGetPhysicalAddress(Buffer);
-
     return true;
 }
 bool CNvmeQueue::InitQueueBuffer()
@@ -396,8 +369,26 @@ void CNvmeQueue::DeallocQueueBuffer()
     this->Buffer = NULL;
     this->BufferSize = 0;
 }
+bool CNvmeQueue::AllocOrigSrbExtHistory()
+{
+    OrigSrbExt = (PSPCNVME_SRBEXT*) 
+            new(NonPagedPool, TAG_SRB_HISTORY) SPCNVME_SRBEXT[Depth];
+    if(NULL == OrigSrbExt)
+        return false;
+
+    return true;
+}
+void CNvmeQueue::DeallocOrigSrbExtHistory()
+{
+    if (NULL != OrigSrbExt)
+    {
+        delete[] OrigSrbExt;
+        OrigSrbExt = NULL;
+    }
+}
 #pragma endregion
 
+#if 0
 #pragma region ======== class CCmdHistory ========
 CCmdHistory::CCmdHistory()
 {
@@ -480,3 +471,4 @@ NTSTATUS CCmdHistory::Pop(ULONG index, PSPCNVME_SRBEXT& srbext)
     return STATUS_SUCCESS;
 }
 #pragma endregion
+#endif

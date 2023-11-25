@@ -62,19 +62,43 @@
 #define SCSI_TAG_SHIFT       10
 #define MAX_SCSI_TARGETS        1
 #define MAX_SCSI_LOGICAL_UNIT   1
-#define MAX_SCSI_LU_SHIFT       5
-static_assert(((1<< MAX_SCSI_LU_SHIFT) >= MAX_SCSI_LOGICAL_UNIT), 
-                    "Incorrect definition of MAX_SCSI_LU_SHIFT");
 #pragma endregion
 #pragma region  ======== NVME ========
+#define DEFAULT_MAX_TXSIZE          (256 * PAGE_SIZE)
 #define DEFAULT_INT_COALESCE_COUNT  0
 #define DEFAULT_INT_COALESCE_TIME   0    //in 100us unit
 #define MAX_ADM_CMD_COUNT           256
-//#define ADM_CMD_CID_FLAG        (USHORT)0x8000
+#define SUBQ_ENTRY_SIZE             6   //sizeof(NVME_COMMAND)==64 == 2^6, so IOSQES== 6.
+#define CPLQ_ENTRY_SIZE             4   //sizeof(NVME_COMPLETION_ENTRY)==16 == 2^4, so IOCQES== 4.
+#define INIT_DBL_VALUE              0
+#define INVALID_DBL_VALUE           ((ULONG)MAXUSHORT)
+#define CPL_INIT_PHASETAG           1
+#define MAX_INT_COUNT               64
+#define SUPPORT_NAMESPACES          1
+#define SAFE_SUBMIT_THRESHOLD       8
+#define IO_QUEUE_COUNT              32
+#define STALL_TIME_US               100     //in micro-seconds
+#define SLEEP_TIME_US               (STALL_TIME_US*10)
+#define UNSPECIFIC_NSID             0
+#define DEFAULT_CTRLID              1
+#define ADMIN_QUEUE_DEPTH           64
+#define IO_QUEUE_DEPTH              256
+#define ASYNC_EVENT_LIMIT           3
+#define MAX_NS_COUNT                1024    //Max NameSpace count. defined in NVMe spec.
+#define INTCOAL_TIME                2       //Interrupt Coalescing time threshold in 100us unit.
+#define INTCOAL_THRESHOLD           8       //Interrupt Coalescing trigger threshold.
+#define AB_BURST                    7       //Arbitration Burst. 111b(0n7) is Unlimit.
+#define AB_HPW                      (128-1) //High Priority Weight. it is 0-based so need substract 1.
+#define AB_MPW                      (64-1)  //Medium Priority Weight. it is 0-based so need substract 1.
+#define AB_LPW                      (32-1)  //Low Priority Weight. it is 0-based so need substract 1.
 #pragma endregion
 
 #pragma region  ======== STORPORT MINIPORT ========
 #define MAX_IO_PER_LU           (1<<SCSI_TAG_SHIFT)-1//1024-1 = 1023 
+#define ABOVE_4G_ADDR           ((LONGLONG)1<<32)
+#define VENDOR_ID               "SPC     "          //vendor name
+#define PRODUCT_ID              "SomkingPC NVMe  "  //model name
+#define PRODUCT_REV             "0100"
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========
@@ -83,6 +107,10 @@ static_assert(((1<< MAX_SCSI_LU_SHIFT) >= MAX_SCSI_LOGICAL_UNIT),
 #define REGNAME_IOQ_COUNT       (UCHAR*)"IoQCount"
 #define REGNAME_COALESCE_TIME   (UCHAR*)"IntCoalescingTime"
 #define REGNAME_COALESCE_COUNT  (UCHAR*)"IntCoalescingEntries"
+#pragma endregion
 
+#pragma region  ======== MEMORY TAG ========
+#define TAG_NVME_QUEUE          ((ULONG)'QMVN')
+#define TAG_SRB_HISTORY         ((ULONG)'HBRS')
 
 #pragma endregion

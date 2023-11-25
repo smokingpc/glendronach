@@ -262,8 +262,8 @@ NTSTATUS CNvmeDevice::EnableController()
     cc.CSS = NVME_CSS_NVM_COMMAND_SET;
     cc.AMS = NVME_AMS_ROUND_ROBIN;
     cc.SHN = NVME_CC_SHN_NO_NOTIFICATION;
-    cc.IOSQES = NVME_CONST::IOSQES;
-    cc.IOCQES = NVME_CONST::IOCQES;
+    cc.IOSQES = SUBQ_ENTRY_SIZE;
+    cc.IOCQES = CPLQ_ENTRY_SIZE;
     cc.EN = 0;
     WriteNvmeRegister(cc);
 
@@ -425,7 +425,7 @@ NTSTATUS CNvmeDevice::RestartController()
 NTSTATUS CNvmeDevice::IdentifyAllNamespaces()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CAutoPtr<ULONG, NonPagedPool, TAG_DEV_POOL> idlist(new ULONG[NVME_CONST::MAX_NS_COUNT]);
+    CAutoPtr<ULONG, NonPagedPool, TAG_DEV_POOL> idlist(new ULONG[MAX_NS_COUNT]);
     ULONG ret_count = 0;
     status = IdentifyActiveNamespaceIdList(NULL, idlist, ret_count);
     if(!NT_SUCCESS(status))
@@ -433,7 +433,7 @@ NTSTATUS CNvmeDevice::IdentifyAllNamespaces()
 
     //query ns one by one. NS ID is 1 based index
     ULONG *nsid_list = idlist;
-    this->NamespaceCount = min(ret_count, NVME_CONST::SUPPORT_NAMESPACES);
+    this->NamespaceCount = min(ret_count, SUPPORT_NAMESPACES);
     for (ULONG i = 0; i < NamespaceCount; i++)
     {
         if(0 == nsid_list[i])
@@ -580,7 +580,7 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOI
 
     ret_count = 0;
     ULONG *idlist = (ULONG*)nsid_list;
-    for(ULONG i=0; i < NVME_CONST::MAX_NS_COUNT; i++)
+    for(ULONG i=0; i < MAX_NS_COUNT; i++)
     {
         if(0 == idlist[i])
             break;
@@ -875,8 +875,9 @@ NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
         return STATUS_DEVICE_NOT_READY;
 
     ULONG cpu_idx = KeGetCurrentProcessorNumberEx(NULL);
-    srbext->IoQueueIndex = (cpu_idx % RegisteredIoQ);
-    return IoQueue[srbext->IoQueueIndex]->SubmitCmd(srbext, cmd);
+    //todo: determine idx by NUMA rules to improve performance
+    ULONG idx = (cpu_idx % RegisteredIoQ);
+    return IoQueue[idx]->SubmitCmd(srbext, cmd);
 }
 void CNvmeDevice::ReleaseOutstandingSrbs()
 {
@@ -884,9 +885,9 @@ void CNvmeDevice::ReleaseOutstandingSrbs()
         return;
 
     State = NVME_STATE::RESETBUS;
-    AdmQueue->ResetAllCmd();
+    AdmQueue->GiveupAllCmd();
     for(ULONG i=0; i<RegisteredIoQ;i++)
-        IoQueue[i]->ResetAllCmd();
+        IoQueue[i]->GiveupAllCmd();
 
     State = NVME_STATE::RUNNING;
 }
@@ -1199,7 +1200,7 @@ void CNvmeDevice::ReadCtrlCap()
     MaxPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMAX));
     MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * MinPageSize);
     if(0 == MaxTxSize)
-        MaxTxSize = NVME_CONST::DEFAULT_MAX_TXSIZE;
+        MaxTxSize = DEFAULT_MAX_TXSIZE;
     MaxTxPages = (ULONG)(MaxTxSize / PAGE_SIZE);
 
     AdmDepth = min((USHORT)CtrlCap.MQES + 1, AdmDepth);
@@ -1320,16 +1321,16 @@ void CNvmeDevice::InitVars()
     State = NVME_STATE::STOP;
     RegisteredIoQ = 0;
     AllocatedIoQ = 0;
-    DesiredIoQ = NVME_CONST::IO_QUEUE_COUNT;
+    DesiredIoQ = IO_QUEUE_COUNT;
 
-    DeviceTimeout = 2000 * NVME_CONST::STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
-    StallDelay = NVME_CONST::STALL_TIME_US;
+    DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
+    StallDelay = STALL_TIME_US;
 
     AccessRangeCount = 0;
     Bar0Size = 0;
-    MaxNamespaces = NVME_CONST::SUPPORT_NAMESPACES;
-    IoDepth = NVME_CONST::IO_QUEUE_DEPTH;
-    AdmDepth = NVME_CONST::ADMIN_QUEUE_DEPTH;
+    MaxNamespaces = SUPPORT_NAMESPACES;
+    IoDepth = IO_QUEUE_DEPTH;
+    AdmDepth = ADMIN_QUEUE_DEPTH;
     TotalNumaNodes = 0;
     NamespaceCount = 0;       //how many namespace active in current device?
 
@@ -1358,7 +1359,7 @@ void CNvmeDevice::InitVars()
     RtlZeroMemory(AccessRanges, sizeof(AccessRanges));
     RtlZeroMemory(IoQueue, sizeof(IoQueue));
 
-    for(ULONG i=0; i< NVME_CONST::MAX_INT_COUNT; i++)
+    for(ULONG i=0; i< MAX_INT_COUNT; i++)
     {
         MsgGroupAffinity[i].Mask = MAXULONG_PTR;
     }
