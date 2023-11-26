@@ -65,12 +65,6 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
     ULONG block_size = 0;
     ULONG64 blocks = 0;
 
-    //LUN is zero based...
-    if (srbext->DevExt->IsNsExist(nsid))
-    {
-        srb_status = SRB_STATUS_INVALID_LUN;
-        goto END;
-    }
     if (!srbext->DevExt->IsWorking())
     {
         srb_status = SRB_STATUS_NO_DEVICE;

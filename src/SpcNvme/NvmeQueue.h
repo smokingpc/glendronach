@@ -129,16 +129,29 @@ public:
     void DeallocOrigSrbExtBuffer();
     void DeallocQueueBuffer();
 
-    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, PSPCNVME_SRBEXT orig_srbexts[], ULONG idx)
+    inline USHORT GetNextCid()
     {
+        ULONG new_cid = (ULONG)InterlockedIncrement((volatile LONG*)&InternalCid);
+        return 1 + (new_cid % Depth); //let CID be 1-based index so add 1.
+    }
+    inline USHORT CidToSrbExtIdx(USHORT cid)
+    {
+        return cid - 1;
+    }
+    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, PSPCNVME_SRBEXT orig_srbexts[], USHORT cid)
+    {
+        USHORT idx = CidToSrbExtIdx(cid);
+        ASSERT(idx < Depth);
         PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
             (volatile PVOID*)orig_srbexts + idx, srbext, NULL);
 
         if (NULL != old_srbext)
             old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
     }
-    inline PSPCNVME_SRBEXT PopSrbExt(PSPCNVME_SRBEXT orig_srbexts[], ULONG idx)
+    inline PSPCNVME_SRBEXT PopSrbExt(PSPCNVME_SRBEXT orig_srbexts[], USHORT cid)
     {
+        USHORT idx = CidToSrbExtIdx(cid);
+        ASSERT(idx < Depth);
         PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
             (volatile PVOID*)orig_srbexts + idx, NULL);
 
@@ -148,10 +161,5 @@ public:
     inline bool IsSafeForSubmit()
     {
         return ((Depth - SAFE_SUBMIT_THRESHOLD) > (USHORT)InflightCmds) ? true : false;
-    }
-    inline USHORT GetNextCid()
-    {
-        ULONG new_cid = (ULONG)InterlockedIncrement((volatile LONG*) &InternalCid);
-        return 1+(new_cid % Depth); //let CID be 1-based index so add 1.
     }
 };

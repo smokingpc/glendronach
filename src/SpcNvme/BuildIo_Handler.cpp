@@ -23,8 +23,6 @@ UCHAR BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
     
     //check path/target/lun here. Only accept request which has valid BTL address.
-    UCHAR path = 0, target = 0, lun = 0;
-    SrbGetPathTargetLun(srbext->Srb, &path, &target, &lun);
     if(FALSE == (0==srbext->ScsiPath && 
                 0==srbext->ScsiTarget && 
                 srbext->DevExt->IsLunExist(srbext->ScsiLun))
