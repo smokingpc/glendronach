@@ -117,7 +117,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
     KeInitializeSpinLock(&SubLock);
 
-    ok = AllocOrigSrbExtHistory();
+    ok = AllocOrigSrbExtBuffer();
     if (!ok)
     {
         status = STATUS_MEMORY_NOT_ALLOCATED;
@@ -155,7 +155,7 @@ ERROR:
 void CNvmeQueue::Teardown()
 {
     this->IsReady = false;
-    DeallocOrigSrbExtHistory();
+    DeallocOrigSrbExtBuffer();
     DeallocQueueBuffer();
 }
 NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
@@ -369,16 +369,17 @@ void CNvmeQueue::DeallocQueueBuffer()
     this->Buffer = NULL;
     this->BufferSize = 0;
 }
-bool CNvmeQueue::AllocOrigSrbExtHistory()
+bool CNvmeQueue::AllocOrigSrbExtBuffer()
 {
     OrigSrbExt = (PSPCNVME_SRBEXT*) 
-            new(NonPagedPool, TAG_SRB_HISTORY) SPCNVME_SRBEXT[Depth];
+            new(NonPagedPool, TAG_SRB_HISTORY) PSPCNVME_SRBEXT[Depth];
     if(NULL == OrigSrbExt)
         return false;
 
+    RtlZeroMemory(OrigSrbExt, sizeof(PSPCNVME_SRBEXT)*Depth);
     return true;
 }
-void CNvmeQueue::DeallocOrigSrbExtHistory()
+void CNvmeQueue::DeallocOrigSrbExtBuffer()
 {
     if (NULL != OrigSrbExt)
     {

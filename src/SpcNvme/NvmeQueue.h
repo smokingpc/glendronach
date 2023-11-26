@@ -125,8 +125,8 @@ public:
     void WriteCplHead(ULONG value);
     bool InitQueueBuffer();    //init contents of this queue
     bool AllocQueueBuffer();    //allocate memory of this queue
-    bool AllocOrigSrbExtHistory();
-    void DeallocOrigSrbExtHistory();
+    bool AllocOrigSrbExtBuffer();
+    void DeallocOrigSrbExtBuffer();
     void DeallocQueueBuffer();
 
     inline void PushSrbExt(PSPCNVME_SRBEXT srbext, PSPCNVME_SRBEXT orig_srbexts[], ULONG idx)
