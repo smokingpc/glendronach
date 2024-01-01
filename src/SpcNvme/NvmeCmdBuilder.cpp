@@ -23,7 +23,6 @@ void BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, b
     ULONG nsid = LunToNsId(srbext->ScsiLun);
 
     cmd->CDW0.OPC = (is_write)? NVME_NVM_COMMAND_WRITE : NVME_NVM_COMMAND_READ;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = nsid;
     BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
     cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
@@ -37,7 +36,6 @@ void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_CONTROLLER;
     cmd->u.IDENTIFY.CDW10.CNTID = 0;
@@ -50,7 +48,6 @@ void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, size_
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ACTIVE_NAMESPACES;
     BuildPrp(srbext, cmd, nsid_list, list_size);
@@ -60,7 +57,6 @@ void BuildCmd_IdentSpecifiedNS(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = nsid;
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_SPECIFIC_NAMESPACE;
 
@@ -73,7 +69,6 @@ void BuildCmd_IdentAllNSList(PSPCNVME_SRBEXT srbext, PVOID ns_buf, size_t buf_si
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_IDENTIFY;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.IDENTIFY.CDW10.CNS = NVME_IDENTIFY_CNS_ALLOCATED_NAMESPACE_LIST;
 
@@ -84,7 +79,6 @@ void BuildCmd_SetIoQueueCount(PSPCNVME_SRBEXT srbext, USHORT count)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_NUMBER_OF_QUEUES;
 
     //NSQ and NCQ should be 0 based.
@@ -99,7 +93,6 @@ void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue *queue)
     queue->GetSubQAddr(&paddr);
 
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_CREATE_IO_SQ;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->QueueID;
@@ -116,7 +109,6 @@ void BuildCmd_RegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     queue->GetCplQAddr(&paddr);
 
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_CREATE_IO_CQ;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->PRP1 = (ULONG64)paddr.QuadPart;
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.CREATEIOCQ.CDW10.QID = queue->QueueID;
@@ -130,7 +122,6 @@ void BuildCmd_UnRegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_DELETE_IO_SQ;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->QueueID;
 }
@@ -139,7 +130,6 @@ void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_DELETE_IO_CQ;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.CREATEIOSQ.CDW10.QID = queue->QueueID;
 }
@@ -151,7 +141,6 @@ void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_INTERRUPT_COALESCING;
     cmd->u.SETFEATURES.CDW11.InterruptCoalescing.THR = threshold;
@@ -162,7 +151,6 @@ void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_ARBITRATION;
     cmd->u.SETFEATURES.CDW11.Arbitration.AB = AB_BURST;
@@ -175,7 +163,6 @@ void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER &timestamp)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_TIMESTAMP;
     BuildPrp(srbext, cmd, &timestamp.QuadPart, sizeof(LARGE_INTEGER));
@@ -185,7 +172,6 @@ void BuildCmd_SetAsyncEvent(PSPCNVME_SRBEXT srbext)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_ASYNC_EVENT_CONFIG;
     cmd->u.SETFEATURES.CDW11.AsyncEventConfig.CriticalWarnings = TRUE;
@@ -195,7 +181,6 @@ void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_I
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
 
     //In this command, we need "count of DWORD" not "size in bytes".
@@ -213,7 +198,6 @@ void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
 
     USHORT dword_count = (USHORT)(sizeof(NVME_FIRMWARE_SLOT_INFO_LOG) >> 2);
@@ -228,7 +212,6 @@ void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SECURITY_SEND;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = nsid;
 
     //In this command, we need "count of DWORD" not "size in bytes".
@@ -247,7 +230,6 @@ void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SECURITY_RECEIVE;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = nsid;
 
     //In this command, we need "count of DWORD" not "size in bytes".
@@ -267,7 +249,6 @@ void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext)
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
 }
 void BuildCmd_GetLogPage(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size)
@@ -277,7 +258,6 @@ void BuildCmd_GetLogPage(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UI
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     UINT32 numd = GetDwordNumByLogPageId(log_id);
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     BuildPrp(srbext, &srbext->NvmeCmd, log_buf, buf_size);
     cmd->u.GETLOGPAGE.CDW10.LID = log_id;
@@ -291,7 +271,6 @@ void BuildCmd_GetLogPageV13(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf,
     RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
     UINT32 numd = GetDwordNumByLogPageId(log_id);
     cmd->CDW0.OPC = NVME_ADMIN_COMMAND_GET_LOG_PAGE;
-    //cmd->CDW0.CID = srbext->GetCid();
     cmd->NSID = UNSPECIFIC_NSID;
     BuildPrp(srbext, &srbext->NvmeCmd, log_buf, buf_size);
     cmd->u.GETLOGPAGE.CDW10_V13.LID = log_id;

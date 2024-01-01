@@ -64,19 +64,19 @@ void CNvmeDevice::RestartAdapterWorker(
 VOID CNvmeDevice::HandleAsyncEvent(
     _In_ PSPCNVME_SRBEXT srbext)
 {
-    ////todo: call workitem to invoke GetLogPage to retrieve detailed infomation.
     PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event =
         (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&srbext->NvmeCpl.DW0;
+    ((CNvmeDevice*)srbext->DevExt)->SaveAsyncEvent(event);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "AsyncEvent occurred! => Cid=%d, EventType=%d, EventInfo=%d, LogPage=%d\n",
-        srbext->NvmeCpl.DW3.CID, event->AsyncEventType, event->AsyncEventInfo, event->LogPage);
-    KdBreakPoint();
-    ((CNvmeDevice*)srbext->DevExt)->GetLogPage(event->LogPage);
+    //If AsyncEvent can notify back, AdmQ should be still working.
+    //Just ask controller : What happened?
+    ((CNvmeDevice*)srbext->DevExt)->GetLogPageForAsyncEvent(event->LogPage);
 }
 VOID CNvmeDevice::HandleErrorInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_ERROR_INFO_LOG errlog = (PNVME_ERROR_INFO_LOG)srbext->ExtBuf;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[ErrorInfo LogPage]:\n");
     
@@ -85,22 +85,68 @@ VOID CNvmeDevice::HandleErrorInfoLogPage(
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    LBA(%llX), NameSpace(%08X), CmdSpecificInfo(%llX), VendorSpecificInfo(%X)\n",
             errlog->Lba, errlog->NameSpace, errlog->CommandSpecificInfo, errlog->VendorInfoAvailable);
 
+    //SaveAsyncEventLogPage() will copy srbext->ExtBuf pointer and save it.
+    //Should replace srbext->ExtBuf by NULL to prevent completion function free it.
+    devext->SaveAsyncEventLogPage(srbext->ExtBuf);
+    srbext->ExtBuf = NULL;
+
     if(srbext->NvmeCpl.DW3.Status.M)
-        ((CNvmeDevice*)srbext->DevExt)->GetLogPage(1);
+        devext->GetLogPageForAsyncEvent(1);
     else
-        ((CNvmeDevice*)srbext->DevExt)->RequestAsyncEvent();
+        devext->RequestAsyncEvent();
 }
-VOID CNvmeDevice::PrintSmartInfoLogPage(
+VOID CNvmeDevice::HandleSmartInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
-    PNVME_HEALTH_INFO_LOG smart = (PNVME_HEALTH_INFO_LOG)srbext->ExtBuf;
-    UNREFERENCED_PARAMETER(smart);
+    PNVME_HEALTH_INFO_LOG smartlog = (PNVME_HEALTH_INFO_LOG)srbext->ExtBuf;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    AvailableSpaceLow(%d), TemperatureThreshold(%d), ReliabilityDegraded(%d), ReadOnly(%d), VolatileMemoryBackupDeviceFailed(%d)\n",
+        smartlog->CriticalWarning.AvailableSpaceLow, smartlog->CriticalWarning.TemperatureThreshold, 
+        smartlog->CriticalWarning.ReliabilityDegraded, smartlog->CriticalWarning.ReadOnly, 
+        smartlog->CriticalWarning.VolatileMemoryBackupDeviceFailed);
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    Temperature[0]=(%d), Temperature[1]=(%d)\n", 
+        smartlog->Temperature[0]+ KELVIN_ZERO_TO_CELSIUS, smartlog->Temperature[1]+ KELVIN_ZERO_TO_CELSIUS);
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    AvailableSpare(%d), PercentageUsed(%d)\n", 
+        smartlog->AvailableSpare, smartlog->PercentageUsed);
+
+    //SaveAsyncEventLogPage() will copy srbext->ExtBuf pointer and save it.
+    //Should replace srbext->ExtBuf by NULL to prevent completion function free it.
+    devext->SaveAsyncEventLogPage(srbext->ExtBuf);
+    srbext->ExtBuf = NULL;
+
+    if (srbext->NvmeCpl.DW3.Status.M)
+        devext->GetLogPageForAsyncEvent(1);
+    else
+        devext->RequestAsyncEvent();
 }
-VOID CNvmeDevice::PrintFwSlotInfoLogPage(
+VOID CNvmeDevice::HandleFwSlotInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_FIRMWARE_SLOT_INFO_LOG slotinfo = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtBuf;
-    UNREFERENCED_PARAMETER(slotinfo);
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    ActiveSlot(%d), PendingActivateSlot(%d)\n",
+        slotinfo->AFI.ActiveSlot, slotinfo->AFI.PendingActivateSlot);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    ");
+    for(int i=0; i<7; i++)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    FRS[%d]=%llX,", i, slotinfo->FRS[i]);
+    }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "\n");
+
+    //SaveAsyncEventLogPage() will copy srbext->ExtBuf pointer and save it.
+    //Should replace srbext->ExtBuf by NULL to prevent completion function free it.
+    devext->SaveAsyncEventLogPage(srbext->ExtBuf);
+    srbext->ExtBuf = NULL;
+
+    if (srbext->NvmeCpl.DW3.Status.M)
+        devext->GetLogPageForAsyncEvent(1);
+    else
+        devext->RequestAsyncEvent();
 }
 
 #pragma region ======== CSpcNvmeDevice inline routines ======== 
@@ -199,11 +245,6 @@ bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
 #pragma endregion
 
 #pragma region ======== CSpcNvmeDevice ======== 
-#if 0
-bool CNvmeDevice::GetMsixTable()
-{
-}
-#endif 
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -242,8 +283,17 @@ void CNvmeDevice::Teardown()
     DeleteIoQ();
     DeleteAdmQ();
     State = NVME_STATE::STOP;
-    if(this->CtrlReg != NULL)
+    if(NULL != this->CtrlReg)
+    {
         StorPortFreeDeviceBase(this, this->CtrlReg);
+        CtrlReg = NULL;
+    }
+
+    if(NULL != MsgGroupAffinity)
+    {
+        delete[] MsgGroupAffinity;
+        MsgGroupAffinity = NULL;
+    }
 }
 NTSTATUS CNvmeDevice::EnableController()
 {
@@ -389,18 +439,23 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     status = SetInterruptCoalescing();
     ASSERT(NT_SUCCESS(status));
+
     status = SetArbitration();
     ASSERT(NT_SUCCESS(status));
+
     status = SetPowerManagement();
     ASSERT(NT_SUCCESS(status));
+
     status = SetHostBuffer();
     ASSERT(NT_SUCCESS(status));
-    status = SetSyncHostTime();
-    ASSERT(NT_SUCCESS(status));
-    status = SetAsyncEvent();
-    ASSERT(NT_SUCCESS(status));
 
-    RequestAsyncEvent();
+    //optional feature
+    status = SetSyncHostTime();
+
+    status = SetAsyncEvent();
+    if(NT_SUCCESS(status))
+        RequestAsyncEvent();
+
     return STATUS_SUCCESS;
 }
 NTSTATUS CNvmeDevice::RestartController()
@@ -661,6 +716,9 @@ NTSTATUS CNvmeDevice::SetAsyncEvent()
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
+    if (0 == this->CtrlIdent.AERL)
+        return STATUS_NOT_SUPPORTED;
+
     //Only support SMART health / critical AsyncEvent now.
     //No checking CtrlIdent.OAES fields.
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr;
@@ -700,9 +758,8 @@ NTSTATUS CNvmeDevice::RequestAsyncEvent()
     status = SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     return status;
 }
-NTSTATUS CNvmeDevice::GetLogPage(UCHAR logid)
+NTSTATUS CNvmeDevice::GetLogPageForAsyncEvent(UCHAR logid)
 {
-    ASSERT(logid == NVME_LOG_PAGE_ERROR_INFO);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PSPCNVME_SRBEXT srbext = new(NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
     srbext->Init(this, NULL);
@@ -716,10 +773,10 @@ NTSTATUS CNvmeDevice::GetLogPage(UCHAR logid)
         srbext->CompletionCB = HandleErrorInfoLogPage;
         break;
     case NVME_LOG_PAGE_HEALTH_INFO:
-        srbext->CompletionCB = PrintSmartInfoLogPage;
+        srbext->CompletionCB = HandleSmartInfoLogPage;
         break;
     case NVME_LOG_PAGE_FIRMWARE_SLOT_INFO:
-        srbext->CompletionCB = PrintFwSlotInfoLogPage;
+        srbext->CompletionCB = HandleFwSlotInfoLogPage;
         break;
     }
 
@@ -867,6 +924,14 @@ NTSTATUS CNvmeDevice::SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
 {
     if(!IsWorking() || NULL == AdmQueue)
         return STATUS_DEVICE_NOT_READY;
+
+    //AsyncEvent use special CID. Don't let it overlap to normal CID range. 
+    if(cmd->CDW0.OPC == NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST)
+    {
+        srbext->NvmeCmd.CDW0.CID = AdmQueue->Depth + 2;
+        return AdmQueue->SubmitCmd(srbext, cmd, false);
+    }
+
     return AdmQueue->SubmitCmd(srbext, cmd);
 }
 NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
@@ -937,6 +1002,24 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
         return STATUS_UNSUCCESSFUL;
 
     return STATUS_SUCCESS;
+}
+void CNvmeDevice::SaveAsyncEvent(PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event)
+{
+    //note: if extend AsyncEvent to multiple event, here should be refactor to 
+    //      make saving AsyncEventLog atomic.
+    CurrentAsyncEvent = (CurrentAsyncEvent+1) % MAX_ASYNC_EVENT_LOG;
+    RtlCopyMemory(&AsyncEventLog[CurrentAsyncEvent], event,
+        sizeof(NVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST));
+}
+void CNvmeDevice::SaveAsyncEventLogPage(PVOID page)
+{
+    //note: if extend AsyncEvent to multiple event, here should be refactor to 
+    //      make saving AsyncEventLog atomic.
+    CurrentLogPage = (CurrentLogPage + 1) % MAX_ASYNC_EVENT_LOGPAGES;
+    PVOID temp = AsyncEventLogPage[CurrentLogPage];
+    AsyncEventLogPage[CurrentLogPage] = page;
+    if(NULL != temp)
+        delete[] temp;
 }
 bool CNvmeDevice::IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
 {
@@ -1113,7 +1196,6 @@ END:
     }
     return status;
 }
-
 NTSTATUS CNvmeDevice::CreateAdmQ()
 {
     if(NULL != AdmQueue)
@@ -1212,7 +1294,7 @@ bool CNvmeDevice::MapCtrlRegisters()
     STOR_PHYSICAL_ADDRESS bar0 = { 0 };
     INTERFACE_TYPE type = PortCfg->AdapterInterfaceType;
     //I got this mapping method by cracking stornvme.sys.
-    bar0.LowPart = (PciCfg.u.type0.BaseAddresses[0] & 0xFFFFC000);
+    bar0.LowPart = (PciCfg.u.type0.BaseAddresses[0] & BAR0_LOWPART_MASK);
     bar0.HighPart = PciCfg.u.type0.BaseAddresses[1];
 
     for (ULONG i = 0; i < AccessRangeCount; i++)
@@ -1311,6 +1393,9 @@ bool CNvmeDevice::WaitForCtrlerShst(ULONG time_us)
 }
 void CNvmeDevice::InitVars()
 {
+//DeviceExtension is created by storport and ZEROED.
+//It WILL NOT call constructor of class or struct.
+//Should re-init variables again.
     ReadCacheEnabled = false;
     WriteCacheEnabled = false;
     RebalancingPnp = FALSE;
@@ -1321,50 +1406,52 @@ void CNvmeDevice::InitVars()
     State = NVME_STATE::STOP;
     RegisteredIoQ = 0;
     AllocatedIoQ = 0;
-    DesiredIoQ = IO_QUEUE_COUNT;
-
+    DesiredIoQ = MAX_IO_QUEUE_COUNT;
     DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
     StallDelay = STALL_TIME_US;
-
+    RtlZeroMemory(AccessRanges, sizeof(AccessRanges));
     AccessRangeCount = 0;
     Bar0Size = 0;
     MaxNamespaces = SUPPORT_NAMESPACES;
     IoDepth = IO_QUEUE_DEPTH;
     AdmDepth = ADMIN_QUEUE_DEPTH;
-    TotalNumaNodes = 0;
     NamespaceCount = 0;       //how many namespace active in current device?
-
     CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;  //how many interrupt should be coalesced into one interrupt?
     CoalescingTime = DEFAULT_INT_COALESCE_TIME;       //how long(100us unit) should interrupts be coalesced?
-
     VendorID = 0;
     DeviceID = 0;
-    CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-    OutstandAsyncEvent = 0;
-    //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
+
+    RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
+    RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
+    RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
+    RtlZeroMemory(NsData, sizeof(NsData));
+
+    //RestartWorker and RestartDpc are used for HwAdapterControl::ScsiRestartAdapter event.
     RestartWorker = NULL;
-    RestartDpc;
+    StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
+
+    //One interrupt could be handled by multiple CPU, especially in system with lots of CPU.
+    //e.g. AMD EPYC 9654.
+    //So MsgGroupAffinity should be allocated by CpuCount.
+    CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+    MsgGroupAffinity = (PGROUP_AFFINITY) 
+                new(NonPagedPool, TAG_GROUP_AFFINITY) GROUP_AFFINITY[CpuCount];
+    RtlZeroMemory(&MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
+
     CtrlReg = NULL;
     PortCfg = NULL;
     Doorbells = NULL;
     MsixTable = NULL;
     AdmQueue = NULL;
-    
-    RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
-    RtlZeroMemory(MsgGroupAffinity, sizeof(MsgGroupAffinity));
-    RtlZeroMemory(&NvmeVer, sizeof(NVME_VERSION));
-    RtlZeroMemory(&CtrlCap, sizeof(NVME_CONTROLLER_CAPABILITIES));
-    RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
-    RtlZeroMemory(NsData, sizeof(NsData));
-    RtlZeroMemory(AccessRanges, sizeof(AccessRanges));
     RtlZeroMemory(IoQueue, sizeof(IoQueue));
+    UncachedExt = NULL;
 
-    for(ULONG i=0; i< MAX_INT_COUNT; i++)
-    {
-        MsgGroupAffinity[i].Mask = MAXULONG_PTR;
-    }
+    RtlZeroMemory(AsyncEventLog, sizeof(AsyncEventLog));
+    CurrentAsyncEvent = MAXULONG;
+    RtlZeroMemory(AsyncEventLogPage, sizeof(AsyncEventLogPage));
+    CurrentLogPage = MAXULONG;
 
-    StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
+    RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
 }
 void CNvmeDevice::LoadRegistry()
 {

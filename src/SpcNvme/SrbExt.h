@@ -60,7 +60,7 @@ typedef struct _SPCNVME_SRBEXT
     PVOID Prp2VA;
     PHYSICAL_ADDRESS Prp2PA;
     PSPC_SRBEXT_COMPLETION CompletionCB;
-    //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPage().
+    //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPageForAsyncEvent().
     //It should be freed in CompletionCB.
     PVOID ExtBuf;
     USHORT StoragePort;

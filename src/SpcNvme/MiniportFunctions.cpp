@@ -71,6 +71,16 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto error;
     
+    //[Workaround for AdapterTopologyTelemetry event]
+    //before HwInitialize, should init DmaAdapter.
+    //AdapterTopologyTelemetry could come in between HwFindAdapter and Hwinitialize.
+    //But Storport!RaidpAdapterContiunueScatterGather has problem : it will return
+    //error code if DmaAdapter not allocated. But upper callstacks didn't check error codes.
+    //This situation cause SRB of AdapterTopologyTelemetry event be leaked.
+    //If rapidly create/delete storage controller device, this SRB leaking will make system hanging.
+    nvme->UncachedExt = StorPortGetUncachedExtension(
+                                devext, port_cfg, UNCACHED_EXT_SIZE);
+
     //PCI bus related initialize
     //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
@@ -277,11 +287,9 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
         //In PCI rebalance, we should disable controller and free all resources
         //here and stoport will call HwFindAdapter again.
         
-
-        //In normal procedure of removing device, we don't have to do anything here.
-        //BuildIo SRB_FUNCTION_PNP should handle DEVICE_REMOVE teardown.
-        //ScsiStopAdapter is just a power state handler.
-        //Only power state changing will call this control code.
+        //Before adapter remove, suspend/hiberation, and rebalance , 
+        //it will enter D3 state.
+        //Here should disable controller so storport can disconnect interrupts.
         status = Handle_StopAdapter(nvme);
         break;
     }
@@ -290,6 +298,8 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     //Device "entering" D0 state from D1 D2 D3 state
     //This control code do similar things(exclude PerfConfig) as HwInitialize().
     //**running at DIRQL
+    //this event handles "Wakeup" from suspend/hiberation.
+    //StopAdapter disabled controller so should restart it here.
         status = Handle_RestartAdapter(nvme);
         break;
     }

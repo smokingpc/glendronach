@@ -44,9 +44,6 @@
 #define NVME_INVALID_CID    (MAXUSHORT)        //should align to NVME CID size
 #define NVME_INVALID_QID    (MAXUSHORT)
 
-#define MAX_LOGIC_UNIT      1
-#define MAX_IO_QUEUE_COUNT  64
-#define ACCESS_RANGE_COUNT  2
 //const char* SpcVendorID = "SPC     ";           //vendor name
 //const char* SpcProductID = "SomkingPC NVMe  ";  //model name
 //const char* SpcProductRev = "0100";
@@ -76,14 +73,18 @@
 #define MAX_INT_COUNT               64
 #define SUPPORT_NAMESPACES          1
 #define SAFE_SUBMIT_THRESHOLD       8
-#define IO_QUEUE_COUNT              32
+#define MAX_IO_QUEUE_COUNT          32
 #define STALL_TIME_US               100     //in micro-seconds
 #define SLEEP_TIME_US               (STALL_TIME_US*10)
 #define UNSPECIFIC_NSID             0
 #define DEFAULT_CTRLID              1
 #define ADMIN_QUEUE_DEPTH           64
 #define IO_QUEUE_DEPTH              256
-#define ASYNC_EVENT_LIMIT           3
+#define MAX_ASYNC_EVENT_LOG         (1<<4)  //max 16 logs.
+#define MAX_ASYNC_EVENT_LOGPAGES    MAX_ASYNC_EVENT_LOG
+#define CELSIUS_ZERO_TO_KELVIN      (273)
+#define KELVIN_ZERO_TO_CELSIUS      (-273)
+#define BAR0_LOWPART_MASK           (0xFFFFC000)
 #define MAX_NS_COUNT                1024    //Max NameSpace count. defined in NVMe spec.
 #define INTCOAL_TIME                2       //Interrupt Coalescing time threshold in 100us unit.
 #define INTCOAL_THRESHOLD           8       //Interrupt Coalescing trigger threshold.
@@ -99,6 +100,8 @@
 #define VENDOR_ID               "SPC     "          //vendor name
 #define PRODUCT_ID              "SomkingPC NVMe  "  //model name
 #define PRODUCT_REV             "0100"
+#define UNCACHED_EXT_SIZE       (21*PAGE_SIZE)
+#define ACCESS_RANGE_COUNT      2
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========

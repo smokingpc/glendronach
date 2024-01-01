@@ -73,7 +73,7 @@ public:
 
     inline bool IsInitOK(){return this->IsReady;}
     
-    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
+    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd, bool replace_cid = true);
     void CompleteCmd(ULONG max_count = 0);
     void GiveupAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);

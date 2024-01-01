@@ -45,13 +45,74 @@ typedef struct _DOORBELL_PAIR{
     NVME_COMPLETION_QUEUE_HEAD_DOORBELL CplHead;
 }DOORBELL_PAIR, *PDOORBELL_PAIR;
 
-//HW_MESSAGE_SIGNALED_INTERRUPT_ROUTINE NvmeMsixISR;
+
+//Using this structure represents the DeviceExtension.
+//And CNvmeDevice inherit this structure to apply behaviors.
+typedef struct _NVME_DEVEXT{
+    bool ReadCacheEnabled = false;
+    bool WriteCacheEnabled = false;
+    BOOLEAN RebalancingPnp = FALSE;
+    ULONG MinPageSize = PAGE_SIZE;
+    ULONG MaxPageSize = PAGE_SIZE;
+    ULONG MaxTxSize = 0;
+    ULONG MaxTxPages = 0;
+    NVME_STATE State = NVME_STATE::STOP;
+    ULONG RegisteredIoQ = 0;
+    ULONG AllocatedIoQ = 0;
+    ULONG DesiredIoQ = MAX_IO_QUEUE_COUNT;
+    ULONG DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
+    ULONG StallDelay = STALL_TIME_US;
+    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = { 0 };         //AccessRange from miniport HwFindAdapter.
+    ULONG AccessRangeCount = 0;
+    ULONG Bar0Size = 0;
+    UCHAR MaxNamespaces = SUPPORT_NAMESPACES;
+    USHORT IoDepth = IO_QUEUE_DEPTH;
+    USHORT AdmDepth = ADMIN_QUEUE_DEPTH;
+    ULONG NamespaceCount = 0;       //how many namespace active in current device?
+
+    UCHAR CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;  //how many interrupt should be coalesced into one interrupt?
+    UCHAR CoalescingTime = DEFAULT_INT_COALESCE_TIME;       //how long(100us unit) should interrupts be coalesced?
+
+    USHORT  VendorID = 0;
+    USHORT  DeviceID = 0;
+
+    NVME_VERSION                        NvmeVer = { 0 };
+    NVME_CONTROLLER_CAPABILITIES        CtrlCap = { 0 };
+    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = { 0 };
+    NVME_IDENTIFY_NAMESPACE_DATA        NsData[SUPPORT_NAMESPACES] = { 0 };
+
+    //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
+    PVOID                               RestartWorker = NULL;
+    STOR_DPC                            RestartDpc;
+    ULONG                               CpuCount = 0;
+    PGROUP_AFFINITY                     MsgGroupAffinity = NULL;
+
+    PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
+    PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;
+    volatile ULONG* Doorbells = NULL;
+    PMSIX_TABLE_ENTRY MsixTable = NULL;
+    CNvmeQueue* AdmQueue = NULL;
+    CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT] = { 0 };
+    PVOID UncachedExt = NULL;
+    
+    //note: if extend AsyncEvent to multiple event, here should be refactor to 
+    //      make saving AsyncEventLog atomic.
+    NVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST AsyncEventLog[MAX_ASYNC_EVENT_LOG] = {0};
+    ULONG CurrentAsyncEvent = MAXULONG;
+    PVOID AsyncEventLogPage[MAX_ASYNC_EVENT_LOGPAGES] = { 0 };
+    ULONG CurrentLogPage = MAXULONG;
+
+    //Following are huge data.
+    //for more convenient windbg debugging, I put them on tail of class data.
+    PCI_COMMON_CONFIG                   PciCfg;
+}NVME_DEVEXT, *PNVME_DEVEXT;
+
 
 //Using this class represents the DeviceExtension.
 //Because memory allocation in kernel is still C style,
 //the constructor and destructor are useless. They won't be called.
 //So using Setup() and Teardown() to replace them.
-class CNvmeDevice {
+class CNvmeDevice : public NVME_DEVEXT {
 public:
     static const ULONG BUGCHECK_BASE = 0x23939889;          //pizzahut....  XD
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE + 1;            //adapter has some problem. e.g. CSTS.CFS==1
@@ -71,9 +132,9 @@ public:
         _In_ PSPCNVME_SRBEXT srbext);
     static VOID HandleErrorInfoLogPage(
         _In_ PSPCNVME_SRBEXT srbext);
-    static VOID PrintSmartInfoLogPage(
+    static VOID HandleSmartInfoLogPage(
         _In_ PSPCNVME_SRBEXT srbext);
-    static VOID PrintFwSlotInfoLogPage(
+    static VOID HandleFwSlotInfoLogPage(
         _In_ PSPCNVME_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
@@ -87,11 +148,10 @@ public:
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
-    NTSTATUS InitNsExt();   //init namespace extension for exposed disks
+//    NTSTATUS InitNsExt();   //init namespace extension for exposed disks
     NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
     NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
 
-    //NTSTATUS InitIdentifyCtrl();
     NTSTATUS IdentifyAllNamespaces();
     NTSTATUS IdentifyFirstNamespace();
     NTSTATUS CreateIoQueues(bool force = false);    //if(force) => delete exist queue objects and recreate again.
@@ -105,7 +165,7 @@ public:
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
     NTSTATUS RequestAsyncEvent();
-    NTSTATUS GetLogPage(UCHAR logid);
+    NTSTATUS GetLogPageForAsyncEvent(UCHAR logid);
     NTSTATUS SetArbitration();
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
     NTSTATUS SetPowerManagement();
@@ -117,6 +177,8 @@ public:
     NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
     void ReleaseOutstandingSrbs();
     NTSTATUS SetPerfOpts();
+    void SaveAsyncEvent(PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event);
+    void SaveAsyncEventLogPage(PVOID page);
     bool IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len);
     bool IsNsExist(ULONG nsid);
     bool IsLunExist(UCHAR lun);
@@ -125,58 +187,7 @@ public:
     bool IsTeardown();
     bool IsStop();
 
-    bool ReadCacheEnabled = false;
-    bool WriteCacheEnabled = false;
-    BOOLEAN RebalancingPnp = FALSE;
-    ULONG MinPageSize = PAGE_SIZE;
-    ULONG MaxPageSize = PAGE_SIZE;
-    ULONG MaxTxSize = 0;
-    ULONG MaxTxPages = 0;
-    NVME_STATE State = NVME_STATE::STOP;
-    ULONG RegisteredIoQ = 0;
-    ULONG AllocatedIoQ = 0;
-    ULONG DesiredIoQ = IO_QUEUE_COUNT;
-
-    ULONG DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
-    ULONG StallDelay = STALL_TIME_US;
-
-    ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = {0};         //AccessRange from miniport HwFindAdapter.
-    ULONG AccessRangeCount = 0;
-    ULONG Bar0Size = 0;
-    UCHAR MaxNamespaces = SUPPORT_NAMESPACES;
-    USHORT IoDepth = IO_QUEUE_DEPTH;
-    USHORT AdmDepth = ADMIN_QUEUE_DEPTH;
-    ULONG TotalNumaNodes = 0;
-    ULONG NamespaceCount = 0;       //how many namespace active in current device?
-    
-    UCHAR CoalescingThreshold = DEFAULT_INT_COALESCE_COUNT;  //how many interrupt should be coalesced into one interrupt?
-    UCHAR CoalescingTime = DEFAULT_INT_COALESCE_TIME;       //how long(100us unit) should interrupts be coalesced?
-
-    USHORT  VendorID = 0;
-    USHORT  DeviceID = 0;
-    ULONG   CpuCount = 0;
-    volatile long    OutstandAsyncEvent = 0;
-    NVME_VERSION                        NvmeVer = {0};
-    NVME_CONTROLLER_CAPABILITIES        CtrlCap = {0};
-    NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = {0};
-    NVME_IDENTIFY_NAMESPACE_DATA        NsData[SUPPORT_NAMESPACES] = {0};
-    
-    //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
-    PVOID                               RestartWorker = NULL;
-    STOR_DPC                            RestartDpc;
-    GROUP_AFFINITY                      MsgGroupAffinity[MAX_INT_COUNT] = {0};
 private:
-    PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
-    PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;
-    ULONG *Doorbells = NULL;
-    PMSIX_TABLE_ENTRY MsixTable = NULL;
-    CNvmeQueue* AdmQueue = NULL;
-    CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT] = {0};
-
-    //Following are huge data.
-    //for more convenient windbg debugging, I put them on tail of class data.
-    PCI_COMMON_CONFIG                   PciCfg;
-
     void InitVars();
     void LoadRegistry();
 

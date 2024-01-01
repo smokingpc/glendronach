@@ -158,7 +158,7 @@ void CNvmeQueue::Teardown()
     DeallocOrigSrbExtBuffer();
     DeallocQueueBuffer();
 }
-NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd, bool replace_cid)
 {
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
@@ -172,7 +172,8 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         CQueuedSpinLock lock(&SubLock);
 
         ASSERT(NULL != srbext);
-        src_cmd->CDW0.CID = GetNextCid();
+        if(replace_cid)
+            src_cmd->CDW0.CID = GetNextCid();
         PushSrbExt(srbext, OrigSrbExt, src_cmd->CDW0.CID);
 
         //For Debugging

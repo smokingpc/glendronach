@@ -87,6 +87,7 @@ typedef enum _NVME_STATE {
     TEARDOWN = 4,
     RESETCTRL = 5,
     RESETBUS = 6,
-    SHUTDOWN = 10,   //CC.SHN==1
+    SHUTDOWN = 10,  //CC.SHN==1
+    ERROR = 99,     //un-recoverable error from AsyncEvent
 }NVME_STATE;
 
