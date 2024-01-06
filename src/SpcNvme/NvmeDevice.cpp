@@ -755,6 +755,8 @@ NTSTATUS CNvmeDevice::RequestAsyncEvent()
     srbext->DeleteInComplete = TRUE;
     srbext->CompletionCB = HandleAsyncEvent;
     BuildCmd_RequestAsyncEvent(srbext);
+    //AsyncEvent use special CID. Don't let it overlap to normal CID range. 
+    srbext->NvmeCmd.CDW0.CID = AdmQueue->Depth + 1;
     status = SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     return status;
 }
@@ -925,13 +927,8 @@ NTSTATUS CNvmeDevice::SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
     if(!IsWorking() || NULL == AdmQueue)
         return STATUS_DEVICE_NOT_READY;
 
-    //AsyncEvent use special CID. Don't let it overlap to normal CID range. 
-    if(cmd->CDW0.OPC == NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST)
-    {
-        srbext->NvmeCmd.CDW0.CID = AdmQueue->Depth + 2;
-        return AdmQueue->SubmitCmd(srbext, cmd, false);
-    }
-
+    if(MAXUSHORT == srbext->NvmeCmd.CDW0.CID)
+        srbext->NvmeCmd.CDW0.CID = AdmQueue->GetNextCid();
     return AdmQueue->SubmitCmd(srbext, cmd);
 }
 NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
@@ -942,6 +939,9 @@ NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
     ULONG cpu_idx = KeGetCurrentProcessorNumberEx(NULL);
     //todo: determine idx by NUMA rules to improve performance
     ULONG idx = (cpu_idx % RegisteredIoQ);
+
+    if (MAXUSHORT == srbext->NvmeCmd.CDW0.CID)
+        srbext->NvmeCmd.CDW0.CID = IoQueue[idx]->GetNextCid();
     return IoQueue[idx]->SubmitCmd(srbext, cmd);
 }
 void CNvmeDevice::ReleaseOutstandingSrbs()

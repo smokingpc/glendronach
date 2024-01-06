@@ -72,8 +72,17 @@ static __inline void UpdateCplHeadAndPhase(ULONG& cpl_head, USHORT& phase, USHOR
     //quick calculation, write a boolean table will know why.
     //    phase = !(cpl_head ^ phase);      
 }
-#pragma region ======== class CNvmeQueue ========
 
+static __inline void SetCidForAsyncEvent(CNvmeQueue *queue, PNVME_COMMAND cmd)
+{
+    //AsyncEvent use special CID. Don't let it overlap to normal CID range. 
+    if (cmd->CDW0.OPC == NVME_ADMIN_COMMAND_ASYNC_EVENT_REQUEST)
+    {
+        cmd->CDW0.CID = queue->Depth+1;
+    }
+}
+
+#pragma region ======== class CNvmeQueue ========
 VOID CNvmeQueue::QueueCplDpcRoutine(
     _In_ PSTOR_DPC dpc,
     _In_ PVOID devext,
@@ -117,7 +126,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
     KeInitializeSpinLock(&SubLock);
 
-    ok = AllocOrigSrbExtBuffer();
+    ok = AllocSrbExtBuffer();
     if (!ok)
     {
         status = STATUS_MEMORY_NOT_ALLOCATED;
@@ -155,10 +164,10 @@ ERROR:
 void CNvmeQueue::Teardown()
 {
     this->IsReady = false;
-    DeallocOrigSrbExtBuffer();
+    DeallocSrbExtBuffer();
     DeallocQueueBuffer();
 }
-NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd, bool replace_cid)
+NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
@@ -172,9 +181,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd, bo
         CQueuedSpinLock lock(&SubLock);
 
         ASSERT(NULL != srbext);
-        if(replace_cid)
-            src_cmd->CDW0.CID = GetNextCid();
-        PushSrbExt(srbext, OrigSrbExt, src_cmd->CDW0.CID);
+        PushSrbExt(srbext, src_cmd->CDW0.CID);
 
         //For Debugging
         srbext->SubTail = SubTail;
@@ -195,10 +202,10 @@ void CNvmeQueue::GiveupAllCmd()
 
     for (ULONG i = 0; i < Depth; i++)
     {
-        if (OrigSrbExt[i] != NULL)
+        if (OriginalSrbExt[i] != NULL)
         {
-            OrigSrbExt[i]->CompleteSrb(SRB_STATUS_BUS_RESET);
-            OrigSrbExt[i] = NULL;
+            OriginalSrbExt[i]->CompleteSrb(SRB_STATUS_BUS_RESET);
+            OriginalSrbExt[i] = NULL;
         }
     }
 
@@ -220,7 +227,7 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
     while(NewCplArrived(cpl, this->PhaseTag) && max_count > done_count)
     {
         USHORT cid = cpl->DW3.CID;
-        PSPCNVME_SRBEXT srbext = PopSrbExt(OrigSrbExt, cid);
+        PSPCNVME_SRBEXT srbext = PopSrbExt(cid);
         SubHead = cpl->DW2.SQHD;
 
         if(NULL != srbext)
@@ -370,107 +377,22 @@ void CNvmeQueue::DeallocQueueBuffer()
     this->Buffer = NULL;
     this->BufferSize = 0;
 }
-bool CNvmeQueue::AllocOrigSrbExtBuffer()
+bool CNvmeQueue::AllocSrbExtBuffer()
 {
-    OrigSrbExt = (PSPCNVME_SRBEXT*) 
+    OriginalSrbExt = (PSPCNVME_SRBEXT*) 
             new(NonPagedPool, TAG_SRB_HISTORY) PSPCNVME_SRBEXT[Depth];
-    if(NULL == OrigSrbExt)
+    if(NULL == OriginalSrbExt)
         return false;
 
-    RtlZeroMemory(OrigSrbExt, sizeof(PSPCNVME_SRBEXT)*Depth);
+    RtlZeroMemory(OriginalSrbExt, sizeof(PSPCNVME_SRBEXT)*Depth);
     return true;
 }
-void CNvmeQueue::DeallocOrigSrbExtBuffer()
+void CNvmeQueue::DeallocSrbExtBuffer()
 {
-    if (NULL != OrigSrbExt)
+    if (NULL != OriginalSrbExt)
     {
-        delete[] OrigSrbExt;
-        OrigSrbExt = NULL;
+        delete[] OriginalSrbExt;
+        OriginalSrbExt = NULL;
     }
 }
 #pragma endregion
-
-#if 0
-#pragma region ======== class CCmdHistory ========
-CCmdHistory::CCmdHistory()
-{
-    //KeInitializeSpinLock(&CmdLock);
-}
-CCmdHistory::CCmdHistory(class CNvmeQueue* parent, PVOID devext, USHORT depth, ULONG numa_node)
-        : CCmdHistory()
-{   Setup(parent, devext, depth, numa_node);    }
-CCmdHistory::~CCmdHistory()
-{
-    Teardown();
-}
-NTSTATUS CCmdHistory::Setup(class CNvmeQueue* parent, PVOID devext, USHORT depth, ULONG numa_node)
-{
-    this->Parent = parent;
-    this->NumaNode = numa_node;
-    this->Depth = depth;
-    this->DevExt = devext;
-    this->BufferSize = depth * sizeof(PSPCNVME_SRBEXT);
-    this->QueueID = parent->QueueID;
-
-    ULONG status = StorPortAllocatePool(devext, (ULONG)this->BufferSize, this->BufferTag, &this->Buffer);
-    if(STOR_STATUS_SUCCESS != status)
-        return STATUS_MEMORY_NOT_ALLOCATED;
-
-    RtlZeroMemory(this->Buffer, this->BufferSize);
-    this->History = (PSPCNVME_SRBEXT *)this->Buffer;
-    return STATUS_SUCCESS;
-}
-void CCmdHistory::Teardown()
-{
-    //todo: complete all remained SRBEXT
-
-    if(NULL != this->Buffer)
-        StorPortFreePool(this->DevExt, this->Buffer);
-
-    this->Buffer = NULL;
-}
-void CCmdHistory::Reset()
-{
-    if(NULL == this->History)
-        return;
-
-    for(ULONG i=0; i<Depth; i++)
-    {
-        if(History[i] != NULL)
-        {
-            History[i]->CompleteSrb(SRB_STATUS_BUS_RESET);
-            History[i] = NULL;
-        }
-    }
-}
-NTSTATUS CCmdHistory::Push(ULONG index, PSPCNVME_SRBEXT srbext)
-{
-    if(index >= Depth)
-        return STATUS_UNSUCCESSFUL;
-
-    PVOID old_ptr = InterlockedCompareExchangePointer(
-                        (volatile PVOID*)&History[index], srbext, NULL);
-
-    if(NULL != old_ptr)
-        return STATUS_ALREADY_COMMITTED;
-
-    return STATUS_SUCCESS;
-}
-NTSTATUS CCmdHistory::Pop(ULONG index, PSPCNVME_SRBEXT& srbext)
-{
-    if (index >= Depth)
-    {
-        KdBreakPoint();
-        return STATUS_UNSUCCESSFUL;
-    }
-
-    srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer((volatile PVOID*)&History[index], NULL);
-    if(NULL == srbext)
-    {
-        KdBreakPoint();
-        return STATUS_INVALID_DEVICE_STATE;
-    }
-    return STATUS_SUCCESS;
-}
-#pragma endregion
-#endif

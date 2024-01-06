@@ -73,7 +73,7 @@ public:
 
     inline bool IsInitOK(){return this->IsReady;}
     
-    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd, bool replace_cid = true);
+    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
     void CompleteCmd(ULONG max_count = 0);
     void GiveupAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
@@ -117,7 +117,8 @@ public:
     size_t CplQ_Size = 0;       //total length of CplQ Buffer.
 
     volatile USHORT InternalCid = 0;
-    PSPCNVME_SRBEXT *OrigSrbExt;
+    PSPCNVME_SRBEXT *OriginalSrbExt = NULL;    //record the caller's SRBEXT, complete them when request done.
+    PSPCNVME_SRBEXT SpecialSrbExt = NULL;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
 
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
@@ -125,8 +126,8 @@ public:
     void WriteCplHead(ULONG value);
     bool InitQueueBuffer();    //init contents of this queue
     bool AllocQueueBuffer();    //allocate memory of this queue
-    bool AllocOrigSrbExtBuffer();
-    void DeallocOrigSrbExtBuffer();
+    bool AllocSrbExtBuffer();
+    void DeallocSrbExtBuffer();
     void DeallocQueueBuffer();
 
     inline USHORT GetNextCid()
@@ -138,24 +139,38 @@ public:
     {
         return cid - 1;
     }
-    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, PSPCNVME_SRBEXT orig_srbexts[], USHORT cid)
+    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid)
     {
         USHORT idx = CidToSrbExtIdx(cid);
-        ASSERT(idx < Depth);
-        PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
-            (volatile PVOID*)orig_srbexts + idx, srbext, NULL);
+        if(idx >= Depth)
+        {
+            SpecialSrbExt = srbext;
+        }
+        else
+        {
+            PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
+                (volatile PVOID*)OriginalSrbExt + idx, srbext, NULL);
 
-        if (NULL != old_srbext)
-            old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
+            if (NULL != old_srbext)
+                old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
+        }
     }
-    inline PSPCNVME_SRBEXT PopSrbExt(PSPCNVME_SRBEXT orig_srbexts[], USHORT cid)
+    inline PSPCNVME_SRBEXT PopSrbExt(USHORT cid)
     {
         USHORT idx = CidToSrbExtIdx(cid);
-        ASSERT(idx < Depth);
-        PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
-            (volatile PVOID*)orig_srbexts + idx, NULL);
+        PSPCNVME_SRBEXT srbext = NULL;
+        if (idx >= Depth)
+        {
+            srbext = SpecialSrbExt;
+            SpecialSrbExt = NULL;
+        }
+        else
+        {
+            srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
+                (volatile PVOID*)OriginalSrbExt + idx, NULL);
 
-        ASSERT(srbext != NULL);
+            ASSERT(srbext != NULL);
+        }
         return srbext;
     }
     inline bool IsSafeForSubmit()
