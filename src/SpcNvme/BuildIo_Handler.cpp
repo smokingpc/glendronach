@@ -80,6 +80,7 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             //surprise remove doesn't need to shutdown controller.
             //controller is already gone , access controller registers will make BSoD or other problem.
             //srb_status = AdapterPnp_RemoveHandler(srbext);
+
             srbext->DevExt->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
