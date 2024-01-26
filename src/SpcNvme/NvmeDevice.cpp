@@ -1,6 +1,6 @@
 #include "pch.h"
-
-BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
+#if 0
+BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID hbaext, IN ULONG msgid)
 {
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     CNvmeQueue *queue = (msgid == 0)? nvme->AdmQueue : nvme->IoQueue[msgid-1];
@@ -12,16 +12,17 @@ BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID devext, IN ULONG msgid)
 END:
     return TRUE;
 }
+#endif
 void CNvmeDevice::RestartAdapterDpc(
     IN PSTOR_DPC  Dpc,
-    IN PVOID  DevExt,
+    IN PVOID  NvmeDev,
     IN PVOID  Arg1,
     IN PVOID  Arg2)
 {
     UNREFERENCED_PARAMETER(Dpc);
     UNREFERENCED_PARAMETER(Arg1);
     UNREFERENCED_PARAMETER(Arg2);
-    CNvmeDevice *nvme = (CNvmeDevice*)DevExt;
+    CNvmeDevice *nvme = (CNvmeDevice*)NvmeDev;
     ULONG stor_status = STOR_STATUS_SUCCESS;
     if(!nvme->IsWorking())
         return;
@@ -31,18 +32,18 @@ void CNvmeDevice::RestartAdapterDpc(
     //STOR_STATUS_INVALID_DEVICE_STATE : device is removing.
     //STOR_STATUS_INVALID_IRQL: IRQL > DISPATCH_LEVEL
     StorPortInitializeWorker(nvme, &nvme->RestartWorker);
-    stor_status = StorPortQueueWorkItem(DevExt, CNvmeDevice::RestartAdapterWorker, nvme->RestartWorker, NULL);
+    stor_status = StorPortQueueWorkItem(NvmeDev, CNvmeDevice::RestartAdapterWorker, nvme->RestartWorker, NULL);
     ASSERT(stor_status == STOR_STATUS_SUCCESS);
 }
 void CNvmeDevice::RestartAdapterWorker(
-    _In_ PVOID DevExt,
+    _In_ PVOID NvmeDev,
     _In_ PVOID Context,
     _In_ PVOID Worker)
 {
     UNREFERENCED_PARAMETER(Context);
     UNREFERENCED_PARAMETER(Worker);
 
-    CNvmeDevice* nvme = (CNvmeDevice*)DevExt;
+    CNvmeDevice* nvme = (CNvmeDevice*)NvmeDev;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     //ULONG stor_status = STOR_STATUS_SUCCESS;
     if (!nvme->IsWorking())
@@ -57,7 +58,7 @@ void CNvmeDevice::RestartAdapterWorker(
     status = nvme->InitNvmeStage2();
     ASSERT(NT_SUCCESS(status));
     //resume adapter AFTER restart controller done.
-    StorPortResume(DevExt);
+    StorPortResume(NvmeDev);
     StorPortFreeWorker(nvme, &nvme->RestartWorker);
     nvme->RestartWorker = NULL;
 }
@@ -66,17 +67,17 @@ VOID CNvmeDevice::HandleAsyncEvent(
 {
     PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event =
         (PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST)&srbext->NvmeCpl.DW0;
-    ((CNvmeDevice*)srbext->DevExt)->SaveAsyncEvent(event);
+    ((CNvmeDevice*)srbext->NvmeDev)->SaveAsyncEvent(event);
 
     //If AsyncEvent can notify back, AdmQ should be still working.
     //Just ask controller : What happened?
-    ((CNvmeDevice*)srbext->DevExt)->GetLogPageForAsyncEvent(event->LogPage);
+    ((CNvmeDevice*)srbext->NvmeDev)->GetLogPageForAsyncEvent(event->LogPage);
 }
 VOID CNvmeDevice::HandleErrorInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_ERROR_INFO_LOG errlog = (PNVME_ERROR_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[ErrorInfo LogPage]:\n");
     
@@ -99,7 +100,7 @@ VOID CNvmeDevice::HandleSmartInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_HEALTH_INFO_LOG smartlog = (PNVME_HEALTH_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    AvailableSpaceLow(%d), TemperatureThreshold(%d), ReliabilityDegraded(%d), ReadOnly(%d), VolatileMemoryBackupDeviceFailed(%d)\n",
@@ -127,7 +128,7 @@ VOID CNvmeDevice::HandleFwSlotInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_FIRMWARE_SLOT_INFO_LOG slotinfo = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    ActiveSlot(%d), PendingActivateSlot(%d)\n",
         slotinfo->AFI.ActiveSlot, slotinfo->AFI.PendingActivateSlot);
@@ -264,6 +265,31 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
             sizeof(ACCESS_RANGE) * AccessRangeCount);
     if(!MapCtrlRegisters())
         return STATUS_NOT_MAPPED_DATA;
+
+    ReadCtrlCap();
+
+    status = CreateAdmQ();
+    if (!NT_SUCCESS(status))
+        return status;
+
+    State = NVME_STATE::RUNNING;
+    return STATUS_SUCCESS;
+}
+NTSTATUS CNvmeDevice::Setup(PVOID pcidata, PVOID ctrlreg)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    if (NVME_STATE::STOP != State && !this->RebalancingPnp)
+        return STATUS_INVALID_DEVICE_STATE;
+
+    State = NVME_STATE::SETUP;
+    InitVars();
+    RtlCopyMemory(&PciCfg, pcidata, sizeof(PCI_COMMON_CONFIG));
+    VendorID = PciCfg.VendorID;
+    DeviceID = PciCfg.DeviceID;
+
+    CtrlReg = (PNVME_CONTROLLER_REGISTERS)ctrlreg;
+    Bar0Size = 4*PAGE_SIZE;
+    Doorbells = CtrlReg->Doorbells;
 
     ReadCtrlCap();
 
@@ -452,9 +478,9 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     //optional feature
     status = SetSyncHostTime();
 
-    status = SetAsyncEvent();
-    if(NT_SUCCESS(status))
-        RequestAsyncEvent();
+    //status = SetAsyncEvent();
+    //if(NT_SUCCESS(status))
+    //    RequestAsyncEvent();
 
     return STATUS_SUCCESS;
 }
@@ -1204,7 +1230,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     QUEUE_PAIR_CONFIG cfg = {0};
     cfg.Depth = (USHORT)AdmDepth;
     cfg.QID = 0;
-    cfg.DevExt = this;
+    cfg.NvmeDev = this;
     cfg.NumaNode = MM_ANY_NODE_OK;
     cfg.Type = QUEUE_TYPE::ADM_QUEUE;
 
@@ -1278,9 +1304,9 @@ void CNvmeDevice::ReadCtrlCap()
     ReadNvmeRegister(NvmeVer);
     ReadNvmeRegister(CtrlCap);
     DeviceTimeout = ((UCHAR)CtrlCap.TO) * (500 * 1000);
-    MinPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMIN));
-    MaxPageSize = (ULONG)(1 << (12 + CtrlCap.MPSMAX));
-    MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * MinPageSize);
+    MinPageSize = CalcMinPageSize(CtrlCap.MPSMIN);
+    MaxPageSize = CalcMinPageSize(CtrlCap.MPSMAX);
+    MaxTxSize = CalcMaxTxSize(CtrlIdent.MDTS, CtrlCap.MPSMIN);
     if(0 == MaxTxSize)
         MaxTxSize = DEFAULT_MAX_TXSIZE;
     MaxTxPages = (ULONG)(MaxTxSize / PAGE_SIZE);
@@ -1441,7 +1467,7 @@ void CNvmeDevice::InitVars()
     CtrlReg = NULL;
     PortCfg = NULL;
     Doorbells = NULL;
-    MsixTable = NULL;
+//    MsixTable = NULL;
     AdmQueue = NULL;
     RtlZeroMemory(IoQueue, sizeof(IoQueue));
     UncachedExt = NULL;
@@ -1506,7 +1532,7 @@ NTSTATUS CNvmeDevice::CreateIoQ()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     QUEUE_PAIR_CONFIG cfg = { 0 };
-    cfg.DevExt = this;
+    cfg.NvmeDev = this;
     cfg.Depth = IoDepth;
     cfg.NumaNode = 0;
     cfg.Type = QUEUE_TYPE::IO_QUEUE;

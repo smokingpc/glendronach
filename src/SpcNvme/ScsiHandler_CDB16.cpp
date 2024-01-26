@@ -4,11 +4,11 @@ inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
     PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuf();
     ULONG block_size = 0;
     ULONG64 blocks = 0;
-    srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
+    srbext->NvmeDev->GetNamespaceBlockSize(lun+1, block_size);
 
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
+    srbext->NvmeDev->GetNamespaceTotalBlocks(lun+1, blocks);
     blocks -= 1;
     REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
     REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);
@@ -40,7 +40,7 @@ UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)
     return SRB_STATUS_INVALID_REQUEST;
     //todo: complete this handler for FULL support of verify
     //UCHAR srb_status = SRB_STATUS_ERROR;
-    //CRamdisk* disk = srbext->DevExt->RamDisk;
+    //CRamdisk* disk = srbext->NvmeDev->RamDisk;
     //PCDB cdb = srbext->Cdb;
     //INT64 lba_start = 0;    //in Blocks, not bytes
     //
@@ -65,7 +65,7 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
     ULONG block_size = 0;
     ULONG64 blocks = 0;
 
-    if (!srbext->DevExt->IsWorking())
+    if (!srbext->NvmeDev->IsWorking())
     {
         srb_status = SRB_STATUS_NO_DEVICE;
         goto END;
@@ -78,10 +78,10 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
         goto END;
     }
 
-    srbext->DevExt->GetNamespaceBlockSize(nsid, block_size);
+    srbext->NvmeDev->GetNamespaceBlockSize(nsid, block_size);
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(nsid, blocks);
+    srbext->NvmeDev->GetNamespaceTotalBlocks(nsid, blocks);
     blocks -= 1;
     REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
     REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);

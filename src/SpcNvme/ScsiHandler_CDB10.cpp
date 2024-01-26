@@ -28,7 +28,7 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
     ULONG64 blocks = 0;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
 
-    if(!srbext->DevExt->IsWorking())
+    if(!srbext->NvmeDev->IsWorking())
     {
         srb_status = SRB_STATUS_NO_DEVICE;
         goto END;
@@ -43,8 +43,8 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
     
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(nsid, blocks);
-    srbext->DevExt->GetNamespaceBlockSize(nsid, block_size);
+    srbext->NvmeDev->GetNamespaceTotalBlocks(nsid, blocks);
+    srbext->NvmeDev->GetNamespaceBlockSize(nsid, block_size);
     if (blocks > MAXULONG32)
     {
         srb_status = SRB_STATUS_INVALID_REQUEST;
@@ -77,7 +77,7 @@ UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
 
     ////todo: complete this handler for FULL support of verify
     //UCHAR srb_status = SRB_STATUS_ERROR;
-    //CRamdisk* disk = srbext->DevExt->RamDisk;
+    //CRamdisk* disk = srbext->NvmeDev->RamDisk;
     //PCDB cdb = srbext->Cdb;
     //UINT32 lba_start = 0;    //in Blocks, not bytes
     //REVERSE_BYTES_4(&lba_start, &cdb->CDB10.LogicalBlockByte0);

@@ -72,3 +72,9 @@ FORCEINLINE UCHAR NsIdToLun(ULONG nsid)
     //LUN is zero-based, Namespace ID is 1-based.
     return (UCHAR)(nsid-1);
 }
+
+FORCEINLINE bool IsValidVendorID(PPCI_COMMON_CONFIG cfg)
+{
+    //not mapped PCI HEADER so only can read 0xFFFF or 0(invalid value)
+    return !(0xffff == cfg->VendorID || 0 == cfg->VendorID);
+}

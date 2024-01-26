@@ -7,16 +7,16 @@ SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
 
     if (ScsiStopAdapter <= max_support)
         list->SupportedTypeList[ScsiStopAdapter] = TRUE;
-    if (ScsiRestartAdapter <= max_support)
-        list->SupportedTypeList[ScsiRestartAdapter] = TRUE;
     if (ScsiAdapterSurpriseRemoval <= max_support)
         list->SupportedTypeList[ScsiAdapterSurpriseRemoval] = TRUE;
+
+#if 0
+    if (ScsiRestartAdapter <= max_support)
+        list->SupportedTypeList[ScsiRestartAdapter] = TRUE;
     if (ScsiAdapterPower <= max_support)
         list->SupportedTypeList[ScsiAdapterPower] = TRUE;
     if (ScsiPowerSettingNotification <= max_support)
         list->SupportedTypeList[ScsiPowerSettingNotification] = TRUE;
-
-#if 0
     //following are not implemented AdapterControl. 
     //Just keep the callback for tracing.
     if (ScsiSetBootConfig <= max_support)

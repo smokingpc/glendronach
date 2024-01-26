@@ -98,6 +98,7 @@
     <ClCompile Include="HandleUnitControl.cpp">
       <Filter>MiniportFunction</Filter>
     </ClCompile>
+    <ClCompile Include="DevExt.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">
@@ -170,5 +171,6 @@
     <ClInclude Include="NvmeAsyncEventLog.h">
       <Filter>Nvme_Device</Filter>
     </ClInclude>
+    <ClInclude Include="DevExt.h" />
   </ItemGroup>
 </Project>

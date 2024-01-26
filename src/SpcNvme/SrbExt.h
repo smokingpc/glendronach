@@ -40,13 +40,15 @@
 // ================================================================
 
 class CNvmeDevice;
+struct _SPC_DEVEXT;
 struct _SPCNVME_SRBEXT;
 typedef VOID SPC_SRBEXT_COMPLETION(struct _SPCNVME_SRBEXT *srbext);
 typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
 typedef struct _SPCNVME_SRBEXT
 {
-    CNvmeDevice *DevExt;
+    _SPC_DEVEXT *DevExt;
+    CNvmeDevice *NvmeDev;
     PSTORAGE_REQUEST_BLOCK Srb;
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
     BOOLEAN InitOK;
@@ -85,7 +87,6 @@ typedef struct _SPCNVME_SRBEXT
     ULONG DataBufLen();
     void SetTransferLength(ULONG length);
     void ResetExtBuf(PVOID new_buffer = NULL);
-    bool BuildPrpForNvme();
     PSRBEX_DATA_PNP SrbDataPnp();
 }SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
 
@@ -93,10 +94,17 @@ inline _SPCNVME_SRBEXT* GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
 {
     return (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
 }
-inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
+inline _SPCNVME_SRBEXT* InitSrbExt(PVOID nvme, PSTORAGE_REQUEST_BLOCK srb)
 {
     PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
-    srbext->Init(devext, srb);
+    srbext->Init(nvme, srb);
+    return srbext;
+}
+inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PVOID nvme, PSTORAGE_REQUEST_BLOCK srb)
+{
+    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
+    srbext->Init(nvme, srb);
+    srbext->DevExt = (_SPC_DEVEXT*)devext;
     return srbext;
 }
 

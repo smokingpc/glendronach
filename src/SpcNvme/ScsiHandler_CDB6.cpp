@@ -48,7 +48,7 @@ static UCHAR Reply_VpdSerialNumber(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 {
     PUCHAR buffer = (PUCHAR)srbext->DataBuf();
     ULONG buf_size = srbext->DataBufLen();
-    size_t sn_len = strlen((char*)srbext->DevExt->CtrlIdent.SN);
+    size_t sn_len = strlen((char*)srbext->NvmeDev->CtrlIdent.SN);
     sn_len = (sn_len, 255);
     ULONG size = (ULONG)(sn_len + sizeof(VPD_SERIAL_NUMBER_PAGE) + 1);
     ret_size = size;
@@ -63,13 +63,13 @@ static UCHAR Reply_VpdSerialNumber(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->PageCode = VPD_SERIAL_NUMBER;
     page->PageLength = (UCHAR) sn_len;
     page++;
-    memcpy(page, srbext->DevExt->CtrlIdent.SN, sn_len);
+    memcpy(page, srbext->NvmeDev->CtrlIdent.SN, sn_len);
 
     return SRB_STATUS_SUCCESS;
 }
 static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 {
-    char *subnqn = (char*)srbext->DevExt->CtrlIdent.SUBNQN;
+    char *subnqn = (char*)srbext->NvmeDev->CtrlIdent.SUBNQN;
     ULONG nqn_size = (ULONG)strlen((char*)subnqn);
     ULONG vid_size = (ULONG)strlen((char*)VENDOR_ID);
     size_t buf_size = (ULONG)sizeof(VPD_IDENTIFICATION_PAGE) +
@@ -114,7 +114,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->PageCode = VPD_BLOCK_LIMITS;
     REVERSE_BYTES_2(page->PageLength, &buf_size);
 
-    ULONG max_tx = srbext->DevExt->MaxTxSize;
+    ULONG max_tx = srbext->NvmeDev->MaxTxSize;
     //tell I/O system: max tx size and optimal tx size of this adapter.
     REVERSE_BYTES_4(page->MaximumTransferLength, &max_tx);
     REVERSE_BYTES_4(page->OptimalTransferLength, &max_tx);
@@ -357,8 +357,8 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
         if(page->PageCode != MODE_PAGE_CACHING || page->PageLength != (sizeof(MODE_CACHING_PAGE)-2))
             continue;
 
-        srbext->DevExt->ReadCacheEnabled = !page->ReadDisableCache;
-        srbext->DevExt->WriteCacheEnabled = page->WriteCacheEnable;
+        srbext->NvmeDev->ReadCacheEnabled = !page->ReadDisableCache;
+        srbext->NvmeDev->WriteCacheEnabled = page->WriteCacheEnable;
     }
 
     SrbSetDataTransferLength(srbext->Srb, 0);
@@ -392,7 +392,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
     {
     case MODE_PAGE_CACHING:
     {
-        page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
+        page_size = ReplyModePageCaching(srbext->NvmeDev, buffer, buf_size, ret_size);
         header->ModeDataLength += (UCHAR)page_size;
         srb_status = SRB_STATUS_SUCCESS;
         break;
@@ -419,7 +419,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
         if (buf_size > 0)
         {
         //buffer size and buffer will be updated in function.
-            page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
+            page_size = ReplyModePageCaching(srbext->NvmeDev, buffer, buf_size, ret_size);
             header->ModeDataLength += (UCHAR)page_size;
         }
         if (buf_size > 0)

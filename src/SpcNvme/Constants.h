@@ -44,6 +44,9 @@
 #define NVME_INVALID_CID    (MAXUSHORT)        //should align to NVME CID size
 #define NVME_INVALID_QID    (MAXUSHORT)
 
+#define KB_SIZE             1024
+#define MB_SIZE             (KB_SIZE * KB_SIZE)
+
 //const char* SpcVendorID = "SPC     ";           //vendor name
 //const char* SpcProductID = "SomkingPC NVMe  ";  //model name
 //const char* SpcProductRev = "0100";
@@ -61,7 +64,7 @@
 #define MAX_SCSI_LOGICAL_UNIT   1
 #pragma endregion
 #pragma region  ======== NVME ========
-#define DEFAULT_MAX_TXSIZE          (256 * PAGE_SIZE)
+#define DEFAULT_MAX_TXSIZE          (32 * PAGE_SIZE)
 #define DEFAULT_INT_COALESCE_COUNT  0
 #define DEFAULT_INT_COALESCE_TIME   0    //in 100us unit
 #define MAX_ADM_CMD_COUNT           256
@@ -101,7 +104,7 @@
 #define PRODUCT_ID              "SomkingPC NVMe  "  //model name
 #define PRODUCT_REV             "0100"
 #define UNCACHED_EXT_SIZE       (21*PAGE_SIZE)
-#define ACCESS_RANGE_COUNT      2
+#define ACCESS_RANGE_COUNT      6       //refer to iaVROC.sys
 #pragma endregion
 
 #pragma region  ======== REGISTRY ========

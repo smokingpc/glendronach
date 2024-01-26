@@ -40,7 +40,7 @@ UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)
 
     ////todo: complete this handler for FULL support of verify
     //UCHAR srb_status = SRB_STATUS_ERROR;
-    //CRamdisk* disk = srbext->DevExt->RamDisk;
+    //CRamdisk* disk = srbext->NvmeDev->RamDisk;
     //PCDB cdb = srbext->Cdb;
     //UINT32 lba_start = 0;    //in Blocks, not bytes
     //REVERSE_BYTES_4(&lba_start, cdb->CDB12.LogicalBlock);
@@ -66,14 +66,14 @@ UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    BOOLEAN is_support = srbext->NvmeDev->CtrlIdent.OACS.SecurityCommands;
     if(!is_support)
         return SRB_STATUS_ERROR;
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
     BuildCmd_AdminSecurityRecv(srbext, DEFAULT_CTRLID, srbext->Cdb());
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = srbext->NvmeDev->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;
     else
@@ -86,14 +86,14 @@ UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    BOOLEAN is_support = srbext->NvmeDev->CtrlIdent.OACS.SecurityCommands;
     if (!is_support)
         return SRB_STATUS_ERROR;
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
     BuildCmd_AdminSecuritySend(srbext, DEFAULT_CTRLID, srbext->Cdb());
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = srbext->NvmeDev->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;
     else

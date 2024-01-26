@@ -1,30 +1,33 @@
 #include "pch.h"
 
-static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvmeDevice* nvme)
+static void FillPortConfiguration(
+            PPORT_CONFIGURATION_INFORMATION portcfg, 
+            PSPC_DEVEXT devext)
+//            CNvmeDevice* nvme)
 {
 //Because MaxTxSize and MaxTxPages should be calculated by nvme->CtrlCap and nvme->CtrlIdent,
 //So FillPortConfiguration() should be called AFTER nvme->IdentifyController()
-    portcfg->MaximumTransferLength = nvme->MaxTxSize;
-    portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages;
+    portcfg->MaximumTransferLength = devext->MaxTxSize;
+    portcfg->NumberOfPhysicalBreaks = devext->MaxTxPages;
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
-    portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
+    portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS; //specify bounce buffer type?
     portcfg->MaximumNumberOfTargets = MAX_SCSI_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    portcfg->DeviceExtensionSize = sizeof(CNvmeDevice);
+    portcfg->DeviceExtensionSize = sizeof(SPC_DEVEXT);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
     portcfg->MaximumNumberOfLogicalUnits = MAX_SCSI_LOGICAL_UNIT;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
-    portcfg->HwMSInterruptRoutine = CNvmeDevice::NvmeMsixISR;
+    portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = 1;
+    portcfg->NumberOfBuses = MAX_CHILD_VROC_DEV;    //each VMD treated as 1 SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
     portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_FULL64BIT_SUPPORTED;   //should set this value if MaxNumberOfIO > 1000.
-    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_SCSI_LOGICAL_UNIT;
+    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_SCSI_LOGICAL_UNIT * MAX_CHILD_VROC_DEV;
     portcfg->MaxIOsPerLun = MAX_IO_PER_LU;
 
     //this will limit LUN i/o queue and affect HBA Gateway OutstandingMax.
@@ -41,7 +44,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
 }
 
 _Use_decl_annotations_ ULONG HwFindAdapter(
-    _In_ PVOID devext,
+    _In_ PVOID hbaext,
     _In_ PVOID ctx,
     _In_ PVOID businfo,
     _In_z_ PCHAR arg_str,
@@ -56,45 +59,44 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
 
-    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    status = nvme->Setup(port_cfg);
-    if (!NT_SUCCESS(status))
-        goto error;
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
 
-    status = nvme->InitController();
+    DbgBreakPoint();
+    status = devext->Setup(port_cfg);
     if (!NT_SUCCESS(status))
-        goto error;
+        goto ERROR;
 
-    //Todo: supports multiple controller of NVMe v2.0  
-    status = nvme->IdentifyController(NULL, &nvme->CtrlIdent, true);
+    status = devext->InitVmd();
     if (!NT_SUCCESS(status))
-        goto error;
-    
+        goto ERROR;
+
+    devext->UpdateNvmeInfoByVmd();
+
     //[Workaround for AdapterTopologyTelemetry event]
     //before HwInitialize, should init DmaAdapter.
     //AdapterTopologyTelemetry could come in between HwFindAdapter and Hwinitialize.
     //But Storport!RaidpAdapterContiunueScatterGather has problem : it will return
     //error code if DmaAdapter not allocated. But upper callstacks didn't check error codes.
     //This situation cause SRB of AdapterTopologyTelemetry event be leaked.
-    //If rapidly create/delete storage controller device, this SRB leaking will make system hanging.
-    nvme->UncachedExt = StorPortGetUncachedExtension(
-                                devext, port_cfg, UNCACHED_EXT_SIZE);
+    //If rapidly create/delete storage controller device, this SRB leaking will make system hang.
+    devext->UncachedExt = StorPortGetUncachedExtension(
+        hbaext, port_cfg, UNCACHED_EXT_SIZE);
 
     //PCI bus related initialize
     //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
-    FillPortConfiguration(port_cfg, nvme);
+    FillPortConfiguration(port_cfg, devext);
     return SP_RETURN_FOUND;
 
-error:
-//return SP_RETURN_NOT_FOUND causes driver installation hanging?
-//I don't know why ....
-    nvme->Teardown();
+ERROR:
+    //return SP_RETURN_NOT_FOUND causes driver installation hanging?
+    //I don't know why ....
+    devext->Teardown();
     return SP_RETURN_ERROR;
 }
 
-_Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
+_Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
 {
 //Running at DIRQL
     //in stornvme, it checks PPORT_CONFIGURATION_INFORMATION::DumpMode.
@@ -102,82 +104,87 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
     //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
 
     CDebugCallInOut inout(__FUNCTION__);
-    CNvmeDevice* nvme = (CNvmeDevice*)devext;
-    NTSTATUS status = nvme->SetPerfOpts();
 
-    if(!NT_SUCCESS(status))
+    //initialize perf options
+    PERF_CONFIGURATION_DATA set_perf = { 0 };
+    PERF_CONFIGURATION_DATA supported = { 0 };
+    ULONG stor_status = STOR_STATUS_SUCCESS;
+    //Just using STOR_PERF_VERSION_5, STOR_PERF_VERSION_6 is for Win2019 and above...
+    supported.Version = STOR_PERF_VERSION_5;
+    supported.Size = sizeof(PERF_CONFIGURATION_DATA);
+    stor_status = StorPortInitializePerfOpts(hbaext, TRUE, &supported);
+    if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
-    StorPortEnablePassiveInitialization(devext, HwPassiveInitialize);
+    set_perf.Version = STOR_PERF_VERSION_5;
+    set_perf.Size = sizeof(PERF_CONFIGURATION_DATA);
+
+    //Allow multiple I/O incoming concurrently. 
+    if (0 != (supported.Flags & STOR_PERF_CONCURRENT_CHANNELS))
+    {
+        set_perf.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
+        set_perf.ConcurrentChannels = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+    }
+    //I don't use SGL... but Win10 don't support this flag
+    if (0 != (supported.Flags & STOR_PERF_NO_SGL))
+        set_perf.Flags |= STOR_PERF_NO_SGL;
+
+    //spread DPC to all cpu. don't make single cpu too busy.
+    if (0 != (supported.Flags & STOR_PERF_DPC_REDIRECTION))
+        set_perf.Flags |= STOR_PERF_DPC_REDIRECTION;
+
+    //IF not set this flag, storport will attempt to fire completion DPC on
+    //original cpu which accept this I/O request.
+    if (0 != (supported.Flags & STOR_PERF_DPC_REDIRECTION_CURRENT_CPU))
+        set_perf.Flags |= STOR_PERF_DPC_REDIRECTION_CURRENT_CPU;
+
+    if (0 != (supported.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO))
+        set_perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
+
+    stor_status = StorPortInitializePerfOpts(hbaext, FALSE, &set_perf);
+    if (STOR_STATUS_SUCCESS != stor_status)
+        return FALSE;
+
+    StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
     return TRUE;
 }
 
 _Use_decl_annotations_
-BOOLEAN HwPassiveInitialize(PVOID devext)
+BOOLEAN HwPassiveInitialize(PVOID hbaext)
 {
     //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
-    CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-
-    if(!nvme->IsWorking())
-        return FALSE;
-    
-    StorPortPause(devext, MAXULONG);
-
-    status = nvme->InitNvmeStage1();
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    StorPortPause(hbaext, MAXULONG);
+    status = devext->PassiveInitVmd();
+    StorPortResume(hbaext);
     if (!NT_SUCCESS(status))
-        return FALSE;
+        devext->Teardown();
 
-    status = nvme->InitNvmeStage2();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
-    //CreateIoQueues should be called AFTER IdentifyController.
-    status = nvme->CreateIoQueues();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
-    status = nvme->RegisterIoQueues(NULL);
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
-    StorPortResume(devext);
-    return TRUE;
+    return (STATUS_SUCCESS == status);
 }
 
 _Use_decl_annotations_
-BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
+BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
 {
 //BuildIo() callback is used to perform "resource preparing" and "jobs DON'T NEED lock".
 //In this callback, also dispatch some behavior which need be handled very fast.
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
-    PSPCNVME_SRBEXT srbext = InitSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
+    PSPCNVME_SRBEXT srbext = NULL;
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    CNvmeDevice *nvme = devext->FindVmdDev(SrbGetPathId(srb));
+    if(NULL == nvme)
+    {
+        srb_status = SRB_STATUS_NO_DEVICE;
+        goto END;
+    }
+    srbext = InitSrbExt(hbaext, nvme, (PSTORAGE_REQUEST_BLOCK)srb);
 
     switch (srbext->FuncCode())
     {
-    case SRB_FUNCTION_RESET_LOGICAL_UNIT:
-    case SRB_FUNCTION_ABORT_COMMAND:
-    case SRB_FUNCTION_RESET_DEVICE:
-        //skip these request currently. I didn't get any idea yet to handle them.
-    case SRB_FUNCTION_RESET_BUS:
-    //MSDN said : 
-    //  it is possible for the HwScsiStartIo routine to be called 
-    //  with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
-    //  if a NT-based operating system storage class driver requests this operation. 
-    //  The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
-    //  to satisfy an incoming bus-reset request.
-    //  I don't understand the difference.... 
-    //  Current Windows family are already all NT-based system :p
-        srb_status = SRB_STATUS_INVALID_REQUEST;
-        break;
-    //case SRB_FUNCTION_WMI:
-
-    case SRB_FUNCTION_POWER:
-        srb_status = BuildIo_SrbPowerHandler(srbext);
-        break;
     case SRB_FUNCTION_EXECUTE_SCSI:
         srb_status = BuildIo_ScsiHandler(srbext);
         break;
@@ -189,12 +196,31 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         //should handle PNP remove adapter
         srb_status = BuildIo_SrbPnpHandler(srbext);
         break;
-	default:
+    #if 0
+    case SRB_FUNCTION_POWER:
+        srb_status = BuildIo_SrbPowerHandler(srbext);
+        break;
+    case SRB_FUNCTION_RESET_LOGICAL_UNIT:
+    case SRB_FUNCTION_ABORT_COMMAND:
+    case SRB_FUNCTION_RESET_DEVICE:
+        //skip these request currently. I didn't get any idea yet to handle them.
+    case SRB_FUNCTION_RESET_BUS:
+        //MSDN said : 
+        //  it is possible for the HwScsiStartIo routine to be called 
+        //  with an SRB in which the Function member is set to SRB_FUNCTION_RESET_BUS 
+        //  if a NT-based operating system storage class driver requests this operation. 
+        //  The HwScsiStartIo routine can simply call the HwScsiResetBus routine 
+        //  to satisfy an incoming bus-reset request.
+        //  I don't understand the difference.... 
+        //  Current Windows family are already all NT-based system :p
+    #endif
+    default:
         srb_status = BuildIo_DefaultHandler(srbext);
         break;
 
     }
 
+END:
     if(SRB_STATUS_PENDING != srb_status)
         srbext->CompleteSrb(srb_status);
 
@@ -203,9 +229,9 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 }
 
 _Use_decl_annotations_
-BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
+BOOLEAN HwStartIo(PVOID hbaext, PSCSI_REQUEST_BLOCK srb)
 {
-    UNREFERENCED_PARAMETER(devext);
+    UNREFERENCED_PARAMETER(hbaext);
     PSPCNVME_SRBEXT srbext = GetSrbExt((PSTORAGE_REQUEST_BLOCK)srb);
     UCHAR srb_status = SRB_STATUS_ERROR;
 
@@ -231,7 +257,6 @@ BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
     default:
         srb_status = StartIo_DefaultHandler(srbext);
         break;
-
     }
 
     //todo: handle SCSI status for SRB
@@ -250,18 +275,17 @@ BOOLEAN HwResetBus(
 )
 {
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(PathId);
     //miniport driver is responsible for completing SRBs received by HwStorStartIo for 
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
-    CNvmeDevice* nvme = (CNvmeDevice*)DeviceExtension;
-    KdBreakPoint();
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)DeviceExtension;
+    CNvmeDevice* nvme = devext->FindVmdDev((UCHAR)PathId);
     nvme->ReleaseOutstandingSrbs();
     return TRUE;
 }
 
 _Use_decl_annotations_
 SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
-    PVOID devext,
+    PVOID hbaext,
     SCSI_ADAPTER_CONTROL_TYPE ctrlcode,
     PVOID param
 )
@@ -269,7 +293,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(param);
     SCSI_ADAPTER_CONTROL_STATUS status = ScsiAdapterControlUnsuccessful;
-    CNvmeDevice *nvme = (CNvmeDevice*)devext;
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
     DebugAdapterControlCode(ctrlcode);
 
     switch (ctrlcode)
@@ -290,7 +314,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
         //Before adapter remove, suspend/hiberation, and rebalance , 
         //it will enter D3 state.
         //Here should disable controller so storport can disconnect interrupts.
-        status = Handle_StopAdapter(nvme);
+        devext->DisableAllVmdController();
         break;
     }
     case ScsiRestartAdapter:
@@ -300,7 +324,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     //**running at DIRQL
     //this event handles "Wakeup" from suspend/hiberation.
     //StopAdapter disabled controller so should restart it here.
-        status = Handle_RestartAdapter(nvme);
+        status = ScsiAdapterControlUnsuccessful;
         break;
     }
     case ScsiAdapterSurpriseRemoval:
@@ -309,7 +333,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     //Device is surprise removed.
     //**Will SRB_PNP_xxx still be fired if this control code supported/implemented?
     //***SurpriseRemove don't need unregister queues. Only need to delete queues.
-        nvme->Teardown();
+        devext->Teardown();
         status = ScsiAdapterControlSuccess;
         break;
     }
@@ -384,7 +408,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
 
 _Use_decl_annotations_
 void HwProcessServiceRequest(
-    PVOID devext,
+    PVOID hbaext,
     PVOID request_irp
 )
 {
@@ -392,7 +416,6 @@ void HwProcessServiceRequest(
     //we should implement this callback.
     
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(devext);
     PIRP irp = (PIRP)request_irp;
     //UNREFERENCED_PARAMETER(Irp);
     ////ioctl interface for miniport
@@ -404,11 +427,11 @@ void HwProcessServiceRequest(
 
     irp->IoStatus.Information = 0;
     irp->IoStatus.Status = STATUS_SUCCESS;
-    StorPortCompleteServiceIrp(devext, irp);
+    StorPortCompleteServiceIrp(hbaext, irp);
 }
 
 _Use_decl_annotations_
-void HwCompleteServiceIrp(PVOID devext)
+void HwCompleteServiceIrp(PVOID hbaext)
 {
     //If HwProcessServiceRequest()is implemented, this HwCompleteServiceIrp 
     // wiill be called before stop to retrieve any new IOCTL_MINIPORT_PROCESS_SERVICE_IRP requests.
@@ -419,88 +442,7 @@ void HwCompleteServiceIrp(PVOID devext)
     //          and cleanup that IRP in this callback.
 
     CDebugCallInOut inout(__FUNCTION__);
-    UNREFERENCED_PARAMETER(devext);
+    UNREFERENCED_PARAMETER(hbaext);
     //if any async request in HwProcessServiceRequest, 
     //we should complete them here and let them go back asap.
-}
-
-_Use_decl_annotations_
-SCSI_UNIT_CONTROL_STATUS HwUnitControl(
-    _In_ PVOID devext,
-    _In_ SCSI_UNIT_CONTROL_TYPE ctrlcode,
-    _In_ PVOID param
-)
-{
-    UNREFERENCED_PARAMETER(param);
-    SCSI_UNIT_CONTROL_STATUS status = ScsiUnitControlUnsuccessful;
-    CNvmeDevice* nvme = (CNvmeDevice*)devext;
-    UNREFERENCED_PARAMETER(nvme);
-
-    DebugUnitControlCode(ctrlcode);
-    //UnitControl is very similar as AdapterControl.
-    //First call will query "ScsiQuerySupportedControlTypes", then 
-    //miniport need fill corresponding element to report.
-    switch(ctrlcode)
-    {
-    case ScsiQuerySupportedUnitControlTypes:
-        status = Handle_QuerySupportedUnitControl(
-                (PSCSI_SUPPORTED_CONTROL_TYPE_LIST)param);
-        break;
-    case ScsiUnitStart:
-        status = Handle_UnitStart((PSTOR_ADDR_BTL8)param);
-        break;
-    case ScsiUnitPower:
-        status = Handle_UnitPower((PSTOR_UNIT_CONTROL_POWER)param);
-        break;
-    case ScsiUnitRemove:
-        status = Handle_UnitRemove((PSTOR_ADDR_BTL8)param);
-        break;
-    case ScsiUnitSurpriseRemoval:
-        status = Handle_UnitSurpriseRemove((PSTOR_ADDR_BTL8)param);
-        break;
-    case ScsiUnitUsage:
-    case ScsiUnitPoFxPowerInfo:
-    case ScsiUnitPoFxPowerRequired:
-    case ScsiUnitPoFxPowerActive:
-    case ScsiUnitPoFxPowerSetFState:
-    case ScsiUnitPoFxPowerControl:
-    case ScsiUnitRichDescription:
-    case ScsiUnitQueryBusType:
-    case ScsiUnitQueryFruId:
-        status = ScsiUnitControlSuccess;
-        break;
-    }
-
-
-    //ScsiUnitStart => a unit is starting up (disk spin up?)
-    //ScsiUnitPower => unit power on or off, [Parameters] arg is STOR_UNIT_CONTROL_POWER*
-    //ScsiUnitRemove => DeviceRemove post event of Unit
-    //ScsiUnitSurpriseRemoval => SurpriseRemoved event of Unit
-    
-    //UnitControl should handle events of LU:
-    //1.Power States
-    //2.Device Start
-    //3.Device Remove and Surprise Remove
-    return status;
-}
-
-_Use_decl_annotations_
-VOID HwTracingEnabled(
-    _In_ PVOID devext,
-    _In_ BOOLEAN is_enabled
-)
-{
-    UNREFERENCED_PARAMETER(devext);
-    UNREFERENCED_PARAMETER(is_enabled);
-
-    //miniport should write its own ETW log via StorPortEtwEventXXX API (refer to storport.h)
-    // So HwTracingEnabled and HwCleanupTracing are used to "turn on" and "turn off" its own ETW logging mechanism.
-}
-
-_Use_decl_annotations_
-VOID HwCleanupTracing(
-    _In_ PVOID  arg1
-)
-{
-    UNREFERENCED_PARAMETER(arg1);
 }

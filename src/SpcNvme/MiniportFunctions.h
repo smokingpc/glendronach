@@ -50,19 +50,22 @@ HW_ADAPTER_CONTROL HwAdapterControl;
 HW_PROCESS_SERVICE_REQUEST HwProcessServiceRequest;
 HW_COMPLETE_SERVICE_IRP HwCompleteServiceIrp;
 
+#if 0
 HW_UNIT_CONTROL HwUnitControl;
 HW_TRACING_ENABLED HwTracingEnabled;
 HW_CLEANUP_TRACING HwCleanupTracing;
-
+#endif
 
 SCSI_ADAPTER_CONTROL_STATUS Handle_QuerySupportedControlTypes(
     PSCSI_SUPPORTED_CONTROL_TYPE_LIST list);
 SCSI_ADAPTER_CONTROL_STATUS Handle_StopAdapter(CNvmeDevice* devext);
 SCSI_ADAPTER_CONTROL_STATUS Handle_RestartAdapter(CNvmeDevice* devext);
 
+#if 0
 SCSI_UNIT_CONTROL_STATUS Handle_QuerySupportedUnitControl(
     PSCSI_SUPPORTED_CONTROL_TYPE_LIST list);
 SCSI_UNIT_CONTROL_STATUS Handle_UnitStart(PSTOR_ADDR_BTL8 addr);
 SCSI_UNIT_CONTROL_STATUS Handle_UnitPower(PSTOR_UNIT_CONTROL_POWER power);
 SCSI_UNIT_CONTROL_STATUS Handle_UnitRemove(PSTOR_ADDR_BTL8 addr);
 SCSI_UNIT_CONTROL_STATUS Handle_UnitSurpriseRemove(PSTOR_ADDR_BTL8 addr);
+#endif

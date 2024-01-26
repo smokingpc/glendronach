@@ -23,13 +23,14 @@ UCHAR BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
     
     //check path/target/lun here. Only accept request which has valid BTL address.
+#if 0
     if(FALSE == (0==srbext->ScsiPath && 
                 0==srbext->ScsiTarget && 
-                srbext->DevExt->IsLunExist(srbext->ScsiLun))
+                srbext->NvmeDev->IsLunExist(srbext->ScsiLun))
         )
-    {
-        return SRB_STATUS_INVALID_LUN;
-    }
+#endif
+    if(NULL == srbext->NvmeDev)
+        return SRB_STATUS_NO_DEVICE;
 
     return SRB_STATUS_PENDING;
 }
@@ -43,7 +44,7 @@ UCHAR BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext)
 
 UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    //NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG flags = 0;
     UCHAR srb_status = SRB_STATUS_ERROR;
 
@@ -67,12 +68,7 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             break;
         case StorRemoveDevice:
         //regular RemoveDevice should shutdown controller first, then delete all queue memory.
-            status = srbext->DevExt->ShutdownController();
-            if (!NT_SUCCESS(status))
-            {
-                KdBreakPoint();
-                //todo: log
-            }
+            srbext->DevExt->ShutdownAllVmdController();
             srbext->DevExt->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
@@ -80,7 +76,6 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             //surprise remove doesn't need to shutdown controller.
             //controller is already gone , access controller registers will make BSoD or other problem.
             //srb_status = AdapterPnp_RemoveHandler(srbext);
-
             srbext->DevExt->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
@@ -89,14 +84,8 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
         //This is rare case that could happen when hotplug.
         //To handle rebalance resource event, just release all PNP resource then 
         //Storport will call HwFindAdapter again to re-assign resource to us.
-            status = srbext->DevExt->DisableController();
-            if (!NT_SUCCESS(status))
-            {
-                KdBreakPoint();
-                //todo: log
-            }
+            srbext->DevExt->DisableAllVmdController();
             srbext->DevExt->Teardown();
-            srbext->DevExt->RebalancingPnp = TRUE;
             srb_status = SRB_STATUS_SUCCESS;
             break;
     }

@@ -84,7 +84,7 @@ static void FillFirmwareInfoV1(
 
 VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
 {
-    CNvmeDevice* nvme = srbext->DevExt;
+    CNvmeDevice* nvme = srbext->NvmeDev;
     PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL)srbext->DataBuf();
     PFIRMWARE_REQUEST_BLOCK request = (PFIRMWARE_REQUEST_BLOCK)(ioctl + 1);
     PSTORAGE_FIRMWARE_INFO buffer = (PSTORAGE_FIRMWARE_INFO)((PUCHAR)ioctl + request->DataBufferOffset);
@@ -145,12 +145,12 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     srbext->ResetExtBuf(logpage);
     srbext->CompletionCB = Complete_FirmwareInfo;
 
-    if(srbext->DevExt->NvmeVer.AsUlong > 0x10000)
+    if(srbext->NvmeDev->NvmeVer.AsUlong > 0x10000)
         BuildCmd_GetFirmwareSlotsInfo(srbext, logpage);
     else
         BuildCmd_GetFirmwareSlotsInfoV1(srbext, logpage);
 
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = srbext->NvmeDev->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
     {
         delete logpage;

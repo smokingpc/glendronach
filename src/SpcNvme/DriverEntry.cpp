@@ -21,10 +21,11 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.HwFindAdapter = HwFindAdapter;        //AddDevice() + IRP_MJ_PNP +  IRP_MN_READ_CONFIG...blahblah
     init_data.HwResetBus = HwResetBus;
     init_data.HwAdapterControl = HwAdapterControl;
+#if 0
     init_data.HwUnitControl = HwUnitControl;
     init_data.HwTracingEnabled = HwTracingEnabled;
     init_data.HwCleanupTracing = HwCleanupTracing;
-
+#endif
     //IRP_MJ_DEVICE_CONTROL + IOCTL code IOCTL_MINIPORT_PROCESS_SERVICE_IRP == IOCTL_MINIPORT_PROCESS_SERVICE_IRP
     //to prevent IOCTL request in DPC_LEVEL, define another IOCTL to make sure it is processed in PASSIVE.
     //so define this IOCTL_MINIPORT_PROCESS_SERVICE_IRP
@@ -57,7 +58,7 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
             STOR_FEATURE_NVME;
 
     /* Set required extension sizes. */
-    init_data.DeviceExtensionSize = sizeof(CNvmeDevice);
+    init_data.DeviceExtensionSize = sizeof(SPC_DEVEXT);
     init_data.SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
 
     // Call StorPortInitialize to register with HwInitData

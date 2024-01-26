@@ -79,5 +79,6 @@ EXTERN_C_END
 #include "IoctlScsiMiniport_Handlers.h"
 #include "IoctlStorageQuery_Handlers.h"
 #include "Ioctl_FirmwareFunctions.h"
+#include "DevExt.h"
 
 using SPC::CAutoPtr;

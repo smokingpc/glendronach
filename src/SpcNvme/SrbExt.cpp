@@ -1,9 +1,9 @@
 #include "pch.h"
 
-void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
+void _SPCNVME_SRBEXT::Init(PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
-    DevExt = (CNvmeDevice*)devext;
+    NvmeDev = (CNvmeDevice*)nvme;
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
     InitOK = TRUE;

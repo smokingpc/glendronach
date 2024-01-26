@@ -4,14 +4,14 @@ UCHAR StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     //SetScsiSenseBySrbStatus(srbext->Srb, SRB_STATUS_INVALID_REQUEST);
-    //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
+    //StorPortNotification(RequestComplete, srbext->NvmeDev, srbext->Srb);
     return SRB_STATUS_INVALID_REQUEST;
 }
 UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
     UCHAR opcode = srbext->Cdb()->CDB6GENERIC.OperationCode;
     UCHAR srb_status = SRB_STATUS_ERROR;
-    DebugScsiOpCode(opcode);
+    //DebugScsiOpCode(opcode);
 
     switch(opcode)
     {

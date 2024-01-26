@@ -13,12 +13,12 @@ UCHAR Scsi_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG len, bool is_
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
 
-    if (!srbext->DevExt->IsFitValidIoRange(nsid, offset, len))
+    if (!srbext->NvmeDev->IsFitValidIoRange(nsid, offset, len))
         return SRB_STATUS_ERROR;
 
     BuiildCmd_ReadWrite(srbext, offset, len, is_write);
     //srbext->CompletionCB = NULL;
-    status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
+    status = srbext->NvmeDev->SubmitIoCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
     {
         if(STATUS_DEVICE_BUSY == status)

@@ -90,7 +90,6 @@ typedef struct _NVME_DEVEXT{
     PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
     PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;
     volatile ULONG* Doorbells = NULL;
-    PMSIX_TABLE_ENTRY MsixTable = NULL;
     CNvmeQueue* AdmQueue = NULL;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT] = { 0 };
     PVOID UncachedExt = NULL;
@@ -118,14 +117,16 @@ public:
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE + 1;            //adapter has some problem. e.g. CSTS.CFS==1
     static const ULONG BUGCHECK_INVALID_STATE = BUGCHECK_BASE + 2;      //if action in invalid controller state, fire this bugcheck
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE + 10;
+    #if 0
     static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
+    #endif    
     static void RestartAdapterDpc(
             IN PSTOR_DPC  Dpc,
-            IN PVOID  DevExt,
+            IN PVOID  NvmeDev,
             IN PVOID  Arg1,
             IN PVOID  Arg2);
     static void RestartAdapterWorker(
-        _In_ PVOID DevExt,
+        _In_ PVOID NvmeDev,
         _In_ PVOID Context,
         _In_ PVOID Worker);
     static VOID HandleAsyncEvent(
@@ -138,6 +139,7 @@ public:
         _In_ PSPCNVME_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
+    NTSTATUS Setup(PVOID pcidata, PVOID ctrlreg);
     void Teardown();
 
     NTSTATUS EnableController();
@@ -231,3 +233,18 @@ private:
     void UpdateParamsByCtrlIdent();
 };
 
+//PLease refer to NVMe Spec IdentifyController data for 
+//meaning of mpsmin / mpsmax / mdts. 
+__inline ULONG CalcMinPageSize(ULONGLONG mpsmin)
+{
+    return (ULONG)(1 << (12 + mpsmin));
+}
+__inline ULONG CalcMaxPageSize(ULONGLONG mpsmax)
+{
+    return (ULONG)(1 << (12 + mpsmax));
+}
+__inline ULONG CalcMaxTxSize(UCHAR mdts, ULONGLONG mpsmin)
+{
+    ULONG pagesize = CalcMinPageSize(mpsmin);
+    return (ULONG)((1 << mdts) * pagesize);
+}

@@ -1,4 +1,6 @@
 #include "pch.h"
+
+#if 0
 SCSI_UNIT_CONTROL_STATUS Handle_QuerySupportedUnitControl(
     PSCSI_SUPPORTED_CONTROL_TYPE_LIST list)
 {
@@ -58,3 +60,4 @@ SCSI_UNIT_CONTROL_STATUS Handle_UnitSurpriseRemove(PSTOR_ADDR_BTL8 addr)
 
     return ScsiUnitControlSuccess;
 }
+#endif
