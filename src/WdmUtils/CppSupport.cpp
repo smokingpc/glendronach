@@ -14,7 +14,6 @@ void* __cdecl operator new (size_t size)
     return ExAllocatePoolWithTag(PagedPool, size, CPP_TAG);
 }
 
-
 //usage: MyClass *ptr = new(NonPagedPool, MY_POOL_TAG) MyClass();
 void* operator new (size_t size, POOL_TYPE type, ULONG tag)
 {

@@ -1,22 +1,77 @@
 #pragma once
-#define MAX_CHILD_VROC_DEV      16
+
+struct _VROC_DEVICE;
+
+//Virtual Bus behind Virtual Bridge in in VROC RaidController's BAR0(child PciCfg Space).
+typedef struct _VROC_BUS
+{
+    LIST_ENTRY List;     //bus list behind same virtual bridge.
+    LIST_ENTRY DevListHead;
+    PPCI_COMMON_CONFIG BridgeCfg;       //PCI config of bridge
+    
+    PUCHAR BusSpace;        //PCI config space of entire Bus. it includes config space of all devices on this bus.
+
+    UCHAR PrimaryBus;
+    UCHAR MyBus;
+    UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
+    
+    //for bridge memory windows setup.
+    //np stands for "NonPrefetchable"
+    //pf stands for "Prefetchable"
+    ULONG NpMemBase;
+    ULONG NpMemLimit;
+    ULONGLONG PfMemBase;
+    ULONGLONG PfMemLimit;
+
+    void Init(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
+    void AddDevice(struct _VROC_DEVICE* dev);
+    void UpdateBridgeMemoryWindow();
+    void RemoveAllDevices();
+}VROC_BUS, *PVROC_BUS;
+
+typedef struct _VROC_DEVICE
+{
+    LIST_ENTRY List;     //device list on same virtual bus.
+    PPCI_COMMON_CONFIG DevCfg;
+    PHYSICAL_ADDRESS Bar0PA;
+    ULONG Bar0Len;
+    PVROC_BUS ParentBus;
+    UCHAR DevId;        //Device ID in PCI Bus
+    CNvmeDevice *NvmeDev;
+
+    void Init(UCHAR dev_id, PPCI_COMMON_CONFIG cfg);
+}VROC_DEVICE, * PVROC_DEVICE;
+
+
+#pragma push(1)
+typedef struct _VMD_VIRTUAL_BUS_CAP {
+    ULONG UseMask : 1;
+    ULONG Reserved1 : 31;
+    ULONG Reserved2 : 8;
+    ULONG BusMask : 3;
+    ULONG Reserved : 21;
+}VMD_VIRTUAL_BUS_CAP, *PVMD_VIRTUAL_BUS_CAP;
+#pragma pop()
 
 typedef struct _SPC_DEVEXT {
 
-    PCI_COMMON_CONFIG PciCfg;
+    PCI_COMMON_CONFIG PciCfg;       //pci config space of RaidController
     PPORT_CONFIGURATION_INFORMATION PortCfg;
     ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];
 
-    PUCHAR RaidPciePage;
-    ULONG RaidPciePageSize;
-    PUCHAR RaidCtrlRegPage;
-    ULONG RaidCtrlRegPageSize;
-    PUCHAR RaidMsixPage;
-    ULONG RaidMsixPageSize;
-
-    PPCI_COMMON_CONFIG NvmePciCfg[MAX_CHILD_VROC_DEV];
-    PNVME_CONTROLLER_REGISTERS NvmeCtrlReg[MAX_CHILD_VROC_DEV];
-    PCIE_CAP NvmePcieCap[MAX_CHILD_VROC_DEV];
+    //In VROC RaidController, there are 3 BARs
+    //BAR0 == PCI conofig space of child NVMe devices and bridges.
+    //BAR1 == NVMe Controller Register region of child devices.
+    //BAR2 == MSIX table (of RAID Controller??)
+    //I only need BAR0 and the NVMe CtrlReg region can be mapped from child device's BAR0.
+    PUCHAR RaidPcieCfgSpace;
+    ULONG RaidPcieCfgSpaceSize;
+    
+    //Each NVMe device are located BEHIND a pci bridge.
+    //The bridge memory(resource) window should be setup correctly.
+    //LED could be also controlled by these bridges.
+    UCHAR PrimaryBus;       //for VMD segment, this RaidController's bus number...
+    LIST_ENTRY BusListHead;
 
     CNvmeDevice *NvmeDev[MAX_CHILD_VROC_DEV];
     PVOID UncachedExt;
@@ -25,8 +80,11 @@ typedef struct _SPC_DEVEXT {
     ULONG AccessRangeCount;
 
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
-    void MapVrocBar0(ACCESS_RANGE *ranges, ULONG count);
-    void EnumNvmeDevs();
+    NTSTATUS GetRaidCtrlPciCfg();
+    void MapRaidCtrlBar0(ACCESS_RANGE *ranges, ULONG count);
+    void EnumVrocBuses();
+    void EnumVrocDevsOnBus(PVROC_BUS bus);
+
     void Teardown();
     void ShutdownAllVmdController();
     void DisableAllVmdController();
