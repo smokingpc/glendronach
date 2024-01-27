@@ -78,3 +78,9 @@ FORCEINLINE bool IsValidVendorID(PPCI_COMMON_CONFIG cfg)
     //not mapped PCI HEADER so only can read 0xFFFF or 0(invalid value)
     return !(0xffff == cfg->VendorID || 0 == cfg->VendorID);
 }
+FORCEINLINE bool IsValidPciCap(PPCI_CAPABILITIES_HEADER cap)
+{
+    if (NULL == cap || 0 == cap->CapabilityID || 0xFF == cap->CapabilityID)
+        return false;
+    return true;
+}

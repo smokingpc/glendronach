@@ -60,6 +60,7 @@
 #define INVALID_SCSI_TAG     (MAXULONG)
 #define INVALID_SRB_QUEUETAG (MAXULONG)
 #define SCSI_TAG_SHIFT       10
+#define MAX_SCSI_BUSES        1
 #define MAX_SCSI_TARGETS        1
 #define MAX_SCSI_LOGICAL_UNIT   1
 #pragma endregion

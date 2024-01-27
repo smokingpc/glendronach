@@ -30,7 +30,8 @@ SpcNvme.sys
 %ManufacturerName% = NVMeDisk,NT$ARCH$
 
 [NVMeDisk.NT$ARCH$]
-%DiskName% = NVMeInstall, PCI\CC_010802
+%DiskName% = NVMeInstall, PCI\VEN_8086&DEV_201D
+%DiskName% = NVMeInstall, PCI\VEN_8086&DEV_28C0
 
 [NVMeInstall.NT$ARCH$]
 CopyFiles=DiskCopyfiles
@@ -53,20 +54,20 @@ AddReg         = Parameters
 HKR, "Interrupt Management", 0x00000010
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", 0x00000010
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported,       %REG_DWORD%,   1
-HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   17
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   64
 HKR, "Interrupt Management\Affinity" Policy, 0x00000010
-HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
+HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 5 ;IrqPolicySpreadMessagesAcrossAllProcessors
 HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3 ;IrqPriorityHigh, for low latency
 HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
 
 [Parameters]
 HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001    ;PCIBus
-HKR, Parameters, "BusType", %REG_DWORD%, 0x00000011           ;STORAGE_BUS_TYPE
+HKR, Parameters, "BusType", %REG_DWORD%, 0x00000008           ;STORAGE_BUS_TYPE::BusTypeRAID
 
 [Strings]
 ManufacturerName="SmokingPC"
 ClassName=""
-DiskName="SpcNvme NVMe Storage"
+DiskName="SpcNvme VRoC Controller"
 
 REG_EXPAND_SZ  = 0x00020000
 REG_DWORD      = 0x00010001

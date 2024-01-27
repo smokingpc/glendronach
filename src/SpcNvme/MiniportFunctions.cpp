@@ -13,8 +13,8 @@ static void FillPortConfiguration(
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
-    portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS; //specify bounce buffer type?
-    portcfg->MaximumNumberOfTargets = MAX_SCSI_TARGETS;
+    portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
+    portcfg->MaximumNumberOfTargets = MAX_CHILD_VROC_DEV;   //each NVMe treated as a SCSI Target
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
     portcfg->DeviceExtensionSize = sizeof(SPC_DEVEXT);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
@@ -22,7 +22,7 @@ static void FillPortConfiguration(
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = MAX_CHILD_VROC_DEV;    //each VMD treated as 1 SCSI bus
+    portcfg->NumberOfBuses = MAX_SCSI_BUSES;    //each VMD are located at same SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
@@ -175,12 +175,7 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     PSPCNVME_SRBEXT srbext = NULL;
     PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
-    CNvmeDevice *nvme = devext->FindVmdDev(SrbGetPathId(srb));
-    if(NULL == nvme)
-    {
-        srb_status = SRB_STATUS_NO_DEVICE;
-        goto END;
-    }
+    CNvmeDevice *nvme = devext->FindVmdDev(SrbGetTargetId(srb));
     srbext = InitSrbExt(hbaext, nvme, (PSTORAGE_REQUEST_BLOCK)srb);
 
     switch (srbext->FuncCode())
@@ -220,7 +215,6 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
 
     }
 
-END:
     if(SRB_STATUS_PENDING != srb_status)
         srbext->CompleteSrb(srb_status);
 
@@ -277,8 +271,12 @@ BOOLEAN HwResetBus(
     CDebugCallInOut inout(__FUNCTION__);
     //miniport driver is responsible for completing SRBs received by HwStorStartIo for 
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
+
     PSPC_DEVEXT devext = (PSPC_DEVEXT)DeviceExtension;
-    CNvmeDevice* nvme = devext->FindVmdDev((UCHAR)PathId);
+
+    STOR_ADDR_BTL8 addr = {0};
+    RtlCopyMemory(&addr.Port, &PathId, sizeof(ULONG));
+    CNvmeDevice* nvme = devext->FindVmdDev(addr.Path);
     nvme->ReleaseOutstandingSrbs();
     return TRUE;
 }
