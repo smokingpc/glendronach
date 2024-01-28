@@ -47,7 +47,7 @@ typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
 typedef struct _SPCNVME_SRBEXT
 {
-    _SPC_DEVEXT *DevExt;
+    PVOID DevExt;
     CNvmeDevice *NvmeDev;
     PSTORAGE_REQUEST_BLOCK Srb;
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
@@ -76,7 +76,7 @@ typedef struct _SPCNVME_SRBEXT
     PNVME_COMMAND SubmitCmdPtr;
     #pragma endregion
 
-    void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
+    void Init(PVOID nvme, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
     void CompleteSrb(UCHAR status);
     void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);
@@ -94,19 +94,22 @@ inline _SPCNVME_SRBEXT* GetSrbExt(PSTORAGE_REQUEST_BLOCK srb)
 {
     return (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
 }
-inline _SPCNVME_SRBEXT* InitSrbExt(PVOID nvme, PSTORAGE_REQUEST_BLOCK srb)
+inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSTORAGE_REQUEST_BLOCK srb)
 {
     PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
-    srbext->Init(nvme, srb);
+    srbext->Init(devext, srb);
     return srbext;
 }
-inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PVOID nvme, PSTORAGE_REQUEST_BLOCK srb)
+inline void SetNvmeDeviceToSrbExt(PSPCNVME_SRBEXT srbext, CNvmeDevice* nvme)
 {
-    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
-    srbext->Init(nvme, srb);
-    srbext->DevExt = (_SPC_DEVEXT*)devext;
-    return srbext;
+    srbext->NvmeDev = nvme;
 }
+//
+//inline void DisatchNvmeDeviceToSrbExt(PSPCNVME_SRBEXT srbext)
+//{
+//    CNvmeDevice* nvme = FindVrocNvmeDev(srbext->ScsiPath);
+//    srbext->NvmeDev = nvme;
+//}
 
 UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status);
 UCHAR NvmeGenericToSrbStatus(NVME_COMMAND_STATUS &status);

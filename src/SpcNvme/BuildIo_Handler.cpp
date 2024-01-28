@@ -50,7 +50,7 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
 
     STOR_PNP_ACTION action = STOR_PNP_ACTION::StorStartDevice;
     PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
-
+    PSPC_DEVEXT devext = (PSPC_DEVEXT)srbext->DevExt;
     ASSERT(NULL != srb_pnp);
     flags = srb_pnp->SrbPnPFlags;
     action = srb_pnp->PnPAction;
@@ -68,15 +68,15 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
             break;
         case StorRemoveDevice:
         //regular RemoveDevice should shutdown controller first, then delete all queue memory.
-            srbext->DevExt->ShutdownAllVmdController();
-            srbext->DevExt->Teardown();
+            devext->ShutdownAllVrocNvmeControllers();
+            devext->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
         case StorSurpriseRemoval:
             //surprise remove doesn't need to shutdown controller.
             //controller is already gone , access controller registers will make BSoD or other problem.
             //srb_status = AdapterPnp_RemoveHandler(srbext);
-            srbext->DevExt->Teardown();
+            devext->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
         case StorStopDevice:
@@ -84,8 +84,8 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
         //This is rare case that could happen when hotplug.
         //To handle rebalance resource event, just release all PNP resource then 
         //Storport will call HwFindAdapter again to re-assign resource to us.
-            srbext->DevExt->DisableAllVmdController();
-            srbext->DevExt->Teardown();
+            devext->DisableAllVrocNvmeControllers();
+            devext->Teardown();
             srb_status = SRB_STATUS_SUCCESS;
             break;
     }

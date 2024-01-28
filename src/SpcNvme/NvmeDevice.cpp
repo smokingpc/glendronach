@@ -1,18 +1,17 @@
 #include "pch.h"
-#if 0
+
 BOOLEAN CNvmeDevice::NvmeMsixISR(IN PVOID hbaext, IN ULONG msgid)
 {
-    CNvmeDevice* nvme = (CNvmeDevice*)devext;
+    CNvmeDevice* nvme = (CNvmeDevice*)hbaext;
     CNvmeQueue *queue = (msgid == 0)? nvme->AdmQueue : nvme->IoQueue[msgid-1];
     if (NULL == queue || !nvme->IsWorking())
         goto END;
 
     BOOLEAN ok = FALSE;
-    ok = StorPortIssueDpc(devext, &queue->QueueCplDpc, NULL, NULL);
+    ok = StorPortIssueDpc(hbaext, &queue->QueueCplDpc, NULL, NULL);
 END:
     return TRUE;
 }
-#endif
 void CNvmeDevice::RestartAdapterDpc(
     IN PSTOR_DPC  Dpc,
     IN PVOID  NvmeDev,
@@ -155,25 +154,25 @@ inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, boo
 {
     if(barrier)
         MemoryBarrier();
-    cc.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->CC.AsUlong);
+    cc.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CC.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    csts.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->CSTS.AsUlong);
+    csts.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_VERSION& ver, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    ver.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->VS.AsUlong);
+    ver.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->VS.AsUlong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_CONTROLLER_CAPABILITIES& cap, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    cap.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->CAP.AsUlonglong);
+    cap.AsUlonglong = StorPortReadRegisterUlong64(DevExt, &CtrlReg->CAP.AsUlonglong);
 }
 inline void CNvmeDevice::ReadNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS& asq,
@@ -183,21 +182,21 @@ inline void CNvmeDevice::ReadNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     if (barrier)
         MemoryBarrier();
 
-    aqa.AsUlong = StorPortReadRegisterUlong(this, &CtrlReg->AQA.AsUlong);
-    asq.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->ASQ.AsUlonglong);
-    acq.AsUlonglong = StorPortReadRegisterUlong64(this, &CtrlReg->ACQ.AsUlonglong);
+    aqa.AsUlong = StorPortReadRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong);
+    asq.AsUlonglong = StorPortReadRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong);
+    acq.AsUlonglong = StorPortReadRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_CONFIGURATION& cc, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    StorPortWriteRegisterUlong(this, &CtrlReg->CC.AsUlong, cc.AsUlong);
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CC.AsUlong, cc.AsUlong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_CONTROLLER_STATUS& csts, bool barrier)
 {
     if (barrier)
         MemoryBarrier();
-    StorPortWriteRegisterUlong(this, &CtrlReg->CSTS.AsUlong, csts.AsUlong);
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->CSTS.AsUlong, csts.AsUlong);
 }
 inline void CNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     NVME_ADMIN_SUBMISSION_QUEUE_BASE_ADDRESS& asq,
@@ -207,9 +206,9 @@ inline void CNvmeDevice::WriteNvmeRegister(NVME_ADMIN_QUEUE_ATTRIBUTES& aqa,
     if (barrier)
         MemoryBarrier();
 
-    StorPortWriteRegisterUlong(this, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
-    StorPortWriteRegisterUlong64(this, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
-    StorPortWriteRegisterUlong64(this, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
+    StorPortWriteRegisterUlong(DevExt, &CtrlReg->AQA.AsUlong, aqa.AsUlong);
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ASQ.AsUlonglong, asq.AsUlonglong);
+    StorPortWriteRegisterUlong64(DevExt, &CtrlReg->ACQ.AsUlonglong, acq.AsUlonglong);
 }
 inline BOOLEAN CNvmeDevice::IsControllerEnabled(bool barrier)
 {
@@ -253,6 +252,7 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
         return STATUS_INVALID_DEVICE_STATE;
 
     State = NVME_STATE::SETUP;
+    DevExt = this;
     InitVars();
     LoadRegistry();
     GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
@@ -275,20 +275,21 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     State = NVME_STATE::RUNNING;
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::Setup(PVOID pcidata, PVOID ctrlreg)
+NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
 {
     NTSTATUS status = STATUS_SUCCESS;
     if (NVME_STATE::STOP != State && !this->RebalancingPnp)
         return STATUS_INVALID_DEVICE_STATE;
 
     State = NVME_STATE::SETUP;
+    DevExt = devext;
     InitVars();
     RtlCopyMemory(&PciCfg, pcidata, sizeof(PCI_COMMON_CONFIG));
     VendorID = PciCfg.VendorID;
     DeviceID = PciCfg.DeviceID;
 
     CtrlReg = (PNVME_CONTROLLER_REGISTERS)ctrlreg;
-    Bar0Size = 4*PAGE_SIZE;
+    Bar0Size = 4 * PAGE_SIZE;
     Doorbells = CtrlReg->Doorbells;
 
     ReadCtrlCap();
@@ -311,7 +312,7 @@ void CNvmeDevice::Teardown()
     State = NVME_STATE::STOP;
     if(NULL != this->CtrlReg)
     {
-        StorPortFreeDeviceBase(this, this->CtrlReg);
+        StorPortFreeDeviceBase(DevExt, this->CtrlReg);
         CtrlReg = NULL;
     }
 
@@ -492,14 +493,14 @@ NTSTATUS CNvmeDevice::RestartController()
         return STATUS_INVALID_DEVICE_STATE;
 
     //stop handling any request BEFORE restart HBA done.
-    StorPortPause(this, MAXULONG);
+    StorPortPause(DevExt, MAXULONG);
 
     //[workaround]
     //StorPortQueueWorkItem() only can be called at IRQL <= DISPATCH_LEVEL.
     //And 
     //CNvmeDevice::RegisterIoQueue() should be called at IRQL < DISPATCH_LEVEL.
     //So I have to call DPC to do StorPortQueueWorkItem().
-    ok = StorPortIssueDpc(this, &this->RestartDpc, NULL, NULL);
+    ok = StorPortIssueDpc(DevExt, &this->RestartDpc, NULL, NULL);
     ASSERT(ok);
     return STATUS_SUCCESS;
 }
@@ -968,6 +969,7 @@ NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
 
     if (MAXUSHORT == srbext->NvmeCmd.CDW0.CID)
         srbext->NvmeCmd.CDW0.CID = IoQueue[idx]->GetNextCid();
+
     return IoQueue[idx]->SubmitCmd(srbext, cmd);
 }
 void CNvmeDevice::ReleaseOutstandingSrbs()
@@ -994,7 +996,7 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
     //Just using STOR_PERF_VERSION_5, STOR_PERF_VERSION_6 is for Win2019 and above...
     supported.Version = STOR_PERF_VERSION_5;
     supported.Size = sizeof(PERF_CONFIGURATION_DATA);
-    stor_status = StorPortInitializePerfOpts(this, TRUE, &supported);
+    stor_status = StorPortInitializePerfOpts(DevExt, TRUE, &supported);
     if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
@@ -1023,7 +1025,7 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
     if (0 != (supported.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO))
         set_perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
 
-    stor_status = StorPortInitializePerfOpts(this, FALSE, &set_perf);
+    stor_status = StorPortInitializePerfOpts(DevExt, FALSE, &set_perf);
     if(STOR_STATUS_SUCCESS != stor_status)
         return STATUS_UNSUCCESSFUL;
 
@@ -1330,7 +1332,7 @@ bool CNvmeDevice::MapCtrlRegisters()
         {
             in_iospace = !range->RangeInMemory;
             PUCHAR addr = (PUCHAR)StorPortGetDeviceBase(
-                                    this, type, 
+                                    DevExt, type,
                                     PortCfg->SystemIoBusNumber, bar0, 
                                     range->RangeLength, in_iospace);
             if (NULL != addr)
@@ -1348,7 +1350,7 @@ bool CNvmeDevice::MapCtrlRegisters()
 bool CNvmeDevice::GetPciBusData(INTERFACE_TYPE type, ULONG bus, ULONG slot)
 {
     ULONG size = sizeof(PciCfg);
-    ULONG status = StorPortGetBusData(this, type, bus, slot, &PciCfg, size);
+    ULONG status = StorPortGetBusData(DevExt, type, bus, slot, &PciCfg, size);
 
     //refer to MSDN StorPortGetBusData() to check why 2==status is error.
     if (2 == status || status != size)
@@ -1454,7 +1456,7 @@ void CNvmeDevice::InitVars()
 
     //RestartWorker and RestartDpc are used for HwAdapterControl::ScsiRestartAdapter event.
     RestartWorker = NULL;
-    StorPortInitializeDpc(this, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
+    StorPortInitializeDpc(DevExt, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
 
     //One interrupt could be handled by multiple CPU, especially in system with lots of CPU.
     //e.g. AMD EPYC 9654.
@@ -1484,7 +1486,7 @@ void CNvmeDevice::LoadRegistry()
     ULONG size = sizeof(ULONG);
     ULONG ret_size = 0;
     BOOLEAN ok = FALSE;
-    UCHAR* buffer = StorPortAllocateRegistryBuffer(this, &size);
+    UCHAR* buffer = StorPortAllocateRegistryBuffer(DevExt, &size);
 
     if (buffer == NULL)
         return;
@@ -1493,40 +1495,40 @@ void CNvmeDevice::LoadRegistry()
     //ret_size should assign buffer length when calling in,
     //then it will return "how many bytes read from registry".
     ret_size = size;    
-    ok = StorPortRegistryRead(this, REGNAME_COALESCE_COUNT, TRUE, 
+    ok = StorPortRegistryRead(DevExt, REGNAME_COALESCE_COUNT, TRUE,
         REG_DWORD, (PUCHAR) buffer, &ret_size);
     if(ok)
         CoalescingThreshold = (UCHAR) *((ULONG*)buffer);
 
     RtlZeroMemory(buffer, size);
     ret_size = size;
-    ok = StorPortRegistryRead(this, REGNAME_COALESCE_TIME, TRUE,
+    ok = StorPortRegistryRead(DevExt, REGNAME_COALESCE_TIME, TRUE,
         REG_DWORD, (PUCHAR)buffer, &ret_size);
     if (ok)
         CoalescingTime = (UCHAR) *((ULONG*)buffer);
     
     RtlZeroMemory(buffer, size);
     ret_size = size;
-    ok = StorPortRegistryRead(this, REGNAME_ADMQ_DEPTH, TRUE,
+    ok = StorPortRegistryRead(DevExt, REGNAME_ADMQ_DEPTH, TRUE,
         REG_DWORD, (PUCHAR)buffer, &ret_size);
     if (ok)
         AdmDepth = (USHORT) *((ULONG*)buffer);
 
     RtlZeroMemory(buffer, size);
     ret_size = size;
-    ok = StorPortRegistryRead(this, REGNAME_IOQ_DEPTH, TRUE,
+    ok = StorPortRegistryRead(DevExt, REGNAME_IOQ_DEPTH, TRUE,
         REG_DWORD, (PUCHAR)buffer, &ret_size);
     if (ok)
         IoDepth = (USHORT) *((ULONG*)buffer);
 
     RtlZeroMemory(buffer, size);
     ret_size = size;
-    ok = StorPortRegistryRead(this, REGNAME_IOQ_COUNT, TRUE,
+    ok = StorPortRegistryRead(DevExt, REGNAME_IOQ_COUNT, TRUE,
         REG_DWORD, (PUCHAR)buffer, &ret_size);
     if (ok)
         DesiredIoQ = *((ULONG*)buffer);
 
-    StorPortFreeRegistryBuffer(this, buffer);
+    StorPortFreeRegistryBuffer(DevExt, buffer);
 }
 NTSTATUS CNvmeDevice::CreateIoQ()
 {

@@ -23,7 +23,8 @@ typedef struct _VROC_BUS
     ULONGLONG PfMemBase;
     ULONGLONG PfMemLimit;
 
-    void Init(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
+    void Setup(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
+    void Teardown();
     void AddDevice(struct _VROC_DEVICE* dev);
     void UpdateBridgeMemoryWindow();
     void RemoveAllDevices();
@@ -39,18 +40,21 @@ typedef struct _VROC_DEVICE
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
 
-    void Init(UCHAR dev_id, PPCI_COMMON_CONFIG cfg);
+    void Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg);
+    void Teardown();
+    void CreateNvmeDevice(PVOID devext, PPCI_COMMON_CONFIG pcidata);
+    void DeleteNvmeDevice();
 }VROC_DEVICE, * PVROC_DEVICE;
 
 
 #pragma push(1)
-typedef struct _VMD_VIRTUAL_BUS_CAP {
+typedef struct _VROC_RAID_VIRTUAL_BUS_CAP {
     ULONG UseMask : 1;
     ULONG Reserved1 : 31;
     ULONG Reserved2 : 8;
     ULONG BusMask : 3;
     ULONG Reserved : 21;
-}VMD_VIRTUAL_BUS_CAP, *PVMD_VIRTUAL_BUS_CAP;
+}VROC_RAID_VIRTUAL_BUS_CAP, *PVROC_RAID_VIRTUAL_BUS_CAP;
 #pragma pop()
 
 typedef struct _SPC_DEVEXT {
@@ -66,14 +70,19 @@ typedef struct _SPC_DEVEXT {
     //I only need BAR0 and the NVMe CtrlReg region can be mapped from child device's BAR0.
     PUCHAR RaidPcieCfgSpace;
     ULONG RaidPcieCfgSpaceSize;
-    
+    PUCHAR RaidNvmeCfgSpace;
+    ULONG RaidNvmeCfgSpaceSize;
+    PUCHAR RaidMsixCfgSpace;
+    ULONG RaidMsixCfgSpaceSize;
+
     //Each NVMe device are located BEHIND a pci bridge.
     //The bridge memory(resource) window should be setup correctly.
     //LED could be also controlled by these bridges.
-    UCHAR PrimaryBus;       //for VMD segment, this RaidController's bus number...
+    UCHAR PrimaryBus;       //for VROC segment, this RaidController's bus number...
     LIST_ENTRY BusListHead;
 
     CNvmeDevice *NvmeDev[MAX_CHILD_VROC_DEV];
+    ULONG NvmeDevCount;
     PVOID UncachedExt;
     ULONG MaxTxSize;
     ULONG MaxTxPages;
@@ -86,14 +95,14 @@ typedef struct _SPC_DEVEXT {
     void EnumVrocDevsOnBus(PVROC_BUS bus);
 
     void Teardown();
-    void ShutdownAllVmdController();
-    void DisableAllVmdController();
-    NTSTATUS InitVmd();
-    NTSTATUS PassiveInitVmd();
-    void UpdateNvmeInfoByVmd();
-    inline CNvmeDevice* _SPC_DEVEXT::FindVmdDev(UCHAR target_id)
+    void ShutdownAllVrocNvmeControllers();
+    void DisableAllVrocNvmeControllers();
+    NTSTATUS InitAllVrocNvme();
+    NTSTATUS PassiveInitAllVrocNvme();
+    void UpdateVrocNvmeDevInfo();
+    inline CNvmeDevice* _SPC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {
-        //treat VMD index as scsi target id.
+        //treat vroc virtual bus index as scsi target id.
         //there is only one bus of this storage.
         //each path has multiple targets.
         //each target only have 1 logical unit.

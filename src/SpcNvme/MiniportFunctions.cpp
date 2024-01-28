@@ -3,7 +3,6 @@
 static void FillPortConfiguration(
             PPORT_CONFIGURATION_INFORMATION portcfg, 
             PSPC_DEVEXT devext)
-//            CNvmeDevice* nvme)
 {
 //Because MaxTxSize and MaxTxPages should be calculated by nvme->CtrlCap and nvme->CtrlIdent,
 //So FillPortConfiguration() should be called AFTER nvme->IdentifyController()
@@ -14,7 +13,7 @@ static void FillPortConfiguration(
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;
     portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
-    portcfg->MaximumNumberOfTargets = MAX_CHILD_VROC_DEV;   //each NVMe treated as a SCSI Target
+    portcfg->MaximumNumberOfTargets = MAX_VROC_TARGETS;   //each NVMe treated as a SCSI Target
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
     portcfg->DeviceExtensionSize = sizeof(SPC_DEVEXT);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
@@ -22,12 +21,12 @@ static void FillPortConfiguration(
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = MAX_SCSI_BUSES;    //each VMD are located at same SCSI bus
+    portcfg->NumberOfBuses = MAX_VROC_BUSES;    //each VMD are located at same SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
     portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_FULL64BIT_SUPPORTED;   //should set this value if MaxNumberOfIO > 1000.
-    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_SCSI_LOGICAL_UNIT * MAX_CHILD_VROC_DEV;
+    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_VROC_TARGETS * MAX_VROC_LOGICAL_UNIT * MAX_VROC_BUSES;
     portcfg->MaxIOsPerLun = MAX_IO_PER_LU;
 
     //this will limit LUN i/o queue and affect HBA Gateway OutstandingMax.
@@ -67,11 +66,11 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     if (!NT_SUCCESS(status))
         goto ERROR;
 
-    status = devext->InitVmd();
+    status = devext->InitAllVrocNvme();
     if (!NT_SUCCESS(status))
         goto ERROR;
 
-    devext->UpdateNvmeInfoByVmd();
+    devext->UpdateVrocNvmeDevInfo();
 
     //[Workaround for AdapterTopologyTelemetry event]
     //before HwInitialize, should init DmaAdapter.
@@ -157,7 +156,7 @@ BOOLEAN HwPassiveInitialize(PVOID hbaext)
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
     StorPortPause(hbaext, MAXULONG);
-    status = devext->PassiveInitVmd();
+    status = devext->PassiveInitAllVrocNvme();
     StorPortResume(hbaext);
     if (!NT_SUCCESS(status))
         devext->Teardown();
@@ -173,10 +172,16 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    PSPCNVME_SRBEXT srbext = NULL;
     PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
-    CNvmeDevice *nvme = devext->FindVmdDev(SrbGetTargetId(srb));
-    srbext = InitSrbExt(hbaext, nvme, (PSTORAGE_REQUEST_BLOCK)srb);
+    PSPCNVME_SRBEXT srbext = InitSrbExt(hbaext, (PSTORAGE_REQUEST_BLOCK)srb);
+    CNvmeDevice* nvme = devext->FindVrocNvmeDev(srbext->ScsiPath);
+
+    if(NULL == nvme)
+    {
+        srb_status = SRB_STATUS_NO_DEVICE;
+        goto END;
+    }
+    SetNvmeDeviceToSrbExt(srbext, nvme);
 
     switch (srbext->FuncCode())
     {
@@ -215,6 +220,7 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
 
     }
 
+END:
     if(SRB_STATUS_PENDING != srb_status)
         srbext->CompleteSrb(srb_status);
 
@@ -276,7 +282,7 @@ BOOLEAN HwResetBus(
 
     STOR_ADDR_BTL8 addr = {0};
     RtlCopyMemory(&addr.Port, &PathId, sizeof(ULONG));
-    CNvmeDevice* nvme = devext->FindVmdDev(addr.Path);
+    CNvmeDevice* nvme = devext->FindVrocNvmeDev(addr.Path);
     nvme->ReleaseOutstandingSrbs();
     return TRUE;
 }
@@ -312,7 +318,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
         //Before adapter remove, suspend/hiberation, and rebalance , 
         //it will enter D3 state.
         //Here should disable controller so storport can disconnect interrupts.
-        devext->DisableAllVmdController();
+        devext->DisableAllVrocNvmeControllers();
         break;
     }
     case ScsiRestartAdapter:

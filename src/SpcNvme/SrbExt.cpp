@@ -3,6 +3,7 @@
 void _SPCNVME_SRBEXT::Init(PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
+    DevExt = nvme;
     NvmeDev = (CNvmeDevice*)nvme;
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
@@ -60,12 +61,6 @@ ULONG _SPCNVME_SRBEXT::FuncCode()
         return SRB_FUNCTION_SPC_INTERNAL;
     return SrbGetSrbFunction(Srb);
 }
-//ULONG _SPCNVME_SRBEXT::ScsiQTag()
-//{
-//    if (NULL == Srb)
-//        return INVALID_SCSI_TAG;
-//    return SrbGetQueueTag(Srb);
-//}
 PCDB _SPCNVME_SRBEXT::Cdb()
 {
     if (NULL == Srb)
@@ -77,21 +72,6 @@ UCHAR _SPCNVME_SRBEXT::CdbLen() {
         return 0;
     return SrbGetCdbLength(Srb);
 }
-//UCHAR _SPCNVME_SRBEXT::PathID() {
-//    if (NULL == Srb)
-//        return INVALID_PATH_ID;
-//    return SrbGetPathId(Srb);
-//}
-//UCHAR _SPCNVME_SRBEXT::TargetID() {
-//    if (NULL == Srb)
-//        return INVALID_TARGET_ID;
-//    return SrbGetTargetId(Srb);
-//}
-//UCHAR _SPCNVME_SRBEXT::Lun() {
-//    if (NULL == Srb)
-//        return INVALID_LUN_ID;
-//    return SrbGetLun(Srb);
-//}
 PVOID _SPCNVME_SRBEXT::DataBuf() {
     if (NULL == Srb)
         return NULL;

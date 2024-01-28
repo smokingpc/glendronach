@@ -104,22 +104,21 @@ typedef struct _NVME_DEVEXT{
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
     PCI_COMMON_CONFIG                   PciCfg;
+    PVOID DevExt;
 }NVME_DEVEXT, *PNVME_DEVEXT;
 
 
 //Using this class represents the DeviceExtension.
 //Because memory allocation in kernel is still C style,
 //the constructor and destructor are useless. They won't be called.
-//So using Setup() and Teardown() to replace them.
+//So using Init() and Teardown() to replace them.
 class CNvmeDevice : public NVME_DEVEXT {
 public:
     static const ULONG BUGCHECK_BASE = 0x23939889;          //pizzahut....  XD
     static const ULONG BUGCHECK_ADAPTER = BUGCHECK_BASE + 1;            //adapter has some problem. e.g. CSTS.CFS==1
     static const ULONG BUGCHECK_INVALID_STATE = BUGCHECK_BASE + 2;      //if action in invalid controller state, fire this bugcheck
     static const ULONG BUGCHECK_NOT_IMPLEMENTED = BUGCHECK_BASE + 10;
-    #if 0
     static BOOLEAN NvmeMsixISR(IN PVOID devext, IN ULONG msgid);
-    #endif    
     static void RestartAdapterDpc(
             IN PSTOR_DPC  Dpc,
             IN PVOID  NvmeDev,
@@ -139,7 +138,7 @@ public:
         _In_ PSPCNVME_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
-    NTSTATUS Setup(PVOID pcidata, PVOID ctrlreg);
+    NTSTATUS Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg);
     void Teardown();
 
     NTSTATUS EnableController();
@@ -150,7 +149,6 @@ public:
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
-//    NTSTATUS InitNsExt();   //init namespace extension for exposed disks
     NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
     NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
 
@@ -189,7 +187,7 @@ public:
     bool IsTeardown();
     bool IsStop();
 
-private:
+protected:
     void InitVars();
     void LoadRegistry();
 
@@ -232,19 +230,3 @@ private:
     BOOLEAN IsControllerReady(bool barrier = true);
     void UpdateParamsByCtrlIdent();
 };
-
-//PLease refer to NVMe Spec IdentifyController data for 
-//meaning of mpsmin / mpsmax / mdts. 
-__inline ULONG CalcMinPageSize(ULONGLONG mpsmin)
-{
-    return (ULONG)(1 << (12 + mpsmin));
-}
-__inline ULONG CalcMaxPageSize(ULONGLONG mpsmax)
-{
-    return (ULONG)(1 << (12 + mpsmax));
-}
-__inline ULONG CalcMaxTxSize(UCHAR mdts, ULONGLONG mpsmin)
-{
-    ULONG pagesize = CalcMinPageSize(mpsmin);
-    return (ULONG)((1 << mdts) * pagesize);
-}

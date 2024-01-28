@@ -105,7 +105,6 @@ FORCEINLINE ULONG GetPciDevCfgSpaceSize(ULONG dev_count)
     ECAM_OFFSET ecam = { 0 };
     ecam.u.Dev = dev_count;
     return ecam.AsAddr;
-    PCI_PMC pcm = {0};
 }
 //Calculate the size of PCI Bus(with its child devices and functions) config space block.
 FORCEINLINE ULONG GetPciBusCfgSpaceSize(ULONG bus_count)
@@ -128,12 +127,29 @@ FORCEINLINE ULONG GetDeviceBarLength(ULONGLONG* bar_addr)
     ULONGLONG new_value = 0;
     ULONG length = 0;
     *bar_addr = MAXULONGLONG;
-    new_value = (*bar_addr & PCI_64BITBAR_ADDR_MASK);
+    new_value = (*bar_addr & PCI_BAR_ADDR_MASK);
     new_value = ~new_value;
-    length = new_value + 1;
+    ASSERT((new_value + 1) < 0x100000000ULL);
+    length = (ULONG)(new_value + 1);
     *bar_addr = old_value;
+    return length;
 }
 FORCEINLINE bool IsBarAddrPrefetchable(ULONG value)
 {
     return ((value & 0x00000008) > 0);
+}
+//PLease refer to NVMe Spec IdentifyController data for 
+//meaning of mpsmin / mpsmax / mdts. 
+FORCEINLINE ULONG CalcMinPageSize(ULONGLONG mpsmin)
+{
+    return (ULONG)(1 << (12 + mpsmin));
+}
+FORCEINLINE ULONG CalcMaxPageSize(ULONGLONG mpsmax)
+{
+    return (ULONG)(1 << (12 + mpsmax));
+}
+FORCEINLINE ULONG CalcMaxTxSize(UCHAR mdts, ULONGLONG mpsmin)
+{
+    ULONG pagesize = CalcMinPageSize(mpsmin);
+    return (ULONG)((1 << mdts) * pagesize);
 }
