@@ -189,6 +189,7 @@ public:
 
 protected:
     void InitVars();
+    void InitDpcs();
     void LoadRegistry();
 
     NTSTATUS CreateAdmQ();

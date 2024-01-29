@@ -254,6 +254,7 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     State = NVME_STATE::SETUP;
     InitVars();
     DevExt = this;
+    InitDpcs();
     LoadRegistry();
     GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
     PortCfg = pci;
@@ -280,10 +281,13 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
     NTSTATUS status = STATUS_SUCCESS;
     if (NVME_STATE::STOP != State && !this->RebalancingPnp)
         return STATUS_INVALID_DEVICE_STATE;
+    if(!this->RebalancingPnp)
+        RtlZeroMemory(this, sizeof(CNvmeDevice));
 
     State = NVME_STATE::SETUP;
     InitVars();
     DevExt = devext;
+    InitDpcs();
     RtlCopyMemory(&PciCfg, pcidata, sizeof(PCI_COMMON_CONFIG));
     VendorID = PciCfg.VendorID;
     DeviceID = PciCfg.DeviceID;
@@ -1240,7 +1244,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     //AdmQ histroy depth should reserve one more element for AsyncEvent.
     cfg.HistoryDepth = 1 + MAX_IO_PER_LU;
     GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
-    AdmQueue = new CNvmeQueue(&cfg);
+    AdmQueue = new(NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue(&cfg);
     if(!AdmQueue->IsInitOK())
         return STATUS_MEMORY_NOT_ALLOCATED;
     return STATUS_SUCCESS;
@@ -1455,10 +1459,6 @@ void CNvmeDevice::InitVars()
     RtlZeroMemory(&CtrlIdent, sizeof(NVME_IDENTIFY_CONTROLLER_DATA));
     RtlZeroMemory(NsData, sizeof(NsData));
 
-    //RestartWorker and RestartDpc are used for HwAdapterControl::ScsiRestartAdapter event.
-    RestartWorker = NULL;
-    StorPortInitializeDpc(DevExt, &this->RestartDpc, CNvmeDevice::RestartAdapterDpc);
-
     //One interrupt could be handled by multiple CPU, especially in system with lots of CPU.
     //e.g. AMD EPYC 9654.
     //So MsgGroupAffinity should be allocated by CpuCount.
@@ -1470,7 +1470,6 @@ void CNvmeDevice::InitVars()
     CtrlReg = NULL;
     PortCfg = NULL;
     Doorbells = NULL;
-//    MsixTable = NULL;
     AdmQueue = NULL;
     RtlZeroMemory(IoQueue, sizeof(IoQueue));
     UncachedExt = NULL;
@@ -1481,6 +1480,13 @@ void CNvmeDevice::InitVars()
     CurrentLogPage = MAXULONG;
 
     RtlZeroMemory(&PciCfg, sizeof(PCI_COMMON_CONFIG));
+}
+void CNvmeDevice::InitDpcs()
+{
+    //RestartWorker and RestartDpc are used for HwAdapterControl::ScsiRestartAdapter event.
+    RestartWorker = NULL;
+    StorPortInitializeDpc(DevExt, &this->RestartDpc, 
+                            CNvmeDevice::RestartAdapterDpc);
 }
 void CNvmeDevice::LoadRegistry()
 {
@@ -1539,16 +1545,16 @@ NTSTATUS CNvmeDevice::CreateIoQ()
     cfg.Depth = IoDepth;
     cfg.NumaNode = 0;
     cfg.Type = QUEUE_TYPE::IO_QUEUE;
-    cfg.HistoryDepth = MAX_IO_PER_LU;    //HistoryDepth should equal to MaxScsiTag (ScsiTag Depth).
+    cfg.HistoryDepth = MAX_IO_PER_LU + 1;    //HistoryDepth should equal to MaxScsiTag (ScsiTag Depth).
 
     for(USHORT i=0; i<DesiredIoQ; i++)
     {
         if(NULL != IoQueue[i])
             continue;
-        CNvmeQueue* queue = new CNvmeQueue();
         //Dbl[0] is for AdminQ
         cfg.QID = i + 1;
         this->GetQueueDbl(cfg.QID, cfg.SubDbl, cfg.CplDbl);
+        CNvmeQueue* queue = new(NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue;
         status = queue->Setup(&cfg);
         if(!NT_SUCCESS(status))
         {

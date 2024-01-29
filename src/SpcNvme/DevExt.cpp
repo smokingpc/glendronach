@@ -172,7 +172,9 @@ void _VROC_DEVICE::CreateNvmeDevice(PVOID devext)
     if(NULL == ctrlreg)
         return;
 
+    DbgBreakPoint();
     NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice;
+    DbgBreakPoint();
     NvmeDev->Setup(devext, DevCfg, ctrlreg);
 }
 void _VROC_DEVICE::DeleteNvmeDevice()
@@ -240,8 +242,8 @@ NTSTATUS _SPC_DEVEXT::GetRaidCtrlPciCfg()
 }
 void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
 {
-    RtlCopyMemory(AccessRanges, ranges, sizeof(AccessRanges));
     AccessRangeCount = min(ACCESS_RANGE_COUNT, count);
+    RtlCopyMemory(AccessRanges, ranges, AccessRangeCount * sizeof(ACCESS_RANGE));
 
     INTERFACE_TYPE type = PortCfg->AdapterInterfaceType;
     PACCESS_RANGE range = NULL;
@@ -341,11 +343,13 @@ void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
             continue;
 
         PVROC_DEVICE dev = new (NonPagedPool, TAG_VROC_BUS) VROC_DEVICE;
+        DbgBreakPoint();
         //calculate Bar0 PhyAddr for this device.
         PHYSICAL_ADDRESS nvme_bar0 = {0};
         nvme_bar0.QuadPart = bus->NpMemBase.QuadPart +
                                 (dev_id * VROC_NVME_BAR0_SIZE);
         dev->Setup(bus, dev_id, dev_space, nvme_bar0);
+        DbgBreakPoint();
         dev->CreateNvmeDevice(this);
         //Debug
         DbgBreakPoint();
