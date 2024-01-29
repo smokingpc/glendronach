@@ -41,6 +41,7 @@
 
 
 typedef struct _QUEUE_PAIR_CONFIG {
+    PVOID DevExt = NULL;
     PVOID NvmeDev = NULL;
     USHORT QID = 0;         //QueueID is zero-based. ID==0 is assigned to AdminQueue constantly
     USHORT Depth = 0;
@@ -83,6 +84,7 @@ public:
     void GetCplQAddr(PHYSICAL_ADDRESS* cplq);
 
     STOR_DPC QueueCplDpc;
+    PVOID DevExt = NULL;
     PVOID NvmeDev = NULL;
     USHORT QueueID = NVME_INVALID_QID;  //1-based ID, 0 is reserved for AdminQ
     USHORT Depth = 0;       //how many entries in both SubQ and CplQ?

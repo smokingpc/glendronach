@@ -92,7 +92,7 @@ PUCHAR GetDevCfgSpace(PUCHAR bus_space, UCHAR dev_id)
 }
 
 #pragma region ======== _VROC_BUS ========
-void _VROC_BUS::Setup(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space)
+void _VROC_BUS::Setup(UINT16 segment_idx, UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space)
 {
     RtlZeroMemory(this, sizeof(VROC_BUS));
     InitializeListHead(&List);
@@ -103,6 +103,7 @@ void _VROC_BUS::Setup(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridg
     PrimaryBus = primary_bus;
     MyBusIdx = bus_idx;
     MyBus = bus_idx + primary_bus;
+    PciSegmentIdx = segment_idx;
 }
 void _VROC_BUS::Teardown()
 {
@@ -124,121 +125,55 @@ void _VROC_BUS::RemoveAllDevices()
         delete dev;
     }
 }
-void _VROC_BUS::UpdateBridgeMemoryWindow()
+void _VROC_BUS::UpdateBridgeMemoryWindow(PHYSICAL_ADDRESS window_start, PHYSICAL_ADDRESS window_end)
 {
-    //**Behind a bridge, NonPrefetchable BAR address is always in 32bit range
-    ULONG np_lowest = MAXULONG;     //np stands for "non-prefetchable addr"
-    ULONG np_highest = 0;
-    ULONGLONG pf_lowest = MAXULONGLONG; //pf stands for "prefetchable addr"
-    ULONGLONG pf_highest = 0;
-    PLIST_ENTRY entry = NULL;
-
-    if(IsListEmpty(&DevListHead))
-        return;
-    
-    for(entry = DevListHead.Flink; entry != &DevListHead; entry = entry->Flink)
-    {
-        PVROC_DEVICE dev = CONTAINING_RECORD(entry, VROC_DEVICE, List);
-        bool prefatchable = IsBarAddrPrefetchable(dev->DevCfg->u.type0.BaseAddresses[0]);
-        ULONGLONG dev_addr_start = (ULONGLONG)dev->Bar0PA.QuadPart;
-        ULONGLONG dev_addr_end = dev_addr_start + (dev->Bar0Len - 1);
-
-        if(prefatchable)
-        {
-            if(pf_lowest > dev_addr_start)
-                pf_lowest = dev_addr_start;
-            if (pf_highest < dev_addr_end)
-                pf_highest = dev_addr_end;
-        }
-        else
-        {
-            if (np_lowest > (ULONG)(dev_addr_start&0xFFFFFFFFULL) )
-                np_lowest = (ULONG)(dev_addr_start & 0xFFFFFFFFULL);
-            if (pf_highest < (ULONG)(dev_addr_end & 0xFFFFFFFFULL))
-                pf_highest = (ULONG)(dev_addr_end & 0xFFFFFFFFULL);
-        }
-    }
-
-    NpMemBase = NpMemLimit = 0;
-    PfMemBase = PfMemLimit = 0;
-
-    if(MAXULONG > np_lowest)
-        NpMemBase = np_lowest;
-    if(np_highest > 0)
-        NpMemLimit = np_highest;
-
-    if (MAXULONGLONG > pf_lowest)
-        PfMemBase = pf_lowest;
-    if (pf_highest > 0)
-        PfMemLimit = pf_highest;
-
-    if ((NpMemBase > 0 && NpMemLimit > 0) && (NpMemLimit > NpMemBase))
-    {
+//todo : update prefetch mem range and i/o range....
     //NonPrefetchable MemBase
-        UINT16 base = (UINT16)((NpMemBase >> 16) & 0xFFF0); //low 4 bits are readonly, ignore them. 
-        UINT16 limit = ((1 + NpMemLimit - NpMemBase) + (MB_SIZE-1)) >> 20;  //round up to mb
-        
-        //refer to https://blog.csdn.net/zsmcdut/article/details/120040003?spm=1001.2101.3001.6650.1&utm_medium=distribute.pc_relevant.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-120040003-blog-52324940.235%5Ev43%5Epc_blog_bottom_relevance_base6&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-120040003-blog-52324940.235%5Ev43%5Epc_blog_bottom_relevance_base6&utm_relevant_index=2
-        limit = (base + (limit << 4) - 1) & 0xFFF0; //low 4 bits are readonly, ignore them. 
-        this->BridgeCfg->u.type1.MemoryBase = base;
-        this->BridgeCfg->u.type1.MemoryLimit = limit;
-    }
-    DbgBreakPoint();
-
-    if ((PfMemBase > 0 && PfMemLimit > 0) && (PfMemLimit > PfMemBase))
-    {
-        //Prefetch MemBase
-        UINT16 base_low = (UINT16)((PfMemBase & 0x00000000FFF00000ULL) >> 16);
-        ULONG base_high = (ULONG)((PfMemBase & 0xFFFFFFFF00000000ULL) >> 32);
-        //
-        ULONGLONG limit = ((1 + PfMemLimit - PfMemBase) + (MB_SIZE - 1)) / MB_SIZE;
-        UINT16 limit_low = (UINT16)((limit & 0x00000000FFF00000ULL) >> 16);
-        ULONG limit_high = (ULONG)((limit & 0xFFFFFFFF00000000ULL) >> 32);
-        this->BridgeCfg->u.type1.PrefetchBase = base_low;
-        this->BridgeCfg->u.type1.PrefetchBaseUpper32 = base_high;
-        this->BridgeCfg->u.type1.PrefetchLimit = limit_low;
-        this->BridgeCfg->u.type1.PrefetchLimitUpper32 = limit_high;
-    }
-    DbgBreakPoint();
+    NpMemBase = window_start;
+    NpMemLimit = window_end;
+    UINT16 base = (UINT16)((window_start.QuadPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
+    UINT16 limit = (UINT16)((window_end.QuadPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
+    
+    this->BridgeCfg->u.type1.MemoryBase = base;
+    this->BridgeCfg->u.type1.MemoryLimit = limit;
 }
 #pragma endregion
 #pragma region ======== _VROC_DEVICE ========
-void _VROC_DEVICE::Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg)
+void _VROC_DEVICE::Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PHYSICAL_ADDRESS bar0)
 {
     RtlZeroMemory(this, sizeof(VROC_DEVICE));
     InitializeListHead(&List);
     DevCfg = cfg;
     DevId = dev_id;
-    RtlCopyMemory(&Bar0PA.QuadPart, &cfg->u.type0.BaseAddresses[0], sizeof(ULONGLONG));
-    //Low 4 bits are readonly and indicates flags.
-    //All BAR address are 16 bytes aligned.
-    Bar0PA.QuadPart = Bar0PA.QuadPart & PCI_LOW32BIT_BAR_ADDR_MASK;
-    Bar0Len = GetDeviceBarLength((ULONGLONG*)&cfg->u.type0.BaseAddresses[0]);
+    IsBar0InIoSpace = ((cfg->u.type0.BaseAddresses[0] & 0x00000001) == TRUE);
+
+//update BAR0 in VROC NVMe device's PCI Config Space.
+    Bar0PA = bar0;
+    Bar0Len = VROC_NVME_BAR0_SIZE;
+    cfg->u.type0.BaseAddresses[0] = bar0.LowPart;
+    cfg->u.type0.BaseAddresses[1] = bar0.HighPart;
     ParentBus = bus;
 }
 void _VROC_DEVICE::Teardown()
 {
     DeleteNvmeDevice();
 }
-void _VROC_DEVICE::CreateNvmeDevice(PVOID devext, PPCI_COMMON_CONFIG pcidata)
+void _VROC_DEVICE::CreateNvmeDevice(PVOID devext)
 {
-    STOR_PHYSICAL_ADDRESS addr = {0};
-    addr.LowPart = pcidata->u.type0.BaseAddresses[0];
-    addr.HighPart = pcidata->u.type0.BaseAddresses[1];
-    bool in_iospace = (pcidata->u.type0.BaseAddresses[0] & 0x00000001);
+    STOR_PHYSICAL_ADDRESS addr = Bar0PA;
     PPORT_CONFIGURATION_INFORMATION &portcfg = ((PSPC_DEVEXT)devext)->PortCfg;
     PVOID ctrlreg = StorPortGetDeviceBase(devext,
         portcfg->AdapterInterfaceType,
         portcfg->SystemIoBusNumber,
         addr,
         4 * PAGE_SIZE,
-        in_iospace);
+        IsBar0InIoSpace);
 
     if(NULL == ctrlreg)
         return;
 
     NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice;
-    NvmeDev->Setup(this, pcidata, ctrlreg);
+    NvmeDev->Setup(devext, DevCfg, ctrlreg);
 }
 void _VROC_DEVICE::DeleteNvmeDevice()
 {
@@ -323,8 +258,8 @@ void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
     {
         RaidPcieCfgSpace = addr;
         RaidPcieCfgSpaceSize = range->RangeLength;
+        RaidPcieCfgSpacePA = range->RangeStart;
     }
-    DbgBreakPoint();
 
     range = &AccessRanges[1];
     in_iospace = !range->RangeInMemory;
@@ -336,8 +271,8 @@ void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
     {
         RaidNvmeCfgSpace = addr;
         RaidNvmeCfgSpaceSize = range->RangeLength;
+        RaidNvmeCfgSpacePA = range->RangeStart;
     }
-    DbgBreakPoint();
 
     range = &AccessRanges[2];
     in_iospace = !range->RangeInMemory;
@@ -349,8 +284,8 @@ void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
     {
         RaidMsixCfgSpace = addr;
         RaidMsixCfgSpaceSize = range->RangeLength;
+        RaidMsixCfgSpacePA = range->RangeStart;
     }
-    DbgBreakPoint();
 }
 void _SPC_DEVEXT::EnumVrocBuses()
 {
@@ -362,34 +297,37 @@ void _SPC_DEVEXT::EnumVrocBuses()
 
     //PCI bus has max 32 devices on 1 bus....
     //Enum bridges first.
-    //Bus 0 stores Pci Bridges
-    PUCHAR bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, 0);
+    //Bus 0 stores Pci Bridges, other Bus stores VROC NVMe devices.
+    PUCHAR bridge_bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, 0);
     UCHAR bus_idx = 1;  //bus 0 is for root bus which has bridges
+    UINT16 segment_idx = VROC_PCI_SEGMENT_START_ID;      //PCI segment index.
     for (UCHAR bridge_idx = 0; bridge_idx < PCI_MAX_DEVICES; bridge_idx++)
     {
-        PPCI_COMMON_CONFIG bridge = (PPCI_COMMON_CONFIG)GetDevCfgSpace(bus_space, bridge_idx);
+        PPCI_COMMON_CONFIG bridge = (PPCI_COMMON_CONFIG)GetDevCfgSpace(bridge_bus_space, bridge_idx);
         if (!IsValidVendorID(bridge))
             continue;
 
-        //found a bridge device, set it up and enum its child bus
         if (!IsPciBridge(bridge->HeaderType))
-        {
-            DbgBreakPoint();    //this should not happen...
             continue;
-        }
 
-        //Debugging
-        DbgBreakPoint();
+        //found a bridge device, set it up and enum its child bus
+
         //[Don't forget to set MemBase/MemLimit of this bridge.]
         //System can't access resources of all devices behind this bridge, 
         // if you didn't setup MemBase/MemLimit.
         PVROC_BUS bus = new (NonPagedPool, TAG_VROC_BUS) VROC_BUS;
-        bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
-        bus->Setup(PrimaryBus, bus_idx, bridge, bus_space);
+        PUCHAR dev_bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
+        bus->Setup(segment_idx, PrimaryBus, bus_idx, bridge, dev_bus_space);
+        
+        PHYSICAL_ADDRESS start = {0}, end = {0};
+        start.QuadPart = RaidNvmeCfgSpacePA.QuadPart + (bus_idx * VROC_BRIDGE_WINDOW_SIZE);
+        end.QuadPart = start.QuadPart + VROC_BRIDGE_WINDOW_SIZE - 1;
+        bus->UpdateBridgeMemoryWindow(start, end);
+
         EnumVrocDevsOnBus(bus);
-        bus->UpdateBridgeMemoryWindow();
         InsertTailList(&BusListHead, &bus->List);
         bus_idx++;
+        segment_idx++;
     }
 }
 void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
@@ -403,8 +341,15 @@ void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
             continue;
 
         PVROC_DEVICE dev = new (NonPagedPool, TAG_VROC_BUS) VROC_DEVICE;
-        dev->Setup(bus, dev_id, dev_space);
-        dev->CreateNvmeDevice(this, dev_space);
+        //calculate Bar0 PhyAddr for this device.
+        PHYSICAL_ADDRESS nvme_bar0 = {0};
+        nvme_bar0.QuadPart = bus->NpMemBase.QuadPart +
+                                (dev_id * VROC_NVME_BAR0_SIZE);
+        dev->Setup(bus, dev_id, dev_space, nvme_bar0);
+        dev->CreateNvmeDevice(this);
+        //Debug
+        DbgBreakPoint();
+
         bus->AddDevice(dev);
         NvmeDev[NvmeDevCount++] = dev->NvmeDev;
         //Todo: currently only enum 1 device on bus.
@@ -452,14 +397,7 @@ NTSTATUS _SPC_DEVEXT::InitAllVrocNvme()
             continue;
 
         CNvmeDevice* ptr = NvmeDev[i];
-//        CNvmeDevice *ptr = new CNvmeDevice();
-//        NvmeDev[i] = ptr;
-        //status = ptr->Init(BridgePciCfg[i], NvmeCtrlReg[i]);
-        //if (!NT_SUCCESS(status))
-        //{
-        //    DbgBreakPoint();
-        //    return status;
-        //}
+
         status = ptr->InitController();
         if (!NT_SUCCESS(status))
         {

@@ -76,7 +76,7 @@ VOID CNvmeDevice::HandleErrorInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_ERROR_INFO_LOG errlog = (PNVME_ERROR_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[ErrorInfo LogPage]:\n");
     
@@ -99,7 +99,7 @@ VOID CNvmeDevice::HandleSmartInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_HEALTH_INFO_LOG smartlog = (PNVME_HEALTH_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    AvailableSpaceLow(%d), TemperatureThreshold(%d), ReliabilityDegraded(%d), ReadOnly(%d), VolatileMemoryBackupDeviceFailed(%d)\n",
@@ -127,7 +127,7 @@ VOID CNvmeDevice::HandleFwSlotInfoLogPage(
     _In_ PSPCNVME_SRBEXT srbext)
 {
     PNVME_FIRMWARE_SLOT_INFO_LOG slotinfo = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtBuf;
-    CNvmeDevice* devext = (CNvmeDevice*)srbext->NvmeDev;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "****[SmartInfo LogPage]:\n");
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, 0, "    ActiveSlot(%d), PendingActivateSlot(%d)\n",
         slotinfo->AFI.ActiveSlot, slotinfo->AFI.PendingActivateSlot);
@@ -252,8 +252,8 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
         return STATUS_INVALID_DEVICE_STATE;
 
     State = NVME_STATE::SETUP;
-    DevExt = this;
     InitVars();
+    DevExt = this;
     LoadRegistry();
     GetPciBusData(pci->AdapterInterfaceType, pci->SystemIoBusNumber, pci->SlotNumber);
     PortCfg = pci;
@@ -282,8 +282,8 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
         return STATUS_INVALID_DEVICE_STATE;
 
     State = NVME_STATE::SETUP;
-    DevExt = devext;
     InitVars();
+    DevExt = devext;
     RtlCopyMemory(&PciCfg, pcidata, sizeof(PCI_COMMON_CONFIG));
     VendorID = PciCfg.VendorID;
     DeviceID = PciCfg.DeviceID;
@@ -1232,6 +1232,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     QUEUE_PAIR_CONFIG cfg = {0};
     cfg.Depth = (USHORT)AdmDepth;
     cfg.QID = 0;
+    cfg.DevExt = DevExt;
     cfg.NvmeDev = this;
     cfg.NumaNode = MM_ANY_NODE_OK;
     cfg.Type = QUEUE_TYPE::ADM_QUEUE;

@@ -113,6 +113,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     bool ok = false;
     NTSTATUS status = STATUS_SUCCESS;
 
+    DevExt = config->DevExt;
     NvmeDev = config->NvmeDev;
     QueueID = config->QID;
     Depth = config->Depth;
@@ -123,7 +124,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
     SubDbl = config->SubDbl;
     CplDbl = config->CplDbl;
     //Todo: StorPortNotification(SetTargetProcessorDpc)
-    StorPortInitializeDpc(NvmeDev, &QueueCplDpc, QueueCplDpcRoutine);
+    StorPortInitializeDpc(DevExt, &QueueCplDpc, QueueCplDpcRoutine);
     KeInitializeSpinLock(&SubLock);
 
     ok = AllocSrbExtBuffer();
@@ -191,7 +192,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
         InterlockedIncrement(&InflightCmds);
         SubTail = (SubTail + 1) % Depth;
-        WriteDbl(this->NvmeDev, this->SubDbl, this->SubTail);
+        WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
     }
 
     return STATUS_SUCCESS;
@@ -250,7 +251,7 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
     }
 
     if(done_count != 0)
-        WriteDbl(NvmeDev, CplDbl, CplHead);
+        WriteDbl(DevExt, CplDbl, CplHead);
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  
@@ -281,27 +282,27 @@ void CNvmeQueue::GetCplQAddr(PHYSICAL_ADDRESS* cplq)
 ULONG CNvmeQueue::ReadSubTail()
 {
     if (IsValidQid(QueueID) && NULL != SubDbl)
-        return ReadDbl(NvmeDev, SubDbl);
+        return ReadDbl(DevExt, SubDbl);
     KdBreakPoint();
     return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteSubTail(ULONG value)
 {
     if (IsValidQid(QueueID) && NULL != SubDbl)
-        return WriteDbl(NvmeDev, SubDbl, value);
+        return WriteDbl(DevExt, SubDbl, value);
     KdBreakPoint();
 }
 ULONG CNvmeQueue::ReadCplHead()
 {
     if (IsValidQid(QueueID) && NULL != CplDbl)
-        return ReadDbl(NvmeDev, CplDbl);
+        return ReadDbl(DevExt, CplDbl);
     KdBreakPoint();
     return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteCplHead(ULONG value)
 {
     if (IsValidQid(QueueID) && NULL != CplDbl)
-        return WriteDbl(NvmeDev, CplDbl, value);
+        return WriteDbl(DevExt, CplDbl, value);
     KdBreakPoint();
 }
 
@@ -316,7 +317,7 @@ bool CNvmeQueue::AllocQueueBuffer()
     //I am too lazy to check if NVMe device request continuous page or not, so.... 
     //Allocate SubQ and CplQ together into a continuous physical memory block.
     ULONG status = StorPortAllocateContiguousMemorySpecifyCacheNode(
-        this->NvmeDev, this->BufferSize,
+        this->DevExt, this->BufferSize,
         low, high, align,
         CNvmeQueue::CacheType, this->NumaNode,
         &this->Buffer);
@@ -371,7 +372,7 @@ void CNvmeQueue::DeallocQueueBuffer()
     if(NULL != this->Buffer)
     { 
         StorPortFreeContiguousMemorySpecifyCache(
-                NvmeDev, this->Buffer, this->BufferSize, CNvmeQueue::CacheType);
+            DevExt, this->Buffer, this->BufferSize, CNvmeQueue::CacheType);
     }
 
     this->Buffer = NULL;

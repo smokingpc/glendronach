@@ -10,7 +10,7 @@ typedef struct _VROC_BUS
     PPCI_COMMON_CONFIG BridgeCfg;       //PCI config of bridge
     
     PUCHAR BusSpace;        //PCI config space of entire Bus. it includes config space of all devices on this bus.
-
+    UINT16 PciSegmentIdx;      //PCI segment index. Each VROC bus is a different PCI segment.
     UCHAR PrimaryBus;
     UCHAR MyBus;
     UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
@@ -18,15 +18,13 @@ typedef struct _VROC_BUS
     //for bridge memory windows setup.
     //np stands for "NonPrefetchable"
     //pf stands for "Prefetchable"
-    ULONG NpMemBase;
-    ULONG NpMemLimit;
-    ULONGLONG PfMemBase;
-    ULONGLONG PfMemLimit;
+    PHYSICAL_ADDRESS NpMemBase;
+    PHYSICAL_ADDRESS NpMemLimit;
 
-    void Setup(UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
+    void Setup(UINT16 segment_idx, UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
     void Teardown();
     void AddDevice(struct _VROC_DEVICE* dev);
-    void UpdateBridgeMemoryWindow();
+    void UpdateBridgeMemoryWindow(PHYSICAL_ADDRESS window_start, PHYSICAL_ADDRESS window_end);
     void RemoveAllDevices();
 }VROC_BUS, *PVROC_BUS;
 
@@ -36,13 +34,14 @@ typedef struct _VROC_DEVICE
     PPCI_COMMON_CONFIG DevCfg;
     PHYSICAL_ADDRESS Bar0PA;
     ULONG Bar0Len;
+    BOOLEAN IsBar0InIoSpace;
     PVROC_BUS ParentBus;
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
 
-    void Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg);
+    void Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PHYSICAL_ADDRESS bar0);
     void Teardown();
-    void CreateNvmeDevice(PVOID devext, PPCI_COMMON_CONFIG pcidata);
+    void CreateNvmeDevice(PVOID devext);
     void DeleteNvmeDevice();
 }VROC_DEVICE, * PVROC_DEVICE;
 
@@ -65,14 +64,24 @@ typedef struct _SPC_DEVEXT {
 
     //In VROC RaidController, there are 3 BARs
     //BAR0 == PCI conofig space of child NVMe devices and bridges.
-    //BAR1 == NVMe Controller Register region of child devices.
-    //BAR2 == MSIX table (of RAID Controller??)
+    //BAR1 == NVMe Controller Register region of all child devices.
+    //BAR2 == MSIX table (RAID Controller or all VROC NVMe devices??)
     //I only need BAR0 and the NVMe CtrlReg region can be mapped from child device's BAR0.
-    PUCHAR RaidPcieCfgSpace;
+    PUCHAR RaidPcieCfgSpace;    //BAR0 of RaidController
+    PHYSICAL_ADDRESS RaidPcieCfgSpacePA;
     ULONG RaidPcieCfgSpaceSize;
-    PUCHAR RaidNvmeCfgSpace;
+
+    //RaidNvmeCfgSpace is collection of all VROC NVMe device's 
+    //BAR0 (Controller Register region).
+    //RaidController should calc and write back to VROC NVMe device's
+    //BAR0 and update bridge's MemBase/MemLimit. Then you can see content of 
+    //NVMe device's ControllerRegister region.
+    PUCHAR RaidNvmeCfgSpace;    //BAR1 of RaidController
+    PHYSICAL_ADDRESS RaidNvmeCfgSpacePA;
     ULONG RaidNvmeCfgSpaceSize;
-    PUCHAR RaidMsixCfgSpace;
+
+    PUCHAR RaidMsixCfgSpace;    //BAR2 of RaidController
+    PHYSICAL_ADDRESS RaidMsixCfgSpacePA;
     ULONG RaidMsixCfgSpaceSize;
 
     //Each NVMe device are located BEHIND a pci bridge.
@@ -83,6 +92,7 @@ typedef struct _SPC_DEVEXT {
 
     CNvmeDevice *NvmeDev[MAX_CHILD_VROC_DEV];
     ULONG NvmeDevCount;
+    ULONG NvmeBar0IndexInRaidCtrlBAR1;
     PVOID UncachedExt;
     ULONG MaxTxSize;
     ULONG MaxTxPages;
