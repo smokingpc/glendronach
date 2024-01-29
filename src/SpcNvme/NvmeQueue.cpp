@@ -99,11 +99,6 @@ VOID CNvmeQueue::QueueCplDpcRoutine(
 CNvmeQueue::CNvmeQueue()
 {
 }
-CNvmeQueue::CNvmeQueue(QUEUE_PAIR_CONFIG* config)
-    : CNvmeQueue()
-{
-    Setup(config);
-}
 CNvmeQueue::~CNvmeQueue()
 {
     Teardown();

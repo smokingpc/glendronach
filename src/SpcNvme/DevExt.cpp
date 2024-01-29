@@ -94,7 +94,6 @@ PUCHAR GetDevCfgSpace(PUCHAR bus_space, UCHAR dev_id)
 #pragma region ======== _VROC_BUS ========
 void _VROC_BUS::Setup(UINT16 segment_idx, UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space)
 {
-    RtlZeroMemory(this, sizeof(VROC_BUS));
     InitializeListHead(&List);
     InitializeListHead(&DevListHead);
 
@@ -160,22 +159,10 @@ void _VROC_DEVICE::Teardown()
 }
 void _VROC_DEVICE::CreateNvmeDevice(PVOID devext)
 {
-    STOR_PHYSICAL_ADDRESS addr = Bar0PA;
-    PPORT_CONFIGURATION_INFORMATION &portcfg = ((PSPC_DEVEXT)devext)->PortCfg;
-    PVOID ctrlreg = StorPortGetDeviceBase(devext,
-        portcfg->AdapterInterfaceType,
-        portcfg->SystemIoBusNumber,
-        addr,
-        4 * PAGE_SIZE,
-        IsBar0InIoSpace);
-
-    if(NULL == ctrlreg)
-        return;
-
     DbgBreakPoint();
-    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice;
+    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice[1];
     DbgBreakPoint();
-    NvmeDev->Setup(devext, DevCfg, ctrlreg);
+    NvmeDev->Setup(devext, DevCfg, Bar0PA);
 }
 void _VROC_DEVICE::DeleteNvmeDevice()
 {
@@ -317,7 +304,10 @@ void _SPC_DEVEXT::EnumVrocBuses()
         //[Don't forget to set MemBase/MemLimit of this bridge.]
         //System can't access resources of all devices behind this bridge, 
         // if you didn't setup MemBase/MemLimit.
-        PVROC_BUS bus = new (NonPagedPool, TAG_VROC_BUS) VROC_BUS;
+        PVROC_BUS bus = new (NonPagedPool, TAG_VROC_BUS) VROC_BUS();
+        //PVROC_BUS bus = (PVROC_BUS) ExAllocatePoolWithTag(NonPagedPool, sizeof(VROC_BUS), TAG_VROC_BUS);
+        //RtlZeroMemory(bus, sizeof(VROC_BUS));
+        DbgBreakPoint();
         PUCHAR dev_bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
         bus->Setup(segment_idx, PrimaryBus, bus_idx, bridge, dev_bus_space);
         
@@ -341,8 +331,11 @@ void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
         PPCI_COMMON_CONFIG dev_space = (PPCI_COMMON_CONFIG)GetDevCfgSpace(bus->BusSpace, dev_id);
         if (!IsValidVendorID(dev_space))
             continue;
+        
+        PVROC_DEVICE dev = new (NonPagedPool, TAG_VROC_DEVICE) VROC_DEVICE[1];
+        //PVROC_DEVICE dev = (PVROC_DEVICE)ExAllocatePoolWithTag(NonPagedPool, sizeof(VROC_DEVICE), TAG_VROC_DEVICE);
+        //RtlZeroMemory(dev, sizeof(VROC_DEVICE));
 
-        PVROC_DEVICE dev = new (NonPagedPool, TAG_VROC_BUS) VROC_DEVICE;
         DbgBreakPoint();
         //calculate Bar0 PhyAddr for this device.
         PHYSICAL_ADDRESS nvme_bar0 = {0};

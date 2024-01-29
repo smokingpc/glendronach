@@ -92,7 +92,7 @@ typedef struct _SPC_DEVEXT {
 
     CNvmeDevice *NvmeDev[MAX_CHILD_VROC_DEV];
     ULONG NvmeDevCount;
-    ULONG NvmeBar0IndexInRaidCtrlBAR1;
+    //ULONG NvmeBar0IndexInRaidCtrlBAR1;
     PVOID UncachedExt;
     ULONG MaxTxSize;
     ULONG MaxTxPages;

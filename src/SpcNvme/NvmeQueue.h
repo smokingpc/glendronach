@@ -66,7 +66,6 @@ public:
     );
 
     CNvmeQueue();
-    CNvmeQueue(QUEUE_PAIR_CONFIG* config);
     ~CNvmeQueue();
 
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);

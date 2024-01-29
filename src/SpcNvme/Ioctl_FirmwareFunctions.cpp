@@ -141,7 +141,7 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     PNVME_FIRMWARE_SLOT_INFO_LOG logpage = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    logpage = new NVME_FIRMWARE_SLOT_INFO_LOG();
+    logpage = new (PagedPool, TAG_GENBUF) NVME_FIRMWARE_SLOT_INFO_LOG[1];
     srbext->ResetExtBuf(logpage);
     srbext->CompletionCB = Complete_FirmwareInfo;
 

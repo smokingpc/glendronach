@@ -24,7 +24,7 @@ CDebugCallInOut::CDebugCallInOut(const char* name)
 
 CDebugCallInOut::CDebugCallInOut(char* name)
 {
-    this->Name = (char*) new(NonPagedPoolNx, CALLINOUT_TAG) char[this->BufSize];
+    this->Name = (char*) new(NonPagedPoolNx, CALLINOUT_TAG) char[this->BufSize+1];
     if(NULL != this->Name)
     {
         memcpy(this->Name, name, BufSize);

@@ -99,6 +99,7 @@
 #pragma endregion
 
 #pragma region  ======== STORPORT MINIPORT ========
+#define MAX_ADAPTER_IO          8192
 #define MAX_IO_PER_LU           (1<<SCSI_TAG_SHIFT)-1//1024-1 = 1023 
 #define ABOVE_4G_ADDR           ((LONGLONG)1<<32)
 #define VENDOR_ID               "SPC     "          //vendor name

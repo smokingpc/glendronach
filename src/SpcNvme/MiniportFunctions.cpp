@@ -26,7 +26,7 @@ static void FillPortConfiguration(
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
     portcfg->Dma64BitAddresses = SCSI_DMA64_MINIPORT_FULL64BIT_SUPPORTED;   //should set this value if MaxNumberOfIO > 1000.
-    portcfg->MaxNumberOfIO = MAX_IO_PER_LU * MAX_VROC_TARGETS * MAX_VROC_LOGICAL_UNIT * MAX_VROC_BUSES;
+    portcfg->MaxNumberOfIO = MAX_ADAPTER_IO;
     portcfg->MaxIOsPerLun = MAX_IO_PER_LU;
 
     //this will limit LUN i/o queue and affect HBA Gateway OutstandingMax.
@@ -281,8 +281,7 @@ BOOLEAN HwResetBus(
     PSPC_DEVEXT devext = (PSPC_DEVEXT)DeviceExtension;
 
     STOR_ADDR_BTL8 addr = {0};
-    RtlCopyMemory(&addr.Port, &PathId, sizeof(ULONG));
-    CNvmeDevice* nvme = devext->FindVrocNvmeDev(addr.Path);
+    CNvmeDevice* nvme = devext->FindVrocNvmeDev((UCHAR)PathId);
     nvme->ReleaseOutstandingSrbs();
     return TRUE;
 }

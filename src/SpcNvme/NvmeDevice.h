@@ -138,7 +138,8 @@ public:
         _In_ PSPCNVME_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
-    NTSTATUS Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg);
+    //NTSTATUS Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg);
+    NTSTATUS Setup(PVOID devext, PVOID pcidata, PHYSICAL_ADDRESS ctrlreg);
     void Teardown();
 
     NTSTATUS EnableController();
