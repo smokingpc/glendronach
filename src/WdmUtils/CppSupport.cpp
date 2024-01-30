@@ -1,6 +1,6 @@
 // WdmCppSupport.cpp : Defines the functions for the static library.
 //
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+//#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 #include "pch.h"
 
 #if 0

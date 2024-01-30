@@ -2,7 +2,7 @@
 
 BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid)
 {
-    _SPC_DEVEXT *devext = (_SPC_DEVEXT*)hbaext;
+    _VROC_DEVEXT *devext = (_VROC_DEVEXT*)hbaext;
     BOOLEAN ok = FALSE;
     CNvmeDevice* nvme = NULL;
     CNvmeQueue* queue = NULL;
@@ -174,13 +174,13 @@ void _VROC_DEVICE::DeleteNvmeDevice()
     }
 }
 #pragma endregion
-//#pragma region ======== SPC_DEVEXT ========
+//#pragma region ======== VROC_DEVEXT ========
 //#pragma endregion
 
-#pragma region ======== SPC_DEVEXT ========
-NTSTATUS _SPC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
+#pragma region ======== VROC_DEVEXT ========
+NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 {
-    RtlZeroMemory(this, sizeof(_SPC_DEVEXT));
+    RtlZeroMemory(this, sizeof(_VROC_DEVEXT));
     PortCfg = portcfg;
 
     InitializeListHead(&BusListHead);
@@ -190,7 +190,7 @@ NTSTATUS _SPC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 
     return STATUS_UNSUCCESSFUL;
 }
-NTSTATUS _SPC_DEVEXT::GetRaidCtrlPciCfg()
+NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
 {
     ULONG size = sizeof(PciCfg);
     ULONG status = StorPortGetBusData(this, 
@@ -227,7 +227,7 @@ NTSTATUS _SPC_DEVEXT::GetRaidCtrlPciCfg()
 
     return STATUS_SUCCESS;
 }
-void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
+void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
 {
     AccessRangeCount = min(ACCESS_RANGE_COUNT, count);
     RtlCopyMemory(AccessRanges, ranges, AccessRangeCount * sizeof(ACCESS_RANGE));
@@ -276,7 +276,7 @@ void _SPC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
         RaidMsixCfgSpacePA = range->RangeStart;
     }
 }
-void _SPC_DEVEXT::EnumVrocBuses()
+void _VROC_DEVEXT::EnumVrocBuses()
 {
     //VROC Controller CfgSpace in Bar0 has 32MB.
     //It indicates 32 buses :
@@ -322,7 +322,7 @@ void _SPC_DEVEXT::EnumVrocBuses()
         segment_idx++;
     }
 }
-void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
+void _VROC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
 {
     //enumerate all devices on this child bus.
     for (UCHAR dev_id = 0; dev_id < PCI_MAX_DEVICES; dev_id++)
@@ -354,7 +354,7 @@ void _SPC_DEVEXT::EnumVrocDevsOnBus(PVROC_BUS bus)
         break;
     }
 }
-void _SPC_DEVEXT::Teardown()
+void _VROC_DEVEXT::Teardown()
 {
     while(!IsListEmpty(&BusListHead))
     {
@@ -365,7 +365,7 @@ void _SPC_DEVEXT::Teardown()
     }
     UncachedExt = NULL;
 }
-void _SPC_DEVEXT::ShutdownAllVrocNvmeControllers()
+void _VROC_DEVEXT::ShutdownAllVrocNvmeControllers()
 {
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
     {
@@ -375,7 +375,7 @@ void _SPC_DEVEXT::ShutdownAllVrocNvmeControllers()
         NvmeDev[i]->ShutdownController();
     }
 }
-void _SPC_DEVEXT::DisableAllVrocNvmeControllers()
+void _VROC_DEVEXT::DisableAllVrocNvmeControllers()
 {
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
     {
@@ -385,7 +385,7 @@ void _SPC_DEVEXT::DisableAllVrocNvmeControllers()
         NvmeDev[i]->DisableController();
     }
 }
-NTSTATUS _SPC_DEVEXT::InitAllVrocNvme()
+NTSTATUS _VROC_DEVEXT::InitAllVrocNvme()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
@@ -411,7 +411,7 @@ NTSTATUS _SPC_DEVEXT::InitAllVrocNvme()
 
     return STATUS_SUCCESS;
 }
-NTSTATUS _SPC_DEVEXT::PassiveInitAllVrocNvme()
+NTSTATUS _VROC_DEVEXT::PassiveInitAllVrocNvme()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
@@ -447,7 +447,7 @@ NTSTATUS _SPC_DEVEXT::PassiveInitAllVrocNvme()
 
     return STATUS_SUCCESS;
 }
-void _SPC_DEVEXT::UpdateVrocNvmeDevInfo()
+void _VROC_DEVEXT::UpdateVrocNvmeDevInfo()
 {
     MaxTxSize = MaxTxPages = 0;
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)

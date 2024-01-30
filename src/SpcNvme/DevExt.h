@@ -56,7 +56,7 @@ typedef struct _VROC_RAID_VIRTUAL_BUS_CAP {
 }VROC_RAID_VIRTUAL_BUS_CAP, *PVROC_RAID_VIRTUAL_BUS_CAP;
 #pragma pop()
 
-typedef struct _SPC_DEVEXT {
+typedef struct _VROC_DEVEXT {
 
     PCI_COMMON_CONFIG PciCfg;       //pci config space of RaidController
     PPORT_CONFIGURATION_INFORMATION PortCfg;
@@ -110,7 +110,7 @@ typedef struct _SPC_DEVEXT {
     NTSTATUS InitAllVrocNvme();
     NTSTATUS PassiveInitAllVrocNvme();
     void UpdateVrocNvmeDevInfo();
-    inline CNvmeDevice* _SPC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
+    inline CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {
         //treat vroc virtual bus index as scsi target id.
         //there is only one bus of this storage.
@@ -121,6 +121,6 @@ typedef struct _SPC_DEVEXT {
 
         return NvmeDev[target_id];
     }
-}SPC_DEVEXT, * PSPC_DEVEXT;
+}VROC_DEVEXT, * PVROC_DEVEXT;
 
 BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid);
