@@ -111,9 +111,3 @@
 #define REGNAME_COALESCE_TIME   (UCHAR*)"IntCoalescingTime"
 #define REGNAME_COALESCE_COUNT  (UCHAR*)"IntCoalescingEntries"
 #pragma endregion
-
-#pragma region  ======== MEMORY TAG ========
-#define TAG_NVME_QUEUE          ((ULONG)'QMVN')
-#define TAG_SRB_HISTORY         ((ULONG)'HBRS')
-
-#pragma endregion

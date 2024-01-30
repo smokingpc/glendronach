@@ -1211,7 +1211,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     //AdmQ histroy depth should reserve one more element for AsyncEvent.
     cfg.HistoryDepth = 1 + MAX_IO_PER_LU;
     GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
-    AdmQueue = new CNvmeQueue(&cfg);
+    AdmQueue = new (NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue(&cfg);
     if(!AdmQueue->IsInitOK())
         return STATUS_MEMORY_NOT_ALLOCATED;
     return STATUS_SUCCESS;
@@ -1516,7 +1516,7 @@ NTSTATUS CNvmeDevice::CreateIoQ()
     {
         if(NULL != IoQueue[i])
             continue;
-        CNvmeQueue* queue = new CNvmeQueue();
+        CNvmeQueue* queue = new (NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue();
         //Dbl[0] is for AdminQ
         cfg.QID = i + 1;
         this->GetQueueDbl(cfg.QID, cfg.SubDbl, cfg.CplDbl);

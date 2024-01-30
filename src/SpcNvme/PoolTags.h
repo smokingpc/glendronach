@@ -50,3 +50,5 @@
 #define TAG_ISR_POLL_CPL (ULONG)'LPCC'
 #define TAG_DEV_POOL    (ULONG)'veDN'
 #define TAG_GROUP_AFFINITY  (ULONG)'FFAG' 
+#define TAG_NVME_QUEUE          ((ULONG)'QMVN')
+#define TAG_SRB_HISTORY         ((ULONG)'HBRS')

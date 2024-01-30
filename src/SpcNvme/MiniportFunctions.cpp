@@ -55,7 +55,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(businfo);
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
-
+    DbgBreakPoint();
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     status = nvme->Setup(port_cfg);
