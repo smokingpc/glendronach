@@ -100,7 +100,6 @@ CVrocBus::CVrocBus()
 CVrocBus::~CVrocBus()
 {}
 void CVrocBus::Setup(
-                UINT16 segment_idx, 
                 UCHAR primary_bus, 
                 UCHAR bus_idx, 
                 PPCI_COMMON_CONFIG bridge_cfg, 
@@ -115,7 +114,6 @@ void CVrocBus::Setup(
     PrimaryBus = primary_bus;
     MyBusIdx = bus_idx;
     MyBus = bus_idx + primary_bus;
-    PciSegmentIdx = segment_idx;
     Bar0SpaceForAllDevs = dev_bar0_space;
 }
 void CVrocBus::Teardown()
@@ -159,32 +157,33 @@ CVrocDevice::CVrocDevice(){}
 CVrocDevice::~CVrocDevice(){}
 void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0)
 {
-//    RtlZeroMemory(this, sizeof(CVrocDevice));
     InitializeListHead(&this->List);
     DevCfg = cfg;
     DevId = dev_id;
-    IsBar0InIoSpace = ((cfg->u.type0.BaseAddresses[0] & 0x00000001) == TRUE);
-
     Bar0VA = bar0;
     Bar0Len = VROC_NVME_BAR0_SIZE;
     ParentBus = bus;
 
-//    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice();
-//    NvmeDev->Setup(devext, DevCfg, Bar0VA);
+    if(NULL != bar0)
+    {
+        //update BAR0 in VROC NVMe device's PCI Config Space.
+        PHYSICAL_ADDRESS addr = {0};
+        addr.QuadPart = ~(0ULL);
+        cfg->u.type0.BaseAddresses[0] = addr.LowPart;
+        cfg->u.type0.BaseAddresses[1] = addr.HighPart;
 
-//update BAR0 in VROC NVMe device's PCI Config Space.
-    PHYSICAL_ADDRESS phyaddr = MmGetPhysicalAddress(bar0);
-    cfg->u.type0.BaseAddresses[0] = phyaddr.LowPart;
-    cfg->u.type0.BaseAddresses[1] = phyaddr.HighPart;
+        addr = MmGetPhysicalAddress(bar0); 
+        cfg->u.type0.BaseAddresses[0] = addr.LowPart;
+        cfg->u.type0.BaseAddresses[1] = addr.HighPart;
+    //DbgBreakPoint();
+    }
+
+    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice();
+    NvmeDev->Setup(devext, DevCfg, Bar0VA);
 }
 void CVrocDevice::Teardown()
 {
     DeleteNvmeDevice();
-}
-void CVrocDevice::CreateNvmeDevice(PVOID devext)
-{
-    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice();
-    NvmeDev->Setup(devext, DevCfg, Bar0VA);
 }
 void CVrocDevice::DeleteNvmeDevice()
 {
@@ -196,13 +195,10 @@ void CVrocDevice::DeleteNvmeDevice()
     }
 }
 #pragma endregion
-//#pragma region ======== VROC_DEVEXT ========
-//#pragma endregion
 
 #pragma region ======== VROC_DEVEXT ========
 NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 {
-//    RtlZeroMemory(this, sizeof(_VROC_DEVEXT));
     PortCfg = portcfg;
 
     InitializeListHead(&this->BusListHead);
@@ -210,7 +206,7 @@ NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
     MapRaidCtrlBar0(*portcfg->AccessRanges, portcfg->NumberOfAccessRanges);
     EnumVrocBuses();
 
-    return STATUS_UNSUCCESSFUL;
+    return STATUS_SUCCESS;
 }
 NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
 {
@@ -314,7 +310,6 @@ void _VROC_DEVEXT::EnumVrocBuses()
     {
     //Each bridge map to one bus. bridge id == bus id.
     //there is no bridge 0.
-        UINT16 segment_idx = bridge_idx;
         PPCI_COMMON_CONFIG bridge = (PPCI_COMMON_CONFIG)GetDevCfgSpace(bus0_space, bridge_idx);
         if (!IsValidVendorID(bridge) || !IsPciBridge(bridge->HeaderType))
             continue;
@@ -326,22 +321,19 @@ void _VROC_DEVEXT::EnumVrocBuses()
         // if you didn't setup MemBase/MemLimit.
         UCHAR bus_idx = bridge->u.type1.SecondaryBus - bridge->u.type1.PrimaryBus;
         CVrocBus *bus = new (NonPagedPool, TAGCVrocBus) CVrocBus();
-        DbgBreakPoint();
         PUCHAR bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
-        bus->Setup(segment_idx, PrimaryBus, bus_idx, bridge, 
+        bus->Setup(PrimaryBus, bus_idx, bridge, 
                     bus_space, GetNvmeBar0SpaceForBus(bus_idx));
-        
+
+        //Bridge Memory Window SHOULD BE SET BETORE Bar0 been set for All Device on this bus.
+        //The Bridge Memory Windows is 1MB at least. Bar0 of 32 NVMe devices are 512K.
+        //It's smaller than 1MB, just set start and end addr to same value.
+        PHYSICAL_ADDRESS addr = { 0 };
+        addr = MmGetPhysicalAddress(bus->Bar0SpaceForAllDevs);
+        bus->UpdateBridgeMemoryWindow(addr, addr);
+
         EnumVrocDevsOnBus(bus);
         InsertTailList(&BusListHead, &bus->List);
-
-#if 0
-        //Bridge Memory Windows SHOULD BE UPDATED AFTER Bar0 been set for All Device.
-        PHYSICAL_ADDRESS start = { 0 }, end = { 0 };
-        end.QuadPart = start.QuadPart = 
-            RaidNvmeCfgSpacePA.QuadPart + (bus_idx * VROC_BRIDGE_WINDOW_SIZE);
-        //end.QuadPart = start.QuadPart + VROC_BRIDGE_WINDOW_SIZE - 1;
-        bus->UpdateBridgeMemoryWindow(start, end);
-#endif
     }
 }
 void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
@@ -355,13 +347,7 @@ void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
             continue;
         
         CVrocDevice *dev = new (NonPagedPool, TAG_VROC_DEVICE) CVrocDevice();
-        //PVROC_DEVICE dev = (PVROC_DEVICE)ExAllocatePoolWithTag(NonPagedPool, sizeof(VROC_DEVICE), TAG_VROC_DEVICE);
-        //RtlZeroMemory(dev, sizeof(VROC_DEVICE));
-
-        DbgBreakPoint();
         dev->Setup(this, bus, dev_id, dev_space, bus->GetBar0SpaceForDevice(dev_id));
-        //dev->CreateNvmeDevice(this);
-
         bus->AddDevice(dev);
         NvmeDev[NvmeDevCount++] = dev->NvmeDev;
         //Todo: currently only enum 1 device on bus.

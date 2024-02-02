@@ -130,6 +130,7 @@
 #define MAX_VROC_TARGETS        MAX_CHILD_VROC_DEV
 #define MAX_VROC_LOGICAL_UNIT   1
 
+#define VROC_DEV_PER_BUS        32
 #define VROC_BRIDGE_WINDOW_SIZE (1<<20)         //MemBase/MemLimit downstream window size.
 #define VROC_NVME_BAR0_SIZE     (4*PAGE_SIZE)   //BAR0 region size of each VROC NVMe device.
 #define VROC_PCI_SEGMENT_START_ID   1       //seg0 is primary segment of this computer

@@ -61,7 +61,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
 
-    DbgBreakPoint();
     status = devext->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto ERROR;
@@ -144,8 +143,9 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
-    StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
-    return TRUE;
+    return FALSE;
+    //StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
+    //return TRUE;
 }
 
 _Use_decl_annotations_

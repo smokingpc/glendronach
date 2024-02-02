@@ -280,7 +280,6 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 }
 NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
 {
-    NTSTATUS status = STATUS_SUCCESS;
     if (NVME_STATE::STOP != State && !this->RebalancingPnp)
         return STATUS_INVALID_DEVICE_STATE;
     //if(!this->RebalancingPnp)
@@ -299,6 +298,7 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
     Doorbells = CtrlReg->Doorbells;
 
     ReadCtrlCap();
+    NTSTATUS status = STATUS_SUCCESS;
     status = CreateAdmQ();
     if (!NT_SUCCESS(status))
         return status;
@@ -315,11 +315,11 @@ void CNvmeDevice::Teardown()
     DeleteIoQ();
     DeleteAdmQ();
     State = NVME_STATE::STOP;
-    if(NULL != this->CtrlReg)
-    {
-        StorPortFreeDeviceBase(DevExt, this->CtrlReg);
-        CtrlReg = NULL;
-    }
+    //if(NULL != this->CtrlReg)
+    //{
+    //    StorPortFreeDeviceBase(DevExt, this->CtrlReg);
+    //    CtrlReg = NULL;
+    //}
 
     if(NULL != MsgGroupAffinity)
     {
@@ -1238,7 +1238,7 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     if(NULL != AdmQueue)
         return STATUS_ALREADY_INITIALIZED;
 
-    QUEUE_PAIR_CONFIG cfg = {0};
+    QUEUE_PAIR_CONFIG cfg;// = { 0 };
     cfg.Depth = (USHORT)AdmDepth;
     cfg.QID = 0;
     cfg.DevExt = DevExt;
@@ -1432,6 +1432,7 @@ bool CNvmeDevice::WaitForCtrlerShst(ULONG time_us)
 }
 void CNvmeDevice::InitVars()
 {
+    Guard = 0x87327864;
 //DeviceExtension is created by storport and ZEROED.
 //It WILL NOT call constructor of class or struct.
 //Should re-init variables again.
@@ -1471,7 +1472,7 @@ void CNvmeDevice::InitVars()
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
     MsgGroupAffinity = (PGROUP_AFFINITY) 
                 new(NonPagedPool, TAG_GROUP_AFFINITY) GROUP_AFFINITY[CpuCount];
-    RtlZeroMemory(&MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
+    RtlZeroMemory(MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
 
     CtrlReg = NULL;
     PortCfg = NULL;
@@ -1546,10 +1547,11 @@ void CNvmeDevice::LoadRegistry()
 NTSTATUS CNvmeDevice::CreateIoQ()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    QUEUE_PAIR_CONFIG cfg = { 0 };
+    QUEUE_PAIR_CONFIG cfg;// = { 0 };
+    cfg.DevExt = DevExt;
     cfg.NvmeDev = this;
     cfg.Depth = IoDepth;
-    cfg.NumaNode = 0;
+    cfg.NumaNode = MM_ANY_NODE_OK;
     cfg.Type = QUEUE_TYPE::IO_QUEUE;
     cfg.HistoryDepth = MAX_IO_PER_LU + 1;    //HistoryDepth should equal to MaxScsiTag (ScsiTag Depth).
 

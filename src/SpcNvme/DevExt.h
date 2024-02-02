@@ -10,7 +10,6 @@ public:
     PPCI_COMMON_CONFIG BridgeCfg;       //PCI config of bridge
     
     PUCHAR BusSpace;        //PCI config space of entire Bus. it includes config space of all devices on this bus.
-    UINT16 PciSegmentIdx;      //PCI segment index. Each VROC bus is a different PCI segment.
     UCHAR PrimaryBus;
     UCHAR MyBus;
     UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
@@ -24,7 +23,7 @@ public:
 
     CVrocBus();
     ~CVrocBus();
-    void Setup(UINT16 segment_idx, UCHAR primary_bus, 
+    void Setup(UCHAR primary_bus, 
                 UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, 
                 PUCHAR bus_space, PUCHAR dev_bar0_space);
     void Teardown();
@@ -45,7 +44,6 @@ public:
     PPCI_COMMON_CONFIG DevCfg;
     PUCHAR Bar0VA;
     ULONG Bar0Len;
-    BOOLEAN IsBar0InIoSpace;
     CVrocBus *ParentBus;
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
@@ -54,7 +52,6 @@ public:
     ~CVrocDevice();
     void Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0);
     void Teardown();
-    void CreateNvmeDevice(PVOID devext);
     void DeleteNvmeDevice();
 };
 
@@ -127,7 +124,8 @@ typedef struct _VROC_DEVEXT {
     void UpdateVrocNvmeDevInfo();
     inline PUCHAR GetNvmeBar0SpaceForBus(UCHAR bus_idx)
     {
-        return (RaidNvmeCfgSpace + (MB_SIZE * bus_idx));
+    //Each Block only 512K....not 1MB
+        return (RaidNvmeCfgSpace + (VROC_NVME_BAR0_SIZE* VROC_DEV_PER_BUS * bus_idx));
     }
     inline CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {

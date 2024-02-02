@@ -119,6 +119,7 @@ public:
     STOR_DPC                            RestartDpc;
     ULONG                               CpuCount;
     PGROUP_AFFINITY                     MsgGroupAffinity;
+    ULONG Guard;
 
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
     PPORT_CONFIGURATION_INFORMATION     PortCfg;
@@ -138,7 +139,6 @@ public:
     //for more convenient windbg debugging, I put them on tail of class data.
     PCI_COMMON_CONFIG                   PciCfg;
     PVOID DevExt;
-
 public:
     CNvmeDevice();
     ~CNvmeDevice();
