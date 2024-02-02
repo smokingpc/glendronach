@@ -126,7 +126,7 @@
 //Each PCI bus has 32 devices.
 //VROC always skip device-0?
 #define MAX_CHILD_VROC_DEV      32
-#define MAX_VROC_BUSES          1
+#define MAXCVrocBusES          1
 #define MAX_VROC_TARGETS        MAX_CHILD_VROC_DEV
 #define MAX_VROC_LOGICAL_UNIT   1
 
@@ -136,7 +136,7 @@
 
 #define PCI_LOW32BIT_BAR_ADDR_MASK  (0xFFFFFFF0)
 #define PCI_BAR_ADDR_MASK           (0xFFFFFFFFFFFFFFF0)        //low 4 bits are readonly, ignore them.
-#define TAG_VROC_BUS        ((ULONG)' BRV')
+#define TAGCVrocBus        ((ULONG)' BRV')
 #define TAG_VROC_DEVICE     ((ULONG)' DRV')
 #define TAG_VROC_NVME       ((ULONG)'DNRV')
 #pragma endregion

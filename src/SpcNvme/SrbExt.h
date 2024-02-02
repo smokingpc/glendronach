@@ -76,7 +76,11 @@ typedef struct _SPCNVME_SRBEXT
     PNVME_COMMAND SubmitCmdPtr;
     #pragma endregion
 
-    void Init(PVOID nvme, STORAGE_REQUEST_BLOCK *srb);
+    _SPCNVME_SRBEXT();
+    _SPCNVME_SRBEXT(PVOID devext, STORAGE_REQUEST_BLOCK* srb);
+    ~_SPCNVME_SRBEXT();
+    void Init(PVOID devext, PVOID nvme, STORAGE_REQUEST_BLOCK* srb);
+    void Init(PVOID devext, STORAGE_REQUEST_BLOCK *srb);
     void CleanUp();
     void CompleteSrb(UCHAR status);
     void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);

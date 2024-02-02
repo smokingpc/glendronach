@@ -2,7 +2,7 @@
 
 static void FillPortConfiguration(
             PPORT_CONFIGURATION_INFORMATION portcfg, 
-            PSPC_DEVEXT devext)
+            PVROC_DEVEXT devext)
 {
 //Because MaxTxSize and MaxTxPages should be calculated by nvme->CtrlCap and nvme->CtrlIdent,
 //So FillPortConfiguration() should be called AFTER nvme->IdentifyController()
@@ -15,13 +15,13 @@ static void FillPortConfiguration(
     portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
     portcfg->MaximumNumberOfTargets = MAX_VROC_TARGETS;   //each NVMe treated as a SCSI Target
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
-    portcfg->DeviceExtensionSize = sizeof(SPC_DEVEXT);
+    portcfg->DeviceExtensionSize = sizeof(VROC_DEVEXT);
     portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
     portcfg->MaximumNumberOfLogicalUnits = MAX_SCSI_LOGICAL_UNIT;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = MAX_VROC_BUSES;    //each VMD are located at same SCSI bus
+    portcfg->NumberOfBuses = MAXCVrocBusES;    //each VMD are located at same SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
@@ -59,7 +59,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(Reserved3);
 
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
 
     DbgBreakPoint();
     status = devext->Setup(port_cfg);
@@ -154,7 +154,7 @@ BOOLEAN HwPassiveInitialize(PVOID hbaext)
     //Running at PASSIVE_LEVEL
     CDebugCallInOut inout(__FUNCTION__);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     StorPortPause(hbaext, MAXULONG);
     status = devext->PassiveInitAllVrocNvme();
     StorPortResume(hbaext);
@@ -172,7 +172,7 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     PSPCNVME_SRBEXT srbext = InitSrbExt(hbaext, (PSTORAGE_REQUEST_BLOCK)srb);
     CNvmeDevice* nvme = devext->FindVrocNvmeDev(srbext->ScsiPath);
 
@@ -278,7 +278,7 @@ BOOLEAN HwResetBus(
     //miniport driver is responsible for completing SRBs received by HwStorStartIo for 
     //PathId during this routine and setting their status to SRB_STATUS_BUS_RESET if necessary.
 
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)DeviceExtension;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)DeviceExtension;
 
     STOR_ADDR_BTL8 addr = {0};
     CNvmeDevice* nvme = devext->FindVrocNvmeDev((UCHAR)PathId);
@@ -296,7 +296,7 @@ SCSI_ADAPTER_CONTROL_STATUS HwAdapterControl(
     CDebugCallInOut inout(__FUNCTION__);
     UNREFERENCED_PARAMETER(param);
     SCSI_ADAPTER_CONTROL_STATUS status = ScsiAdapterControlUnsuccessful;
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)hbaext;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     DebugAdapterControlCode(ctrlcode);
 
     switch (ctrlcode)

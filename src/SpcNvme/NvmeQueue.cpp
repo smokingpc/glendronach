@@ -107,7 +107,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
 {
     bool ok = false;
     NTSTATUS status = STATUS_SUCCESS;
-    RtlZeroMemory(this, sizeof(CNvmeQueue));
+//    RtlZeroMemory(this, sizeof(CNvmeQueue));
 
     DevExt = config->DevExt;
     NvmeDev = config->NvmeDev;

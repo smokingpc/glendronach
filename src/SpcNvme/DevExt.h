@@ -1,10 +1,10 @@
 #pragma once
 
-struct _VROC_DEVICE;
-
+class CVrocDevice;
 //Virtual Bus behind Virtual Bridge in in VROC RaidController's BAR0(child PciCfg Space).
-typedef struct _VROC_BUS
+class CVrocBus
 {
+public:
     LIST_ENTRY List;     //bus list behind same virtual bridge.
     LIST_ENTRY DevListHead;
     PPCI_COMMON_CONFIG BridgeCfg;       //PCI config of bridge
@@ -14,36 +14,49 @@ typedef struct _VROC_BUS
     UCHAR PrimaryBus;
     UCHAR MyBus;
     UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
-    
+    PUCHAR Bar0SpaceForAllDevs;
+
     //for bridge memory windows setup.
     //np stands for "NonPrefetchable"
     //pf stands for "Prefetchable"
     PHYSICAL_ADDRESS NpMemBase;
     PHYSICAL_ADDRESS NpMemLimit;
 
-    void Setup(UINT16 segment_idx, UCHAR primary_bus, UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, PUCHAR bus_space);
+    CVrocBus();
+    ~CVrocBus();
+    void Setup(UINT16 segment_idx, UCHAR primary_bus, 
+                UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, 
+                PUCHAR bus_space, PUCHAR dev_bar0_space);
     void Teardown();
-    void AddDevice(struct _VROC_DEVICE* dev);
+    void AddDevice(class CVrocDevice* dev);
     void UpdateBridgeMemoryWindow(PHYSICAL_ADDRESS window_start, PHYSICAL_ADDRESS window_end);
     void RemoveAllDevices();
-}VROC_BUS, *PVROC_BUS;
 
-typedef struct _VROC_DEVICE
+    inline PUCHAR GetBar0SpaceForDevice(UCHAR dev_idx)
+    {
+        return (Bar0SpaceForAllDevs + (VROC_NVME_BAR0_SIZE * dev_idx));
+    }
+};
+
+class CVrocDevice
 {
+public:
     LIST_ENTRY List;     //device list on same virtual bus.
     PPCI_COMMON_CONFIG DevCfg;
-    PHYSICAL_ADDRESS Bar0PA;
+    PUCHAR Bar0VA;
     ULONG Bar0Len;
     BOOLEAN IsBar0InIoSpace;
-    PVROC_BUS ParentBus;
+    CVrocBus *ParentBus;
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
 
-    void Setup(PVROC_BUS bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PHYSICAL_ADDRESS bar0);
+    CVrocDevice();
+    ~CVrocDevice();
+    void Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0);
     void Teardown();
     void CreateNvmeDevice(PVOID devext);
     void DeleteNvmeDevice();
-}VROC_DEVICE, * PVROC_DEVICE;
+};
 
 
 #pragma push(1)
@@ -92,17 +105,19 @@ typedef struct _VROC_DEVEXT {
 
     CNvmeDevice *NvmeDev[MAX_CHILD_VROC_DEV];
     ULONG NvmeDevCount;
-    //ULONG NvmeBar0IndexInRaidCtrlBAR1;
+
     PVOID UncachedExt;
     ULONG MaxTxSize;
     ULONG MaxTxPages;
     ULONG AccessRangeCount;
 
+    UCHAR Padding[PAGE_SIZE];   //Make DevExt larget than 1 page to avoid strange pool corruption issue.
+
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
     NTSTATUS GetRaidCtrlPciCfg();
     void MapRaidCtrlBar0(ACCESS_RANGE *ranges, ULONG count);
     void EnumVrocBuses();
-    void EnumVrocDevsOnBus(PVROC_BUS bus);
+    void EnumVrocDevsOnBus(CVrocBus *bus);
 
     void Teardown();
     void ShutdownAllVrocNvmeControllers();
@@ -110,6 +125,10 @@ typedef struct _VROC_DEVEXT {
     NTSTATUS InitAllVrocNvme();
     NTSTATUS PassiveInitAllVrocNvme();
     void UpdateVrocNvmeDevInfo();
+    inline PUCHAR GetNvmeBar0SpaceForBus(UCHAR bus_idx)
+    {
+        return (RaidNvmeCfgSpace + (MB_SIZE * bus_idx));
+    }
     inline CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {
         //treat vroc virtual bus index as scsi target id.

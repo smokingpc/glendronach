@@ -1,10 +1,41 @@
 #include "pch.h"
 
-void _SPCNVME_SRBEXT::Init(PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
+_SPCNVME_SRBEXT::_SPCNVME_SRBEXT() 
+{
+    DevExt = NULL;
+    NvmeDev = NULL;
+    Srb = NULL;
+    SrbStatus = 0;
+    InitOK = FreePrp2List = DeleteInComplete = IsCompleted = FALSE;
+    Prp1VA = NULL;
+    Prp2VA = NULL;
+    Prp1PA.QuadPart = Prp2PA.QuadPart = 0;
+    CompletionCB = NULL;
+    ExtBuf = NULL;
+    StoragePort = 0;
+    ScsiPath = ScsiTarget = ScsiLun = 0;
+    ScsiTag = 0;
+    SubmittedQ = NULL;
+    SubTail = 0;
+    SubmitCmdPtr = NULL;
+    RtlZeroMemory(&NvmeCmd, sizeof(NvmeCmd));
+    RtlZeroMemory(&NvmeCpl, sizeof(NvmeCpl));
+}
+_SPCNVME_SRBEXT::_SPCNVME_SRBEXT(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
+{
+    Init(devext, srb); 
+}
+_SPCNVME_SRBEXT::~_SPCNVME_SRBEXT() {}
+void _SPCNVME_SRBEXT::Init(PVOID devext, PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
+{
+    this->Init(devext, srb);
+    this->NvmeDev = (CNvmeDevice*)nvme;
+}
+void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
     RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
-    DevExt = nvme;
-    NvmeDev = (CNvmeDevice*)nvme;
+    DevExt = devext;
+    NvmeDev = NULL;
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
     InitOK = TRUE;

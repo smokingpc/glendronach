@@ -50,7 +50,7 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
 
     STOR_PNP_ACTION action = STOR_PNP_ACTION::StorStartDevice;
     PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
-    PSPC_DEVEXT devext = (PSPC_DEVEXT)srbext->DevExt;
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)srbext->DevExt;
     ASSERT(NULL != srb_pnp);
     flags = srb_pnp->SrbPnPFlags;
     action = srb_pnp->PnPAction;
