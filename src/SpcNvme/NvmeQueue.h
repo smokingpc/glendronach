@@ -126,7 +126,7 @@ public:
     void WriteCplHead(ULONG value);
     bool InitQueueBuffer();    //init contents of this queue
     bool AllocQueueBuffer();    //allocate memory of this queue
-    bool AllocSrbExtBuffer();
+    bool AllocSrbExtBuffer();   //SrbExtBuffer stores original srbext of submitted cmd.
     void DeallocSrbExtBuffer();
     void DeallocQueueBuffer();
 

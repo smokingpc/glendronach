@@ -57,9 +57,9 @@ typedef struct _NVME_DEVEXT{
     ULONG MaxTxSize = 0;
     ULONG MaxTxPages = 0;
     NVME_STATE State = NVME_STATE::STOP;
-    ULONG RegisteredIoQ = 0;
-    ULONG AllocatedIoQ = 0;
     ULONG DesiredIoQ = MAX_IO_QUEUE_COUNT;
+    ULONG AllocatedIoQ = 0;
+    ULONG RegisteredIoQ = 0;
     ULONG DeviceTimeout = 2000 * STALL_TIME_US;//should be updated by CAP, unit in micro-seconds
     ULONG StallDelay = STALL_TIME_US;
     ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT] = { 0 };         //AccessRange from miniport HwFindAdapter.
@@ -75,7 +75,7 @@ typedef struct _NVME_DEVEXT{
 
     USHORT  VendorID = 0;
     USHORT  DeviceID = 0;
-
+    ULONG   NumaNode = 0;       //the NumaNode which this NVMe device resides...
     NVME_VERSION                        NvmeVer = { 0 };
     NVME_CONTROLLER_CAPABILITIES        CtrlCap = { 0 };
     NVME_IDENTIFY_CONTROLLER_DATA       CtrlIdent = { 0 };
@@ -104,7 +104,7 @@ typedef struct _NVME_DEVEXT{
 
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
-    PCI_COMMON_CONFIG                   PciCfg;
+    PCI_COMMON_CONFIG PciCfg;
 }NVME_DEVEXT, *PNVME_DEVEXT;
 
 
@@ -148,7 +148,6 @@ public:
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
-//    NTSTATUS InitNsExt();   //init namespace extension for exposed disks
     NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
     NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
 

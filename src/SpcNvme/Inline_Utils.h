@@ -72,3 +72,13 @@ FORCEINLINE UCHAR NsIdToLun(ULONG nsid)
     //LUN is zero-based, Namespace ID is 1-based.
     return (UCHAR)(nsid-1);
 }
+
+FORCEINLINE void CalcMaxTxSize(
+    ULONG &max_tx_size, 
+    ULONG &max_tx_pages, 
+    UCHAR mdts, 
+    ULONG min_page_size)
+{
+    max_tx_size = (ULONG)((1ul << mdts) * min_page_size);
+    max_tx_pages = max_tx_size / PAGE_SIZE;
+}

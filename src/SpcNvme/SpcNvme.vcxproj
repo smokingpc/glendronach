@@ -148,7 +148,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -168,7 +168,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -188,7 +188,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <DriverSign>
@@ -211,7 +211,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <DriverSign>
@@ -234,7 +234,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <DriverSign>
@@ -257,7 +257,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)WdmUtils_output\$(Platform)\$(ConfigurationName)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>WdmUtils.lib;StorPort.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
     <DriverSign>

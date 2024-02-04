@@ -58,6 +58,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     DbgBreakPoint();
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+    //Block incoming I/O during initialize
+    StorPortPause(devext, MAXULONG);
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto error;
@@ -70,7 +73,16 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     status = nvme->IdentifyController(NULL, &nvme->CtrlIdent, true);
     if (!NT_SUCCESS(status))
         goto error;
-    
+
+    status = nvme->InitNvmeStage1();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
+    //CreateIoQueues should be called AFTER IdentifyController.
+    status = nvme->CreateIoQueues();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
     //[Workaround for AdapterTopologyTelemetry event]
     //before HwInitialize, should init DmaAdapter.
     //AdapterTopologyTelemetry could come in between HwFindAdapter and Hwinitialize.
@@ -91,6 +103,7 @@ error:
 //return SP_RETURN_NOT_FOUND causes driver installation hanging?
 //I don't know why ....
     nvme->Teardown();
+    StorPortResume(devext);
     return SP_RETURN_ERROR;
 }
 
@@ -104,6 +117,8 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
     CDebugCallInOut inout(__FUNCTION__);
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = nvme->SetPerfOpts();
+
+    StorPortResume(devext);
 
     if(!NT_SUCCESS(status))
         return FALSE;
@@ -123,18 +138,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     if(!nvme->IsWorking())
         return FALSE;
     
-    StorPortPause(devext, MAXULONG);
-
-    status = nvme->InitNvmeStage1();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
     status = nvme->InitNvmeStage2();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
-    //CreateIoQueues should be called AFTER IdentifyController.
-    status = nvme->CreateIoQueues();
     if (!NT_SUCCESS(status))
         return FALSE;
 
@@ -142,7 +146,6 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     if (!NT_SUCCESS(status))
         return FALSE;
 
-    StorPortResume(devext);
     return TRUE;
 }
 

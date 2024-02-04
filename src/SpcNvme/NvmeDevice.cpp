@@ -997,6 +997,23 @@ NTSTATUS CNvmeDevice::SetPerfOpts()
     if (0 != (supported.Flags & STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO))
         set_perf.Flags |= STOR_PERF_OPTIMIZE_FOR_COMPLETION_DURING_STARTIO;
 
+    //MsgGroupAffinity retrieves "How does Storport redirect interrupts".
+    //It's NOT setup redirection.
+    if (0 != (supported.Flags & STOR_PERF_ADV_CONFIG_LOCALITY))
+    {
+        set_perf.Flags |= STOR_PERF_ADV_CONFIG_LOCALITY;
+        this->NumaNode = supported.DeviceNode;
+        set_perf.MessageTargets = this->MsgGroupAffinity;
+    }
+    
+    if (0 != (supported.Flags & STOR_PERF_INTERRUPT_MESSAGE_RANGES))
+    {
+        set_perf.Flags |= STOR_PERF_INTERRUPT_MESSAGE_RANGES;
+        //Each Queue has one interrupt. MsgID 0 is used for AdmQ.
+        set_perf.FirstRedirectionMessageNumber = 0;
+        set_perf.LastRedirectionMessageNumber = this->AllocatedIoQ;
+    }
+
     stor_status = StorPortInitializePerfOpts(this, FALSE, &set_perf);
     if(STOR_STATUS_SUCCESS != stor_status)
         return STATUS_UNSUCCESSFUL;
@@ -1436,7 +1453,7 @@ void CNvmeDevice::InitVars()
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
     MsgGroupAffinity = (PGROUP_AFFINITY) 
                 new(NonPagedPool, TAG_GROUP_AFFINITY) GROUP_AFFINITY[CpuCount];
-    RtlZeroMemory(&MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
+    RtlZeroMemory(MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
 
     CtrlReg = NULL;
     PortCfg = NULL;
@@ -1549,8 +1566,10 @@ NTSTATUS CNvmeDevice::DeleteIoQ()
 }
 void CNvmeDevice::UpdateParamsByCtrlIdent()
 {
-    this->MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * this->MinPageSize);
-    this->MaxTxPages = (ULONG)(this->MaxTxSize / PAGE_SIZE);
+    //this->MaxTxSize = (ULONG)((1 << this->CtrlIdent.MDTS) * this->MinPageSize);
+    //this->MaxTxPages = (ULONG)(this->MaxTxSize / PAGE_SIZE);
+    CalcMaxTxSize(this->MaxTxSize, this->MaxTxPages, 
+                    this->CtrlIdent.MDTS, this->MinPageSize);
 }
 
 #pragma endregion
