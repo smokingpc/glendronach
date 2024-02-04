@@ -7,11 +7,11 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{cfc158ac-577a-4db5-954d-cde4d0ad2a81}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ExportHeader">
+      <UniqueIdentifier>{105e71be-8422-46af-b315-7b38218503b3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="WdmUtils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -19,7 +19,10 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AutoPtr.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>ExportHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="WdmUtils.h">
+      <Filter>ExportHeader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
