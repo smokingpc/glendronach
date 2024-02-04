@@ -55,12 +55,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     UNREFERENCED_PARAMETER(businfo);
     UNREFERENCED_PARAMETER(arg_str);
     UNREFERENCED_PARAMETER(Reserved3);
-    DbgBreakPoint();
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    //Block incoming I/O during initialize
-    StorPortPause(devext, MAXULONG);
     status = nvme->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto error;
@@ -70,18 +67,9 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
         goto error;
 
     //Todo: supports multiple controller of NVMe v2.0  
-    status = nvme->IdentifyController(NULL, &nvme->CtrlIdent, true);
+    status = nvme->InitNvmeStage0();
     if (!NT_SUCCESS(status))
         goto error;
-
-    status = nvme->InitNvmeStage1();
-    if (!NT_SUCCESS(status))
-        return FALSE;
-
-    //CreateIoQueues should be called AFTER IdentifyController.
-    status = nvme->CreateIoQueues();
-    if (!NT_SUCCESS(status))
-        return FALSE;
 
     //[Workaround for AdapterTopologyTelemetry event]
     //before HwInitialize, should init DmaAdapter.
@@ -117,9 +105,6 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID devext)
     CDebugCallInOut inout(__FUNCTION__);
     CNvmeDevice* nvme = (CNvmeDevice*)devext;
     NTSTATUS status = nvme->SetPerfOpts();
-
-    StorPortResume(devext);
-
     if(!NT_SUCCESS(status))
         return FALSE;
 
@@ -137,8 +122,17 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
 
     if(!nvme->IsWorking())
         return FALSE;
-    
+
+    status = nvme->InitNvmeStage1();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
     status = nvme->InitNvmeStage2();
+    if (!NT_SUCCESS(status))
+        return FALSE;
+
+    //CreateIoQueues should be called AFTER IdentifyController.
+    status = nvme->CreateIoQueues();
     if (!NT_SUCCESS(status))
         return FALSE;
 

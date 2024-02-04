@@ -415,14 +415,24 @@ NTSTATUS CNvmeDevice::InitController()
     status = EnableController();
     return status;
 }
-NTSTATUS CNvmeDevice::InitNvmeStage1()
+NTSTATUS CNvmeDevice::InitNvmeStage0()
 {
     NTSTATUS status = STATUS_SUCCESS;
 
     //Todo: supports multiple controller of NVMe v2.0  
-    status = IdentifyController(NULL, &this->CtrlIdent);
+    status = IdentifyController(NULL, &this->CtrlIdent, true);
     if (!NT_SUCCESS(status))
         return status;
+
+    status = UpdateDesiredIoQueue((USHORT)this->DesiredIoQ);
+    if (!NT_SUCCESS(status))
+        return status;
+
+    return status;
+}
+NTSTATUS CNvmeDevice::InitNvmeStage1()
+{
+    NTSTATUS status = STATUS_SUCCESS;
 
     if (1 == this->NvmeVer.MJR && 0 == this->NvmeVer.MNR)
         status = IdentifyFirstNamespace();
@@ -515,7 +525,7 @@ NTSTATUS CNvmeDevice::CreateIoQueues(bool force)
 
     if(0 == this->DesiredIoQ)
     {
-        status = SetNumberOfIoQueue((USHORT)this->DesiredIoQ);
+        status = UpdateDesiredIoQueue((USHORT)this->DesiredIoQ);
         if(!NT_SUCCESS(status))
             return status;
     }
@@ -644,7 +654,7 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOI
 
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
+NTSTATUS CNvmeDevice::UpdateDesiredIoQueue(USHORT count)
 {
     //this is SET_FEATURE of NVMe Adm Command.
     //The flow is :
@@ -668,6 +678,7 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
     do
     {
         StorPortStallExecution(StallDelay);
+        AdmQueue->CompleteCmd();
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)

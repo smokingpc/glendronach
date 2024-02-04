@@ -145,8 +145,9 @@ public:
     NTSTATUS ShutdownController();  //set CC.SHN and wait CSTS.SHST==2
 
     NTSTATUS InitController();
+    NTSTATUS InitNvmeStage0();      //InitNvmeStage0() should be called in HwFindAdapte because it retrieves params for HwInitialize.
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
-    NTSTATUS InitNvmeStage2();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
+    NTSTATUS InitNvmeStage2();      //InitNvmeStage2() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
     NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
     NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
@@ -160,7 +161,7 @@ public:
     //nsid_list : variable to store query result. It's size should be PAGE_SIZE.(NVMe max support 1024 NameSpace)
     NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count);
 
-    NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
+    NTSTATUS UpdateDesiredIoQueue(USHORT count);  //tell NVMe device: I want X i/o queues. then device reply: I permit you use Y queues.
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
     NTSTATUS RequestAsyncEvent();
