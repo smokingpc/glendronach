@@ -2,7 +2,8 @@
 
 UCHAR AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
 {
-    PSTOR_DEVICE_CAPABILITIES_EX cap = (PSTOR_DEVICE_CAPABILITIES_EX)srbext->DataBuf();
+    PSTOR_DEVICE_CAPABILITIES_EX cap = 
+        (PSTOR_DEVICE_CAPABILITIES_EX)srbext->DataBuffer;
     cap->Version = STOR_DEVICE_CAPABILITIES_EX_VERSION_1;
     cap->Size = sizeof(STOR_DEVICE_CAPABILITIES_EX);
     cap->DeviceD1 = 0;

@@ -20,7 +20,7 @@ UCHAR BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
 UCHAR BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
     //todo: set log 
-    DebugScsiOpCode(srbext->Cdb()->CDB6GENERIC.OperationCode);
+    DebugScsiOpCode(srbext->Cdb->CDB6GENERIC.OperationCode);
     
     //check path/target/lun here. Only accept request which has valid BTL address.
     if(FALSE == (0==srbext->ScsiPath && 
@@ -48,11 +48,20 @@ UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext)
     UCHAR srb_status = SRB_STATUS_ERROR;
 
     STOR_PNP_ACTION action = STOR_PNP_ACTION::StorStartDevice;
-    PSRBEX_DATA_PNP srb_pnp = srbext->SrbDataPnp();
 
-    ASSERT(NULL != srb_pnp);
-    flags = srb_pnp->SrbPnPFlags;
-    action = srb_pnp->PnPAction;
+    if(srbext->IsSrbEx())
+    {
+        PSRBEX_DATA_PNP srb_pnp = srbext->GetSrbExPnpData();
+        ASSERT(NULL != srb_pnp);
+        flags = srb_pnp->SrbPnPFlags;
+        action = srb_pnp->PnPAction;
+    }
+    else
+    {
+        PSCSI_PNP_REQUEST_BLOCK scsi_pnp = (PSCSI_PNP_REQUEST_BLOCK)srbext->Srb;
+        flags = scsi_pnp->SrbPnPFlags;
+        action = scsi_pnp->PnPAction;
+    }
 
     //All unit control migrated to HwUnitControl callback...
     if(SRB_PNP_FLAGS_ADAPTER_REQUEST != (flags & SRB_PNP_FLAGS_ADAPTER_REQUEST))

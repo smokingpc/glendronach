@@ -9,7 +9,7 @@ UCHAR StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
 }
 UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 {
-    UCHAR opcode = srbext->Cdb()->CDB6GENERIC.OperationCode;
+    UCHAR opcode = srbext->Cdb->CDB6GENERIC.OperationCode;
     UCHAR srb_status = SRB_STATUS_ERROR;
     DebugScsiOpCode(opcode);
 
@@ -298,7 +298,7 @@ UCHAR StartIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
     //  IOCTL_MINIPORT_SIGNATURE_ENDURANCE_INFO     "ENDURINF"
     //** to use custom made ioctl codes, you should also define your own signature for SrbIoCtrl->Signature.
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL) srbext->DataBuf();
+    PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL) srbext->DataBuffer;
     size_t count = strlen(IOCTL_MINIPORT_SIGNATURE_SCSIDISK);
 
     switch (ioctl->ControlCode)

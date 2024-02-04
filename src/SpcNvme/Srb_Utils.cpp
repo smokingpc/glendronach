@@ -18,7 +18,7 @@ UCHAR NvmeToSrbStatus(NVME_COMMAND_STATUS& status)
     }
     return SRB_STATUS_INTERNAL_ERROR;
 }
-void SetScsiSenseBySrbStatus(PSTORAGE_REQUEST_BLOCK srb, UCHAR &status)
+void SetScsiSenseBySrbStatus(PSCSI_REQUEST_BLOCK srb, UCHAR &status)
 {
 //don't set ScsiStatus for other SRB_STATUS_xxx .
 //Only SRB_STATUS_ERROR need it.

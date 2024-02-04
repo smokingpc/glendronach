@@ -85,7 +85,7 @@ static void FillFirmwareInfoV1(
 VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
 {
     CNvmeDevice* nvme = srbext->DevExt;
-    PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL)srbext->DataBuf();
+    PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL)srbext->DataBuffer;
     PFIRMWARE_REQUEST_BLOCK request = (PFIRMWARE_REQUEST_BLOCK)(ioctl + 1);
     PSTORAGE_FIRMWARE_INFO buffer = (PSTORAGE_FIRMWARE_INFO)((PUCHAR)ioctl + request->DataBufferOffset);
     PNVME_FIRMWARE_SLOT_INFO_LOG logpage = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtBuf;

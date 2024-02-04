@@ -156,10 +156,10 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 //In this callback, also dispatch some behavior which need be handled very fast.
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
-    PSPCNVME_SRBEXT srbext = InitSrbExt(devext, (PSTORAGE_REQUEST_BLOCK)srb);
+    PSPCNVME_SRBEXT srbext = InitSrbExt(devext, srb);
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
 
-    switch (srbext->FuncCode())
+    switch (srbext->SrbFuncCode)
     {
     case SRB_FUNCTION_RESET_LOGICAL_UNIT:
     case SRB_FUNCTION_ABORT_COMMAND:
@@ -209,10 +209,10 @@ _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     UNREFERENCED_PARAMETER(devext);
-    PSPCNVME_SRBEXT srbext = GetSrbExt((PSTORAGE_REQUEST_BLOCK)srb);
+    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
     UCHAR srb_status = SRB_STATUS_ERROR;
 
-    switch (srbext->FuncCode())
+    switch (srbext->SrbFuncCode)
     {
     //case SRB_FUNCTION_RESET_LOGICAL_UNIT:     //dispatched in HwUnitControl
     //case SRB_FUNCTION_RESET_DEVICE:           //dispatched in HwAdapterControl

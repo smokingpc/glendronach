@@ -1,7 +1,7 @@
 #include "pch.h"
 inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
 {
-    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuf();
+    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
     ULONG block_size = 0;
     ULONG64 blocks = 0;
     srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
@@ -18,7 +18,7 @@ UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
-    PCDB cdb = srbext->Cdb();
+    PCDB& cdb = srbext->Cdb;
 
     ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
     return Scsi_ReadWrite(srbext, offset, len, false);
@@ -28,7 +28,7 @@ UCHAR Scsi_Write16(PSPCNVME_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
-    PCDB cdb = srbext->Cdb();
+    PCDB& cdb = srbext->Cdb;
 
     ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
     return Scsi_ReadWrite(srbext, offset, len, true);
@@ -61,7 +61,7 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
-    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuf();
+    PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
     ULONG block_size = 0;
     ULONG64 blocks = 0;
 
@@ -71,7 +71,7 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
         goto END;
     }
 
-    if (srbext->DataBufLen() < sizeof(READ_CAPACITY_DATA_EX))
+    if (srbext->DataBufLen < sizeof(READ_CAPACITY_DATA_EX))
     {
         srb_status = SRB_STATUS_DATA_OVERRUN;
         ret_size = sizeof(READ_CAPACITY_DATA_EX);

@@ -25,7 +25,7 @@ void BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, b
     cmd->CDW0.CID = MAXUSHORT;
     cmd->CDW0.OPC = (is_write)? NVME_NVM_COMMAND_WRITE : NVME_NVM_COMMAND_READ;
     cmd->NSID = nsid;
-    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+    BuildPrp(srbext, cmd, srbext->DataBuffer, srbext->DataBufLen);
     cmd->u.READWRITE.LBALOW = (ULONG)(offset & 0xFFFFFFFFULL);
     cmd->u.READWRITE.LBAHIGH = (ULONG)(offset >> 32);
     cmd->u.READWRITE.CDW12.NLB = blocks - 1;
@@ -254,7 +254,7 @@ void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
     REVERSE_BYTES_4(&payload_size, cdb->SECURITY_PROTOCOL_OUT.AllocationLength);
     cmd->u.SECURITYSEND.CDW11.TL = payload_size;
 
-    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+    BuildPrp(srbext, cmd, srbext->DataBuffer, srbext->DataBufLen);
 }
 void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
 {
@@ -274,7 +274,7 @@ void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
     REVERSE_BYTES_4(&payload_size, cdb->SECURITY_PROTOCOL_IN.AllocationLength);
     cmd->u.SECURITYSEND.CDW11.TL = payload_size;
 
-    BuildPrp(srbext, cmd, srbext->DataBuf(), srbext->DataBufLen());
+    BuildPrp(srbext, cmd, srbext->DataBuffer, srbext->DataBufLen);
 }
 
 void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext)

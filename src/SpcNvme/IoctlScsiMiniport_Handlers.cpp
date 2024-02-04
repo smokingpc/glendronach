@@ -3,7 +3,7 @@
 
 UCHAR IoctlScsiMiniport_Firmware(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl)
 {
-    ULONG data_len = srbext->DataBufLen();
+    ULONG data_len = srbext->DataBufLen;
     PFIRMWARE_REQUEST_BLOCK request = (PFIRMWARE_REQUEST_BLOCK)(ioctl + 1);
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     if (data_len < (sizeof(SRB_IO_CONTROL) + sizeof(FIRMWARE_REQUEST_BLOCK)))

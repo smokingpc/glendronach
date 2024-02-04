@@ -4,7 +4,7 @@ UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
-    PCDB cdb = srbext->Cdb();
+    PCDB &cdb = srbext->Cdb;
 
     ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
     return Scsi_ReadWrite(srbext, offset, len, false);
@@ -13,7 +13,7 @@ UCHAR Scsi_Write10(PSPCNVME_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
-    PCDB cdb = srbext->Cdb();
+    PCDB &cdb = srbext->Cdb;
 
     ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
     return Scsi_ReadWrite(srbext, offset, len, true);
@@ -23,7 +23,7 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
-    PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuf();
+    PREAD_CAPACITY_DATA cap = (PREAD_CAPACITY_DATA)srbext->DataBuffer;
     ULONG block_size = 0;
     ULONG64 blocks = 0;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
@@ -34,7 +34,7 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
         goto END;
     }
     
-    if (srbext->DataBufLen() < sizeof(READ_CAPACITY_DATA))
+    if (srbext->DataBufLen < sizeof(READ_CAPACITY_DATA))
     {
         srb_status = SRB_STATUS_DATA_OVERRUN;
         ret_size = sizeof(READ_CAPACITY_DATA);
