@@ -60,7 +60,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
-
     status = devext->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto ERROR;
@@ -102,7 +101,7 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
 
     CDebugCallInOut inout(__FUNCTION__);
-
+    
     //initialize perf options
     PERF_CONFIGURATION_DATA set_perf = { 0 };
     PERF_CONFIGURATION_DATA supported = { 0 };

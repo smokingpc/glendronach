@@ -119,7 +119,7 @@ namespace SPC
             old_ptr = this->Ptr;
             this->Ptr = new_ptr;
 
-            if (old_ptr)
+            if (nullptr != old_ptr)
             {
                 this->Deleter(old_ptr);
             }

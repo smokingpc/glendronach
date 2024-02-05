@@ -55,7 +55,10 @@ class CDebugCallInOut
 {
 private:
     static const int BufSize = 64;
-    char* Name = NULL;
+
+    //don't call ExAllocatePool() at DIRQL, or DriverVerifier will BugCheck(0xc4)
+    //using a array, don't allocate dynamically.
+    char Name[BufSize] = {0};
 public:
     CDebugCallInOut(char* name);
     CDebugCallInOut(const char* name);
