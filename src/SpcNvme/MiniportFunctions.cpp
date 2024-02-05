@@ -21,7 +21,7 @@ static void FillPortConfiguration(
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = MAXCVrocBusES;    //each VMD are located at same SCSI bus
+    portcfg->NumberOfBuses = MAX_VROC_BUSES;    //each VROC NVMe are located at same SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
@@ -99,7 +99,6 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     //in stornvme, it checks PPORT_CONFIGURATION_INFORMATION::DumpMode.
     //If (DumpMode != 0) , stornvme will do all Initialize here....
     //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
-
     CDebugCallInOut inout(__FUNCTION__);
     
     //initialize perf options
@@ -142,9 +141,8 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
-    return FALSE;
-    //StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
-    //return TRUE;
+    StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
+    return TRUE;
 }
 
 _Use_decl_annotations_

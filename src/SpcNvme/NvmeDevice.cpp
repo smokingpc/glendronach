@@ -562,7 +562,6 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_
     CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr;
     PSPCNVME_SRBEXT my_srbext = srbext;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    DbgBreakPoint();
     if(NULL == srbext)
     {
         srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());

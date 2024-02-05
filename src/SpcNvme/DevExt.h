@@ -108,7 +108,7 @@ typedef struct _VROC_DEVEXT {
     ULONG MaxTxPages;
     ULONG AccessRangeCount;
 
-    UCHAR Padding[PAGE_SIZE];   //Make DevExt larget than 1 page to avoid strange pool corruption issue.
+//    UCHAR Padding[PAGE_SIZE];   //Make DevExt larget than 1 page to avoid strange pool corruption issue.
 
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
     NTSTATUS GetRaidCtrlPciCfg();

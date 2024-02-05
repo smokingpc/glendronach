@@ -6,6 +6,7 @@ BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid)
     BOOLEAN ok = FALSE;
     CNvmeDevice* nvme = NULL;
     CNvmeQueue* queue = NULL;
+    DbgBreakPoint();
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
     {
         nvme = devext->NvmeDev[i];
@@ -320,7 +321,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
         //System can't access resources of all devices behind this bridge, 
         // if you didn't setup MemBase/MemLimit.
         UCHAR bus_idx = bridge->u.type1.SecondaryBus - bridge->u.type1.PrimaryBus;
-        CVrocBus *bus = new (NonPagedPool, TAGCVrocBus) CVrocBus();
+        CVrocBus *bus = new (NonPagedPool, TAG_VROC_BUS) CVrocBus();
         PUCHAR bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
         bus->Setup(PrimaryBus, bus_idx, bridge, 
                     bus_space, GetNvmeBar0SpaceForBus(bus_idx));
