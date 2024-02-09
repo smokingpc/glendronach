@@ -107,15 +107,15 @@ typedef struct _VROC_DEVEXT {
     ULONG MaxTxSize;
     ULONG MaxTxPages;
     ULONG AccessRangeCount;
-
+    MESSAGE_INTERRUPT_INFORMATION MsixInfoTable[128];
 //    UCHAR Padding[PAGE_SIZE];   //Make DevExt larget than 1 page to avoid strange pool corruption issue.
 
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
     NTSTATUS GetRaidCtrlPciCfg();
+    void UpdateNvmeDevMsixTable();
     void MapRaidCtrlBar0(ACCESS_RANGE *ranges, ULONG count);
     void EnumVrocBuses();
     void EnumVrocDevsOnBus(CVrocBus *bus);
-
     void Teardown();
     void ShutdownAllVrocNvmeControllers();
     void DisableAllVrocNvmeControllers();

@@ -99,6 +99,9 @@
       <Filter>MiniportFunction</Filter>
     </ClCompile>
     <ClCompile Include="DevExt.cpp" />
+    <ClCompile Include="PCIe_MSix.cpp">
+      <Filter>PCIe_and_MSIX</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NvmeDevice.h">

@@ -153,6 +153,7 @@ BOOLEAN HwPassiveInitialize(PVOID hbaext)
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     StorPortPause(hbaext, MAXULONG);
+    DbgBreakPoint();
     status = devext->PassiveInitAllVrocNvme();
     StorPortResume(hbaext);
     if (!NT_SUCCESS(status))

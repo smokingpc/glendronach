@@ -206,7 +206,6 @@ NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
     GetRaidCtrlPciCfg();
     MapRaidCtrlBar0(*portcfg->AccessRanges, portcfg->NumberOfAccessRanges);
     EnumVrocBuses();
-
     return STATUS_SUCCESS;
 }
 NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
@@ -245,6 +244,31 @@ NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
     }
 
     return STATUS_SUCCESS;
+}
+void _VROC_DEVEXT::UpdateNvmeDevMsixTable()
+{
+    PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)this->RaidMsixCfgSpace;
+    for (ULONG i=0; i< MAX_CHILD_VROC_DEV; i++)
+    {
+        CNvmeDevice * nvme = NvmeDev[i];
+        if(NULL == nvme)
+            continue;
+
+        //find the MSIX table begin addr of NVMe device 
+        PMSIX_TABLE_ENTRY ptr = (PMSIX_TABLE_ENTRY)
+                        (((PUCHAR)nvme->CtrlReg) + 0x2000);
+        if(0 != ptr->GetApicBaseAddr() || TRUE != ptr->VectorCtrl.Mask)
+        {
+            ptr = (PMSIX_TABLE_ENTRY) (((PUCHAR)nvme->CtrlReg) + 0x3000);
+        }
+        DbgBreakPoint();
+        for (ULONG msgid = 0; msgid < nvme->DesiredIoQ+1; msgid++)
+        {
+            ptr[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
+            ptr[msgid].MsgAddr.DestinationID = msgid+1;
+            ptr[msgid].VectorCtrl.Mask = FALSE;
+        }
+    }
 }
 void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
 {
@@ -416,6 +440,11 @@ NTSTATUS _VROC_DEVEXT::InitAllVrocNvme()
 NTSTATUS _VROC_DEVEXT::PassiveInitAllVrocNvme()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+    //bridge should be setup before load msix table.
+    //all child device's msix will be calculate?
+    UpdateNvmeDevMsixTable();
+    DbgBreakPoint();
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
     {
         CNvmeDevice* ptr = NvmeDev[i];

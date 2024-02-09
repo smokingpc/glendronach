@@ -42,7 +42,7 @@
 
 #pragma push(1)
 #pragma warning(disable:4201)   // nameless struct/union
-#if 0
+
 //MSIX Table data example: (only allocated 3 MSIX interrupt)
 //0: kd > dd 0xffffe501eaaea000
 //ffffe501`eaaea000  fee0400c 00000000 000049b3 00000000
@@ -93,6 +93,64 @@ typedef struct _MSIX_TABLE_ENTRY
     MSIX_VECTOR_CTRL VectorCtrl;
 }MSIX_TABLE_ENTRY, * PMSIX_TABLE_ENTRY;
 
+typedef struct _PCI_MSI_CAP
+{
+    struct {
+        UINT16 CID : 8;         //Capability ID indicates this is MSI cap. (0x05)
+        UINT16 NEXT : 8;        //indicates the next item in the list.
+    }MID;           //Message Signaled Interrupt Identifiers
+
+    struct {
+        UINT16 MSIE : 1;        //MSI Enable. device will use INTx pins if set 0 here.
+        UINT16 MMC : 3;         //Multiple Message Capable. Indicates the number of messages the controller "wants" to assert.
+        UINT16 MME : 3;         //Multiple Message Enable. How many message the soft want controller assert. vendor will imp this field as ReadOnly if doesn't support multi-msi.
+        UINT16 C64 : 1;         //64 Bit Address Capable. NVMe device should set 1 here.
+        UINT16 PVM : 1;         //Per-Vector Masking Capable. indicates this device support PVM or not.
+        UINT16 RESERVED : 7;
+    }MC;            //Message Signaled Interrupt Message Control
+
+    union
+    {
+        struct
+        {
+            struct {
+                UINT32 RESERVED : 2;
+                UINT32 ADDR : 30;       //Low 30 bits of system specificed message address. always DWORD aligned.
+            }MLA;            //Message Signaled Interrupt Message Address
+            UINT32 MUA;      //Message Signaled Interrupt Upper Address
+        };
+        UINT64 MA;      //Message Signaled Interrupt Address(64 bits)
+    };
+
+    UINT32 MD;            //Message Signaled Interrupt Message Data
+    UINT32 MMASK;         //Message Signaled Interrupt Mask Bits (Optional). each bit can mask associated message.(by id)
+    UINT32 MPEND;         //Message Signaled Interrupt Pending Bits (Optional) each bit indicates has pending msg(by id)
+}PCI_MSI_CAP, * PPCI_MSI_CAP;
+
+typedef struct _PCI_MSIX_CAP {
+    struct {
+        UINT16 CID : 8;         //Capability ID indicates this is MSIX cap. (0x11)
+        UINT16 NEXT : 8;        //indicates the next item in the list.
+    }MXID;           //MSI-X Identifiers
+
+    struct {
+        UINT16 TS : 11;         //Table Size. how many MSI-X message this device support?
+        UINT16 RESERVED : 3;
+        UINT16 FM : 1;          //Function Mask. Block MSI-X function if set 1.
+        UINT16 MXE : 1;         //MSI-X Enable. If MXE==1 and MSIE==0, this device use MSIX and block INTx pin
+    }MXC;           //MSI-X Message Control
+
+    struct {                    //MSIX table
+        UINT32 TBIR : 3;        //Table BIR. refer to NVMe spec 1.3 , section 2.4.3
+        UINT32 TO : 29;         //Table Offset since BusData begin address.  refer to NVMe spec 1.3 , section 2.4.3
+    }MTAB;          //MSI-X Table Offset / Table BIR
+
+    struct {                     //PBA is Pending Bit of interrupt array
+        UINT32 PBIR : 3;        //PBA BIR.  refer to NVMe spec 1.3 , section 2.4.4
+        UINT32 PBAO : 29;       //PBA Offset since BusData begin address.  refer to NVMe spec 1.3 , section 2.4.4
+    }MPBA;          //MSI-X PBA Offset / PBA BIR
+}PCI_MSIX_CAP, * PPCI_MSIX_CAP;
+
 typedef struct
 {
     PHYSICAL_ADDRESS MsgAddress;
@@ -101,8 +159,7 @@ typedef struct
         ULONG Mask : 1;
         ULONG Reserved : 31;
     }DUMMYSTRUCTNAME;
-}MsixVector, * PMsixVector;
-#endif
+}MSIX_VECTOR, * PMSIX_VECTOR;
 
 typedef union _ECAM_OFFSET {
     struct {
@@ -323,5 +380,9 @@ typedef struct _PCIE_CAP
     UINT16 DevStatus2;
 }PCIE_CAP, * PPCIE_CAP;
 #pragma endregion
-
 #pragma pop()
+
+void ParseMsiCaps(
+    PCI_COMMON_CONFIG* ptr,
+    PPCI_MSI_CAP &msi,
+    PPCI_MSIX_CAP &msix);

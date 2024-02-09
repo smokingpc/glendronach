@@ -282,6 +282,7 @@
     <ClCompile Include="Ioctl_FirmwareFunctions.cpp" />
     <ClCompile Include="IoctlStorageQuery_Handlers.cpp" />
     <ClCompile Include="NvmePrpBuilder.cpp" />
+    <ClCompile Include="PCIe_MSix.cpp" />
     <ClCompile Include="Scsi_Utils.cpp" />
     <ClCompile Include="SrbExt.cpp" />
     <ClCompile Include="NvmeCmdBuilder.cpp" />

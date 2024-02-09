@@ -408,8 +408,9 @@ NTSTATUS CNvmeDevice::ShutdownController()
     //if set CC.EN = 0 WHEN CSTS.RDY == 0 and CC.EN == 1, it is undefined behavior.
     //we should wait controller state changing until (CC.EN == 1 and CSTS.RDY == 1).
     bool ok = WaitForCtrlerState(DeviceTimeout, TRUE, TRUE);
-    if (!ok)
-        goto ERROR_BSOD;
+    if (!ok)    //init Nvme CTCS is disabled.
+        return STATUS_INVALID_DEVICE_STATE;
+//        goto ERROR_BSOD;
 
     ReadNvmeRegister(cc);
     cc.SHN = NVME_CC_SHN_NORMAL_SHUTDOWN;
@@ -421,12 +422,13 @@ NTSTATUS CNvmeDevice::ShutdownController()
     //    goto ERROR_BSOD;
 
     return DisableController();
-
+#if 0
 ERROR_BSOD:
     NVME_CONTROLLER_STATUS csts = { 0 };
     ReadNvmeRegister(cc);
     ReadNvmeRegister(csts);
     KeBugCheckEx(BUGCHECK_ADAPTER, (ULONG_PTR)this, (ULONG_PTR)cc.AsUlong, (ULONG_PTR)csts.AsUlong, 0);
+#endif
 }
 NTSTATUS CNvmeDevice::InitController()
 {
