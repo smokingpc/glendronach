@@ -129,12 +129,11 @@
 #define MAX_VROC_BUSES          1
 #define MAX_VROC_TARGETS        MAX_CHILD_VROC_DEV
 #define MAX_VROC_LOGICAL_UNIT   1
-
 #define VROC_DEV_PER_BUS        32
 #define VROC_BRIDGE_WINDOW_SIZE (1<<20)         //MemBase/MemLimit downstream window size.
 #define VROC_NVME_BAR0_SIZE     (4*PAGE_SIZE)   //BAR0 region size of each VROC NVMe device.
 #define VROC_PCI_SEGMENT_START_ID   1       //seg0 is primary segment of this computer
-
+#define VROC_MAX_MSIX_COUNT     256
 #define PCI_LOW32BIT_BAR_ADDR_MASK  (0xFFFFFFF0)
 #define PCI_BAR_ADDR_MASK           (0xFFFFFFFFFFFFFFF0)        //low 4 bits are readonly, ignore them.
 #define TAG_VROC_BUS        ((ULONG)' BRV')

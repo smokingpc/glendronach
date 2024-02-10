@@ -67,7 +67,6 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     status = devext->InitAllVrocNvme();
     if (!NT_SUCCESS(status))
         goto ERROR;
-
     devext->UpdateVrocNvmeDevInfo();
 
     //[Workaround for AdapterTopologyTelemetry event]
@@ -100,7 +99,8 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     //If (DumpMode != 0) , stornvme will do all Initialize here....
     //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
     CDebugCallInOut inout(__FUNCTION__);
-    
+    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
+
     //initialize perf options
     PERF_CONFIGURATION_DATA set_perf = { 0 };
     PERF_CONFIGURATION_DATA supported = { 0 };
@@ -141,6 +141,7 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
+    devext->EnableNvmeDevMsix();
     StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
     return TRUE;
 }
@@ -153,7 +154,6 @@ BOOLEAN HwPassiveInitialize(PVOID hbaext)
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     StorPortPause(hbaext, MAXULONG);
-    DbgBreakPoint();
     status = devext->PassiveInitAllVrocNvme();
     StorPortResume(hbaext);
     if (!NT_SUCCESS(status))
@@ -446,4 +446,16 @@ void HwCompleteServiceIrp(PVOID hbaext)
     UNREFERENCED_PARAMETER(hbaext);
     //if any async request in HwProcessServiceRequest, 
     //we should complete them here and let them go back asap.
+}
+
+//BOOLEAN
+//HW_INTERRUPT(
+//    _In_ PVOID DeviceExtension
+//);
+
+_Use_decl_annotations_
+BOOLEAN HwIrqHandler(_In_ PVOID hbaext)
+{
+    UNREFERENCED_PARAMETER(hbaext);
+    return TRUE;
 }

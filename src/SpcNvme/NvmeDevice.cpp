@@ -247,6 +247,7 @@ bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
 #pragma region ======== CSpcNvmeDevice ======== 
 CNvmeDevice::CNvmeDevice(){}
 CNvmeDevice::~CNvmeDevice(){}
+#if 0
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -278,6 +279,7 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
     State = NVME_STATE::RUNNING;
     return STATUS_SUCCESS;
 }
+#endif
 NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
 {
     if (NVME_STATE::STOP != State && !this->RebalancingPnp)
@@ -304,7 +306,52 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
         return status;
 
     State = NVME_STATE::RUNNING;
+    DesiredIoQ = MAX_IO_QUEUE_COUNT;
     return STATUS_SUCCESS;
+}
+void CNvmeDevice::EnableMsix()
+{
+    PPCI_MSI_CAP msi = NULL;
+    PPCI_MSIX_CAP msix = NULL;
+    ParseMsiCaps(&PciCfg, msi, msix);
+
+    DbgBreakPoint();
+    if (NULL != msix)
+        msix->MXC.MXE = TRUE;
+}
+void CNvmeDevice::DisableMsix()
+{
+    PPCI_MSI_CAP msi = NULL;
+    PPCI_MSIX_CAP msix = NULL;
+
+    ParseMsiCaps(&PciCfg, msi, msix);
+
+    if (NULL != msix)
+        msix->MXC.MXE = FALSE;
+}
+void CNvmeDevice::UpdateMsixTable()
+{
+    PPCI_MSI_CAP msi = NULL;
+    PPCI_MSIX_CAP msix = NULL;
+    ParseMsiCaps(&PciCfg, msi, msix);
+    MsixCount = GetMsixTableSize(&PciCfg);
+
+    PVROC_DEVEXT raid = (PVROC_DEVEXT)this->DevExt;
+    PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)raid->RaidMsixCfgSpace;
+    PMSIX_TABLE_ENTRY entry = (PMSIX_TABLE_ENTRY)
+        (((PUCHAR)CtrlReg) + (msix->MTAB.TO << 3));
+
+    for (ULONG msgid = 0; msgid < this->MsixCount; msgid++)
+    {
+        //only set MsgAddrs to match RaidController's MSIX count.
+        //all other additional MSIX should clear mask but don't set MsgAddr.
+        if(msgid < raid->MsixCount)
+        {
+            entry[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
+            entry[msgid].MsgAddr.DestinationID = msgid + 1;
+            entry[msgid].VectorCtrl.Mask = FALSE;
+        }
+    }
 }
 void CNvmeDevice::Teardown()
 {
@@ -446,12 +493,16 @@ NTSTATUS CNvmeDevice::InitController()
     status = RegisterAdmQ();
     if (!NT_SUCCESS(status))
         return status;
+
+    UpdateMsixTable();
+
     status = EnableController();
     return status;
 }
 NTSTATUS CNvmeDevice::InitNvmeStage1()
 {
     NTSTATUS status = STATUS_SUCCESS;
+    DbgBreakPoint();
 
     //Todo: supports multiple controller of NVMe v2.0  
     status = IdentifyController(NULL, &this->CtrlIdent);
@@ -465,6 +516,8 @@ NTSTATUS CNvmeDevice::InitNvmeStage1()
 
     if (!NT_SUCCESS(status))
         return status;
+
+    status = SetNumberOfIoQueue((USHORT)DesiredIoQ);
 
     return status;
 }
@@ -549,6 +602,7 @@ NTSTATUS CNvmeDevice::CreateIoQueues(bool force)
 
     if(0 == this->DesiredIoQ)
     {
+        this->DesiredIoQ = MAX_IO_QUEUE_COUNT;
         status = SetNumberOfIoQueue((USHORT)this->DesiredIoQ);
         if(!NT_SUCCESS(status))
             return status;
@@ -677,7 +731,7 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOI
 
     return STATUS_SUCCESS;
 }
-NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
+NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count, bool poll)
 {
     //this is SET_FEATURE of NVMe Adm Command.
     //The flow is :
@@ -702,6 +756,8 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count)
     do
     {
         StorPortStallExecution(StallDelay);
+        if(poll)
+            AdmQueue->CompleteCmd();
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)

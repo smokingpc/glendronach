@@ -127,7 +127,7 @@ public:
     CNvmeQueue* AdmQueue;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT];
     PVOID UncachedExt;
-
+    ULONG MsixCount;
     //note: if extend AsyncEvent to multiple event, here should be refactor to 
     //      make saving AsyncEventLog atomic.
     NVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST AsyncEventLog[MAX_ASYNC_EVENT_LOG];
@@ -142,10 +142,14 @@ public:
 public:
     CNvmeDevice();
     ~CNvmeDevice();
+    #if 0
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
+    #endif
     NTSTATUS Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg);
+    void EnableMsix();
+    void DisableMsix();
+    void UpdateMsixTable();
     void Teardown();
-
     NTSTATUS EnableController();
     NTSTATUS DisableController();
     NTSTATUS ShutdownController();  //set CC.SHN and wait CSTS.SHST==2
@@ -166,7 +170,7 @@ public:
     //nsid_list : variable to store query result. It's size should be PAGE_SIZE.(NVMe max support 1024 NameSpace)
     NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count);
 
-    NTSTATUS SetNumberOfIoQueue(USHORT count);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
+    NTSTATUS SetNumberOfIoQueue(USHORT count, bool poll = false);  //tell NVMe device: I want xx i/o queues. then device reply: I can allow you use xxxx queues.
     NTSTATUS SetInterruptCoalescing();
     NTSTATUS SetAsyncEvent();
     NTSTATUS RequestAsyncEvent();

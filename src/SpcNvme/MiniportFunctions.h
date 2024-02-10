@@ -49,7 +49,7 @@ HW_RESET_BUS HwResetBus;
 HW_ADAPTER_CONTROL HwAdapterControl;
 HW_PROCESS_SERVICE_REQUEST HwProcessServiceRequest;
 HW_COMPLETE_SERVICE_IRP HwCompleteServiceIrp;
-
+HW_INTERRUPT HwIrqHandler;
 #if 0
 HW_UNIT_CONTROL HwUnitControl;
 HW_TRACING_ENABLED HwTracingEnabled;

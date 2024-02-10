@@ -383,6 +383,8 @@ typedef struct _PCIE_CAP
 #pragma pop()
 
 void ParseMsiCaps(
-    PCI_COMMON_CONFIG* ptr,
+    PCI_COMMON_CONFIG* cfg,
     PPCI_MSI_CAP &msi,
     PPCI_MSIX_CAP &msix);
+
+ULONG GetMsixTableSize(PCI_COMMON_CONFIG* cfg);

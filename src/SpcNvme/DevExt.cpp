@@ -79,7 +79,7 @@ PUCHAR GetBusCfgSpace(PUCHAR vmd_space, ULONG max_len, UCHAR bus_offset)
         return NULL;
 
 
-    //"vmd_space" is "ptr mapped BAR0 of RaidController"
+    //"vmd_space" is "nvme mapped BAR0 of RaidController"
     ULONG bus_space_size = GetPciBusCfgSpaceSize(1);
     if ((bus_space_size*bus_offset) >= max_len)
         return NULL;
@@ -176,7 +176,6 @@ void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_C
         addr = MmGetPhysicalAddress(bar0); 
         cfg->u.type0.BaseAddresses[0] = addr.LowPart;
         cfg->u.type0.BaseAddresses[1] = addr.HighPart;
-    //DbgBreakPoint();
     }
 
     NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice();
@@ -243,9 +242,21 @@ NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
         }
     }
 
+    MsixCount = GetMsixTableSize(&PciCfg);
     return STATUS_SUCCESS;
 }
-void _VROC_DEVEXT::UpdateNvmeDevMsixTable()
+void _VROC_DEVEXT::EnableNvmeDevMsix()
+{
+    for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
+    {
+        CNvmeDevice* nvme = NvmeDev[i];
+        if (NULL == nvme)
+            continue;
+        nvme->EnableMsix();
+    }
+}
+#if 0
+void _VROC_DEVEXT::EnableNvmeDevMsixTable()
 {
     PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)this->RaidMsixCfgSpace;
     for (ULONG i=0; i< MAX_CHILD_VROC_DEV; i++)
@@ -255,21 +266,27 @@ void _VROC_DEVEXT::UpdateNvmeDevMsixTable()
             continue;
 
         //find the MSIX table begin addr of NVMe device 
-        PMSIX_TABLE_ENTRY ptr = (PMSIX_TABLE_ENTRY)
+        PMSIX_TABLE_ENTRY msix = (PMSIX_TABLE_ENTRY)
                         (((PUCHAR)nvme->CtrlReg) + 0x2000);
-        if(0 != ptr->GetApicBaseAddr() || TRUE != ptr->VectorCtrl.Mask)
+        if(0 != msix->GetApicBaseAddr() || TRUE != msix->VectorCtrl.Mask)
         {
-            ptr = (PMSIX_TABLE_ENTRY) (((PUCHAR)nvme->CtrlReg) + 0x3000);
+            msix = (PMSIX_TABLE_ENTRY) (((PUCHAR)nvme->CtrlReg) + 0x3000);
         }
-        DbgBreakPoint();
-        for (ULONG msgid = 0; msgid < nvme->DesiredIoQ+1; msgid++)
+
+        for(ULONG msgid=0; msgid < nvme->MsixCount; msgid++)
         {
-            ptr[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
-            ptr[msgid].MsgAddr.DestinationID = msgid+1;
-            ptr[msgid].VectorCtrl.Mask = FALSE;
+            if(msgid < (nvme->DesiredIoQ+1))
+            {
+                //only set MsgAddr for AdmQ and IoQ
+                msix[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
+                msix[msgid].MsgAddr.DestinationID = msgid + 1;
+            }
+            msix[msgid].VectorCtrl.Mask = FALSE;
         }
+        nvme->EnableMsix();
     }
 }
+#endif
 void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
 {
     AccessRangeCount = min(ACCESS_RANGE_COUNT, count);
@@ -443,37 +460,28 @@ NTSTATUS _VROC_DEVEXT::PassiveInitAllVrocNvme()
 
     //bridge should be setup before load msix table.
     //all child device's msix will be calculate?
-    UpdateNvmeDevMsixTable();
-    DbgBreakPoint();
     for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
     {
-        CNvmeDevice* ptr = NvmeDev[i];
-        if (NULL == ptr)
+        CNvmeDevice* nvme = NvmeDev[i];
+        if (NULL == nvme)
             continue;
-        status = ptr->InitNvmeStage1();
+
+        nvme->EnableMsix();
+        status = nvme->InitNvmeStage1();
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
-        status = ptr->InitNvmeStage2();
+
+        status = nvme->InitNvmeStage2();
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
-        status = ptr->CreateIoQueues();
+
+        status = nvme->CreateIoQueues();
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
-        status = ptr->RegisterIoQueues(NULL);
+
+        status = nvme->RegisterIoQueues(NULL);
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
     }
 
     return STATUS_SUCCESS;

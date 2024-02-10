@@ -58,7 +58,7 @@ HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLim
 HKR, "Interrupt Management\Affinity" Policy, 0x00000010
 HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 5 ;IrqPolicySpreadMessagesAcrossAllProcessors
 HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3 ;IrqPriorityHigh, for low latency
-HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
+;HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
 
 [Parameters]
 HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001    ;PCIBus
