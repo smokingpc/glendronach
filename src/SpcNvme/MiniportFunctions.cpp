@@ -21,7 +21,7 @@ static void FillPortConfiguration(
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = RaidMsixISR;
     portcfg->InterruptSynchronizationMode = InterruptSynchronizePerMessage;
-    portcfg->NumberOfBuses = MAX_VROC_BUSES;    //each VROC NVMe are located at same SCSI bus
+    portcfg->NumberOfBuses = MAX_VROC_SCSI_BUS;    //each VROC NVMe are located at same SCSI bus
     portcfg->ScatterGather = TRUE;
     portcfg->Master = TRUE;
     portcfg->AddressType = STORAGE_ADDRESS_TYPE_BTL8;
@@ -99,7 +99,6 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     //If (DumpMode != 0) , stornvme will do all Initialize here....
     //Todo: crack stornvme to know why it can do init here. This is called in DIRQL.
     CDebugCallInOut inout(__FUNCTION__);
-    PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
 
     //initialize perf options
     PERF_CONFIGURATION_DATA set_perf = { 0 };
@@ -171,11 +170,11 @@ BOOLEAN HwBuildIo(_In_ PVOID hbaext,_In_ PSCSI_REQUEST_BLOCK srb)
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
     PSPCNVME_SRBEXT srbext = InitSrbExt(hbaext, (PSTORAGE_REQUEST_BLOCK)srb);
-    CNvmeDevice* nvme = devext->FindVrocNvmeDev(srbext->ScsiPath);
+    CNvmeDevice* nvme = devext->FindVrocNvmeDev(srbext->ScsiTarget);
 
     if(NULL == nvme)
     {
-        srb_status = SRB_STATUS_NO_DEVICE;
+        srb_status = SRB_STATUS_INVALID_TARGET_ID;
         goto END;
     }
     SetNvmeDeviceToSrbExt(srbext, nvme);

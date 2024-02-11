@@ -14,9 +14,8 @@ public:
     UCHAR MyBus;
     UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
     PUCHAR Bar0SpaceForDevAndBridge;
+    ULONG Guard;
 
-    CVrocBus();
-    ~CVrocBus();
     void Setup(UCHAR primary_bus, 
                 UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, 
                 PUCHAR bus_space, PUCHAR dev_bar0_space);
@@ -41,9 +40,8 @@ public:
     CVrocBus *ParentBus;
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
+    ULONG Guard;
 
-    CVrocDevice();
-    ~CVrocDevice();
     void Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0);
     void Teardown();
     void DeleteNvmeDevice();
@@ -102,10 +100,11 @@ typedef struct _VROC_DEVEXT {
     ULONG MaxTxPages;
     ULONG AccessRangeCount;
     ULONG MsixCount;
+    UCHAR Pagging[PAGE_SIZE];   //make devext larger than 1 page...
+    ULONG Guard;
 
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
     NTSTATUS GetRaidCtrlPciCfg();
-    //void EnableNvmeDevMsixTable();
     void EnableNvmeDevMsix();
     void MapRaidCtrlBar0(ACCESS_RANGE *ranges, ULONG count);
     void EnumVrocBuses();

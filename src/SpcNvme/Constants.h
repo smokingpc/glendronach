@@ -126,9 +126,10 @@
 //Each PCI bus has 32 devices.
 //VROC always skip device-0?
 #define MAX_CHILD_VROC_DEV      32
-#define MAX_VROC_BUSES          1
+#define MAX_VROC_SCSI_BUS       1
 #define MAX_VROC_TARGETS        MAX_CHILD_VROC_DEV
 #define MAX_VROC_LOGICAL_UNIT   1
+#define MAX_VROC_VIRTUALBUS     16     //total 32MB config space, each bus has 2MB
 #define VROC_DEV_PER_BUS        32
 #define VROC_BRIDGE_WINDOW_SIZE (1<<20)         //MemBase/MemLimit downstream window size.
 #define VROC_NVME_BAR0_SIZE     (8*PAGE_SIZE)   //BAR0 region size of each VROC NVMe device.

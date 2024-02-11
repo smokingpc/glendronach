@@ -26,7 +26,7 @@ static UCHAR Reply_VpdSupportPages(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
         valid_pages * sizeof(UCHAR));
 
     SPC::CAutoPtr<UCHAR, PagedPool, TAG_VPDPAGE>
-            page_ptr(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
+            page_ptr(MemAlloc(PagedPool, buf_size, TAG_VPDPAGE));
     if(page_ptr.IsNull())
         return SRB_STATUS_INSUFFICIENT_RESOURCES;
     PVPD_SUPPORTED_PAGES_PAGE page = (PVPD_SUPPORTED_PAGES_PAGE)page_ptr.Get();
@@ -76,7 +76,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
                         (ULONG)sizeof(VPD_IDENTIFICATION_DESCRIPTOR)
                         + nqn_size + vid_size + 1;      //1 more byte for "_"
     SPC::CAutoPtr<VPD_IDENTIFICATION_PAGE, PagedPool, TAG_VPDPAGE>
-        page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
+        page(MemAlloc(PagedPool, buf_size, TAG_VPDPAGE));
 
     //NQN is too long. So only use VID + SN as Identifier.
     PVPD_IDENTIFICATION_DESCRIPTOR desc = NULL;
@@ -107,7 +107,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     //question : is it really used in modern windows system? Orz
     ULONG buf_size = sizeof(VPD_BLOCK_LIMITS_PAGE);
     SPC::CAutoPtr<VPD_BLOCK_LIMITS_PAGE, PagedPool, TAG_VPDPAGE>
-        page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
+        page(MemAlloc(PagedPool, buf_size, TAG_VPDPAGE));
 
     page->DeviceType = DIRECT_ACCESS_DEVICE;
     page->DeviceTypeQualifier = DEVICE_CONNECTED;
@@ -133,7 +133,7 @@ static UCHAR Reply_VpdBlockDeviceCharacteristics(PSPCNVME_SRBEXT srbext, ULONG& 
 {
     ULONG buf_size = sizeof(VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE);
     SPC::CAutoPtr<VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE, PagedPool, TAG_VPDPAGE>
-        page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
+        page(MemAlloc(PagedPool, buf_size, TAG_VPDPAGE));
 
     page->DeviceType = DIRECT_ACCESS_DEVICE;
     page->DeviceTypeQualifier = DEVICE_CONNECTED;

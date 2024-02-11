@@ -6,7 +6,7 @@ BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid)
     BOOLEAN ok = FALSE;
     CNvmeDevice* nvme = NULL;
     CNvmeQueue* queue = NULL;
-    DbgBreakPoint();
+    //DbgBreakPoint();
 
     for (ULONG i = 0; i < devext->NvmeDevCount; i++)
     {
@@ -100,11 +100,6 @@ PUCHAR GetDevCfgSpace(PUCHAR bus_space, UCHAR dev_id)
 }
 
 #pragma region ======== CVrocBus ========
-CVrocBus::CVrocBus()
-{
-}
-CVrocBus::~CVrocBus()
-{}
 void CVrocBus::Setup(
                 UCHAR primary_bus, 
                 UCHAR bus_idx, 
@@ -121,6 +116,7 @@ void CVrocBus::Setup(
     MyBusIdx = bus_idx;
     MyBus = bus_idx + primary_bus;
     Bar0SpaceForDevAndBridge = dev_bar0_space;
+    Guard = 0x23939889;
 }
 void CVrocBus::Teardown()
 {
@@ -138,7 +134,7 @@ void CVrocBus::RemoveAllDevices()
         PLIST_ENTRY entry = RemoveHeadList(&DevListHead);
         CVrocDevice *dev = CONTAINING_RECORD(entry, CVrocDevice, List);
         dev->Teardown();
-        delete dev;
+        MemDelete(dev, TAG_VROC_DEVICE);
     }
 }
 void CVrocBus::UpdateBridgeInfo(UINT64 msi_addr)
@@ -185,10 +181,9 @@ void CVrocBus::UpdateBridgeInfo(UINT64 msi_addr)
 }
 #pragma endregion
 #pragma region ======== CVrocDevice ========
-CVrocDevice::CVrocDevice(){}
-CVrocDevice::~CVrocDevice(){}
 void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0)
 {
+    Guard = 0x23939889;
     InitializeListHead(&this->List);
     DevCfg = cfg;
     DevId = dev_id;
@@ -209,7 +204,8 @@ void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_C
         cfg->u.type0.BaseAddresses[1] = addr.HighPart;
     }
 
-    NvmeDev = new (NonPagedPool, TAG_VROC_NVME) CNvmeDevice();
+//    NvmeDev = (CNvmeDevice*) MemAlloc(NonPagedPool, sizeof(CNvmeDevice), TAG_VROC_NVME);
+    NvmeDev = MemAllocEx<CNvmeDevice>(NonPagedPool, TAG_VROC_NVME);
     NvmeDev->Setup(devext, DevCfg, Bar0VA);
 }
 void CVrocDevice::Teardown()
@@ -221,7 +217,7 @@ void CVrocDevice::DeleteNvmeDevice()
     if(NULL != NvmeDev)
     {
         NvmeDev->Teardown();
-        delete NvmeDev;
+        MemDelete(NvmeDev, TAG_VROC_NVME);
         NvmeDev = NULL;
     }
 }
@@ -231,7 +227,7 @@ void CVrocDevice::DeleteNvmeDevice()
 NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 {
     PortCfg = portcfg;
-
+    Guard = 0x23939889;
     InitializeListHead(&this->BusListHead);
     GetRaidCtrlPciCfg();
     MapRaidCtrlBar0(*portcfg->AccessRanges, portcfg->NumberOfAccessRanges);
@@ -347,7 +343,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
     //Enum bridges first.
     //Bus 0 stores Pci Bridges, other Bus stores VROC NVMe devices.
     PUCHAR bus0_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, 0);
-    for (UCHAR bridge_idx = 1; bridge_idx < PCI_MAX_DEVICES; bridge_idx++)
+    for (UCHAR bridge_idx = 1; bridge_idx < MAX_VROC_VIRTUALBUS; bridge_idx++)
     {
     //Each bridge map to one bus. bridge id == bus id.
     //there is no bridge 0.
@@ -361,7 +357,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
         //System can't access resources of all devices behind this bridge, 
         // if you didn't setup MemBase/MemLimit.
         UCHAR bus_idx = bridge->u.type1.SecondaryBus - bridge->u.type1.PrimaryBus;
-        CVrocBus *bus = new (NonPagedPool, TAG_VROC_BUS) CVrocBus();
+        CVrocBus* bus = MemAllocEx<CVrocBus>(NonPagedPool, TAG_VROC_BUS);
         PUCHAR bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
         bus->Setup(PrimaryBus, bus_idx, bridge, 
                     bus_space, GetNvmeBar0SpaceForBus(bus_idx));
@@ -390,7 +386,8 @@ void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
         if (!IsValidVendorID(dev_space))
             continue;
         
-        CVrocDevice *dev = new (NonPagedPool, TAG_VROC_DEVICE) CVrocDevice();
+//        CVrocDevice *dev = new (NonPagedPool, TAG_VROC_DEVICE) CVrocDevice();
+        CVrocDevice* dev = MemAllocEx<CVrocDevice>(NonPagedPool, TAG_VROC_DEVICE);
         dev->Setup(this, bus, dev_id, dev_space, bus->GetBar0SpaceForDevice(dev_id));
         bus->AddDevice(dev);
         NvmeDev[NvmeDevCount++] = dev->NvmeDev;
@@ -409,7 +406,7 @@ void _VROC_DEVEXT::Teardown()
         PLIST_ENTRY entry = RemoveHeadList(&BusListHead);
         CVrocBus *bus = CONTAINING_RECORD(entry, CVrocBus, List);
         bus->Teardown();
-        delete bus;
+        MemDelete(bus, TAG_VROC_BUS);
     }
     UncachedExt = NULL;
 }

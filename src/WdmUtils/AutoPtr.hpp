@@ -47,10 +47,13 @@
 #define _INLINE_VAR
 #endif // _HAS_CXX17
 
+void* MemAlloc(POOL_TYPE type, size_t size, ULONG tag);
+void MemDelete(void* ptr, ULONG tag);
+
 namespace SPC
 {
     template <typename _Ty, POOL_TYPE _PoolType, ULONG _PoolTag>
-    class SpcCppDeleter //: SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>
+    class SpcCppDeleter 
     { 
     public:
         constexpr SpcCppDeleter() noexcept = default;
@@ -58,9 +61,8 @@ namespace SPC
         
         void operator()(_Ty* _Ptr) const noexcept 
         {
-            //SpcDefaultDeleter<_Ty, _PoolType, _PoolTag>::operator(_Ptr);
             static_assert(0 < sizeof(_Ty), "can't delete an incomplete type");
-            delete _Ptr;
+            MemDelete(_Ptr, _PoolTag);
         }
     };
 
@@ -71,17 +73,20 @@ namespace SPC
         using DataType = _Ty;
         using DeleterType = _Dx;
 
-        CAutoPtr() noexcept {
-            this->Ptr = nullptr;
-        }
+        //CAutoPtr() noexcept {
+        //    this->Ptr = nullptr;
+        //}
         CAutoPtr(DataType* ptr) noexcept {
             this->Ptr = ptr;
         }
-        CAutoPtr(PVOID ptr) noexcept {
-            this->Ptr = (DataType*)ptr;
+        CAutoPtr(bool alloc=false) noexcept {
+            this->Ptr = nullptr;
+            if(alloc)
+            {
+                this->Ptr = (DataType*) MemAlloc(_PoolType, sizeof(DataType), _PoolTag);
+            }
         }
-
-        virtual ~CAutoPtr() noexcept {
+        ~CAutoPtr() noexcept {
             Reset();
         }
 
@@ -108,12 +113,10 @@ namespace SPC
         _Ty* Get() const noexcept {
             return this->Ptr;
         }
-            
         bool IsNull()  const noexcept 
         {
             return (NULL==this->Ptr);
         }
-
         void Reset(_Ty* new_ptr = nullptr) noexcept {
             _Ty* old_ptr = NULL;
             old_ptr = this->Ptr;
@@ -124,7 +127,9 @@ namespace SPC
                 this->Deleter(old_ptr);
             }
         }
-
+        void Reset(PVOID new_ptr) noexcept {
+            Reset((_T*)new_ptr);
+        }
         _Ty* Release() noexcept {
             _Ty* old_ptr = this->Ptr;
             this->Ptr = nullptr;

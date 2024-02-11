@@ -141,7 +141,7 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     PNVME_FIRMWARE_SLOT_INFO_LOG logpage = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    logpage = new (NonPagedPool, TAG_GENBUF) NVME_FIRMWARE_SLOT_INFO_LOG;
+    logpage = MemAllocEx<NVME_FIRMWARE_SLOT_INFO_LOG>(NonPagedPool, TAG_GENBUF);
     srbext->ResetExtBuf(logpage);
     srbext->CompletionCB = Complete_FirmwareInfo;
 
@@ -153,7 +153,7 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     status = srbext->NvmeDev->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
     {
-        delete logpage;
+        MemDelete(logpage, TAG_GENBUF);
         return SRB_STATUS_INTERNAL_ERROR;
     }
     

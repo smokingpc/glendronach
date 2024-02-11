@@ -119,7 +119,6 @@ public:
     STOR_DPC                            RestartDpc;
     ULONG                               CpuCount;
     PGROUP_AFFINITY                     MsgGroupAffinity;
-    ULONG Guard;
 
     PNVME_CONTROLLER_REGISTERS          CtrlReg;
     PPORT_CONFIGURATION_INFORMATION     PortCfg;
@@ -140,10 +139,12 @@ public:
     PCI_COMMON_CONFIG                   CopiedPciCfg;
     PPCI_COMMON_CONFIG                  PciCfgPtr;
     PVOID DevExt;
+
+    ULONG Guard;
 public:
+    #if 0
     CNvmeDevice();
     ~CNvmeDevice();
-    #if 0
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     #endif
     NTSTATUS Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg);
@@ -177,7 +178,7 @@ public:
     NTSTATUS RequestAsyncEvent();
     NTSTATUS GetLogPageForAsyncEvent(UCHAR logid);
     NTSTATUS SetArbitration();
-    NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
+    NTSTATUS SetSyncHostTime();
     NTSTATUS SetPowerManagement();
     NTSTATUS SetHostBuffer();
     NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);

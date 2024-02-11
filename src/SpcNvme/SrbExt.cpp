@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#if 0
 _SPCNVME_SRBEXT::_SPCNVME_SRBEXT() 
 {
     DevExt = NULL;
@@ -26,6 +27,7 @@ _SPCNVME_SRBEXT::_SPCNVME_SRBEXT(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
     Init(devext, srb); 
 }
 _SPCNVME_SRBEXT::~_SPCNVME_SRBEXT() {}
+#endif
 void _SPCNVME_SRBEXT::Init(PVOID devext, PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
 {
     this->Init(devext, srb);
@@ -33,12 +35,25 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, PVOID nvme, STORAGE_REQUEST_BLOCK* srb)
 }
 void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
 {
-    RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
+    //RtlZeroMemory(this, sizeof(_SPCNVME_SRBEXT));
     DevExt = devext;
     NvmeDev = NULL;
+    FreePrp2List = DeleteInComplete = IsCompleted = FALSE;
+    Prp1VA = NULL;
+    Prp2VA = NULL;
+    Prp1PA.QuadPart = Prp2PA.QuadPart = 0;
+    CompletionCB = NULL;
+    ExtBuf = NULL;
+    StoragePort = 0;
+    ScsiPath = ScsiTarget = ScsiLun = 0;
+    ScsiTag = 0;
+    SubmittedQ = NULL;
+    SubTail = 0;
+    SubmitCmdPtr = NULL;
+    RtlZeroMemory(&NvmeCmd, sizeof(NvmeCmd));
+    RtlZeroMemory(&NvmeCpl, sizeof(NvmeCpl));
     Srb = srb;
     SrbStatus = SRB_STATUS_PENDING;
-    InitOK = TRUE;
     
     if(NULL != srb)
     { 
@@ -59,6 +74,7 @@ void _SPCNVME_SRBEXT::Init(PVOID devext, STORAGE_REQUEST_BLOCK* srb)
         StoragePort = INVALID_PORT_ID;
         ScsiTag = INVALID_SCSI_TAG;
     }
+    InitOK = TRUE;
 }
 void _SPCNVME_SRBEXT::CleanUp()
 {
@@ -120,8 +136,10 @@ void _SPCNVME_SRBEXT::SetTransferLength(ULONG length)
 }
 void _SPCNVME_SRBEXT::ResetExtBuf(PVOID new_buffer)
 {
+//SrbExt don't know ExtBuf's tag, just use ExFreePool()
     if(NULL != ExtBuf)
-        delete[] ExtBuf;
+        ExFreePool(ExtBuf);
+
     ExtBuf = new_buffer;
 }
 PSRBEX_DATA_PNP _SPCNVME_SRBEXT::SrbDataPnp()

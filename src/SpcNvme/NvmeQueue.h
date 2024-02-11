@@ -69,9 +69,6 @@ public:
         _In_opt_ PVOID sysarg2
     );
 
-    CNvmeQueue();
-    ~CNvmeQueue();
-
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
 
@@ -87,44 +84,44 @@ public:
     void GetCplQAddr(PHYSICAL_ADDRESS* cplq);
 
     STOR_DPC QueueCplDpc;
-    PVOID DevExt = NULL;
-    PVOID NvmeDev = NULL;
-    USHORT QueueID = NVME_INVALID_QID;  //1-based ID, 0 is reserved for AdminQ
+    PVOID DevExt;
+    PVOID NvmeDev;
+    USHORT QueueID;  //1-based ID, 0 is reserved for AdminQ
     USHORT Depth = 0;       //how many entries in both SubQ and CplQ?
-    ULONG NumaNode = MM_ANY_NODE_OK;
-    bool IsReady = false;
+    ULONG NumaNode;
+    bool IsReady;
 
-    QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
-    ULONG SubTail = INIT_DBL_VALUE;
-    ULONG SubHead = INIT_DBL_VALUE;
-    ULONG CplHead = INIT_DBL_VALUE;
-    USHORT PhaseTag = CPL_INIT_PHASETAG;
-    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
-    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
+    QUEUE_TYPE Type;
+    ULONG SubTail;
+    ULONG SubHead;
+    ULONG CplHead;
+    USHORT PhaseTag;
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl;
 
     KSPIN_LOCK SubLock;
 
-    volatile LONG InflightCmds = 0;
-    bool UseExtBuffer = false; //Is this Queue use "external allocated buffer" ?
+    volatile LONG InflightCmds;
+    bool UseExtBuffer; //Is this Queue use "external allocated buffer" ?
     //In CNvmeQueuePair, it allocates SubQ and CplQ in one large continuous block.
     //QueueBuffer is pointer of this large block.
     //Then divide into 2 blocks for SubQ and CplQ.
-    PVOID Buffer = NULL;
-    PHYSICAL_ADDRESS BufferPA = {0};
-    size_t BufferSize = 0;      //total size of entire queue buffer, BufferSize >= (SubQ_Size + CplQ_Size)
+    PVOID Buffer;
+    PHYSICAL_ADDRESS BufferPA;
+    size_t BufferSize;      //total size of entire queue buffer, BufferSize >= (SubQ_Size + CplQ_Size)
 
-    PNVME_COMMAND SubQ_VA = NULL;       //Virtual address of SubQ Buffer.
-    PHYSICAL_ADDRESS SubQ_PA = { 0 }; 
-    size_t SubQ_Size = 0;       //total length of SubQ Buffer.
+    PNVME_COMMAND SubQ_VA;       //Virtual address of SubQ Buffer.
+    PHYSICAL_ADDRESS SubQ_PA; 
+    size_t SubQ_Size;       //total length of SubQ Buffer.
 
-    PNVME_COMPLETION_ENTRY CplQ_VA = NULL;       //Virtual address of CplQ Buffer.
-    PHYSICAL_ADDRESS CplQ_PA = { 0 }; 
-    size_t CplQ_Size = 0;       //total length of CplQ Buffer.
+    PNVME_COMPLETION_ENTRY CplQ_VA;       //Virtual address of CplQ Buffer.
+    PHYSICAL_ADDRESS CplQ_PA; 
+    size_t CplQ_Size;       //total length of CplQ Buffer.
 
-    volatile USHORT InternalCid = 0;
-    PSPCNVME_SRBEXT *OriginalSrbExt = NULL;    //record the caller's SRBEXT, complete them when request done.
-    PSPCNVME_SRBEXT SpecialSrbExt = NULL;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
-    ULONG Guard=0x23939889;
+    volatile USHORT InternalCid;
+    PSPCNVME_SRBEXT *OriginalSrbExt;    //record the caller's SRBEXT, complete them when request done.
+    PSPCNVME_SRBEXT SpecialSrbExt;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
+    ULONG Guard;
 
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
@@ -145,42 +142,12 @@ public:
     {
         return cid - 1;
     }
-    inline void PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid)
-    {
-        USHORT idx = CidToSrbExtIdx(cid);
-        if(idx >= Depth)
-        {
-            SpecialSrbExt = srbext;
-        }
-        else
-        {
-            PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
-                (volatile PVOID*)&OriginalSrbExt[idx], srbext, NULL);
-
-            if (NULL != old_srbext)
-                old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
-        }
-    }
-    inline PSPCNVME_SRBEXT PopSrbExt(USHORT cid)
-    {
-        USHORT idx = CidToSrbExtIdx(cid);
-        PSPCNVME_SRBEXT srbext = NULL;
-        if (idx >= Depth)
-        {
-            srbext = SpecialSrbExt;
-            SpecialSrbExt = NULL;
-        }
-        else
-        {
-            srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
-                (volatile PVOID*)OriginalSrbExt + idx, NULL);
-
-            ASSERT(srbext != NULL);
-        }
-        return srbext;
-    }
     inline bool IsSafeForSubmit()
     {
         return ((Depth - SAFE_SUBMIT_THRESHOLD) > (USHORT)InflightCmds) ? true : false;
     }
+
+private:
+    void InitVars();
 };
+

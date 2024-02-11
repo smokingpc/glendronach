@@ -41,8 +41,20 @@
 
 
 #define CPP_TAG             (ULONG)'MPPC'       //tag == 'CPPM' in memory
+#if 0
 void* operator new (size_t size, POOL_TYPE type, ULONG tag = CPP_TAG);
 void* operator new[](size_t size, POOL_TYPE type, ULONG tag = CPP_TAG);
+#endif
+
+void* MemAlloc(POOL_TYPE type, size_t size, ULONG tag = CPP_TAG);
+void MemDelete(void* ptr, ULONG tag = CPP_TAG);
+
+template<typename T>
+T* MemAllocEx(POOL_TYPE type, ULONG tag = CPP_TAG)
+{
+    return (T*) MemAlloc(type, sizeof(T), tag);
+}
+
 
 void DebugSrbFunctionCode(ULONG code);
 void DebugScsiOpCode(UCHAR opcode);

@@ -245,8 +245,6 @@ bool CNvmeDevice::IsStop() { return (State == NVME_STATE::STOP); }
 #pragma endregion
 
 #pragma region ======== CSpcNvmeDevice ======== 
-CNvmeDevice::CNvmeDevice(){}
-CNvmeDevice::~CNvmeDevice(){}
 #if 0
 NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 {
@@ -282,6 +280,7 @@ NTSTATUS CNvmeDevice::Setup(PPORT_CONFIGURATION_INFORMATION pci)
 #endif
 NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
 {
+    Guard = 0x23939889;
     if (NVME_STATE::STOP != State && !this->RebalancingPnp)
         return STATUS_INVALID_DEVICE_STATE;
     //if(!this->RebalancingPnp)
@@ -374,7 +373,7 @@ void CNvmeDevice::Teardown()
 
     if(NULL != MsgGroupAffinity)
     {
-        delete[] MsgGroupAffinity;
+        MemDelete(MsgGroupAffinity, TAG_GENBUF);
         MsgGroupAffinity = NULL;
     }
 }
@@ -572,7 +571,10 @@ NTSTATUS CNvmeDevice::RestartController()
 NTSTATUS CNvmeDevice::IdentifyAllNamespaces()
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CAutoPtr<ULONG, NonPagedPool, TAG_DEV_POOL> idlist(new (NonPagedPool, TAG_DEV_POOL) ULONG[MAX_NS_COUNT]);
+    CAutoPtr<ULONG, NonPagedPool, TAG_DEV_POOL> 
+            idlist( MemAlloc(NonPagedPool, 
+                            (MAX_NS_COUNT * sizeof(ULONG)), 
+                            TAG_DEV_POOL));
     ULONG ret_count = 0;
     status = IdentifyActiveNamespaceIdList(NULL, idlist, ret_count);
     if(!NT_SUCCESS(status))
@@ -625,7 +627,7 @@ NTSTATUS CNvmeDevice::IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     if(NULL == srbext)
     {
-        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+        srbext_ptr.Reset(MemAllocEx<SPCNVME_SRBEXT>(NonPagedPool, TAG_SRBEXT));
         srbext_ptr->Init(this, NULL);
         my_srbext = srbext_ptr.Get();
     }
@@ -666,7 +668,8 @@ NTSTATUS CNvmeDevice::IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVM
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     if (NULL == my_srbext)
     {
-        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+//        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+        srbext_ptr.Reset(MemAllocEx<SPCNVME_SRBEXT>(NonPagedPool, TAG_SRBEXT));
         srbext_ptr->Init(this, NULL);
         my_srbext = srbext_ptr.Get();
     }
@@ -706,7 +709,8 @@ NTSTATUS CNvmeDevice::IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOI
     NTSTATUS status = STATUS_SUCCESS;
     if (NULL == my_srbext)
     {
-        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+//        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+        srbext_ptr.Reset(MemAllocEx<SPCNVME_SRBEXT>(NonPagedPool, TAG_SRBEXT));
         srbext_ptr->Init(this, NULL);
         my_srbext = srbext_ptr.Get();
     }
@@ -746,8 +750,7 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count, bool poll)
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> 
-            my_srbext(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> my_srbext(true);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     my_srbext->Init(this, NULL);
 
@@ -785,8 +788,7 @@ NTSTATUS CNvmeDevice::SetInterruptCoalescing()
     if (0 == CoalescingTime && 0 == CoalescingThreshold)
         return STATUS_SUCCESS;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT>
-            my_srbext(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> my_srbext(true);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     my_srbext->Init(this, NULL);
 
@@ -818,23 +820,22 @@ NTSTATUS CNvmeDevice::SetAsyncEvent()
 
     //Only support SMART health / critical AsyncEvent now.
     //No checking CtrlIdent.OAES fields.
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr;
-    PSPCNVME_SRBEXT my_srbext = NULL;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr(true);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    my_srbext = new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
-    srbext_ptr.Reset(my_srbext);
+//    my_srbext = new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
+    srbext_ptr.Reset(srbext_ptr);
     srbext_ptr->Init(this, NULL);
 
-    BuildCmd_SetAsyncEvent(my_srbext);
-    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    BuildCmd_SetAsyncEvent(srbext_ptr);
+    status = SubmitAdmCmd(srbext_ptr, &srbext_ptr->NvmeCmd);
 
     do
     {
         StorPortStallExecution(StallDelay);
-    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+    } while (SRB_STATUS_PENDING == srbext_ptr->SrbStatus);
 
-    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+    if (SRB_STATUS_SUCCESS == srbext_ptr->SrbStatus)
         status = STATUS_SUCCESS;
     else
         status = STATUS_UNSUCCESSFUL;
@@ -847,7 +848,7 @@ NTSTATUS CNvmeDevice::RequestAsyncEvent()
         return STATUS_INVALID_DEVICE_STATE;
 
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    PSPCNVME_SRBEXT srbext = new(NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
+    PSPCNVME_SRBEXT srbext = MemAllocEx<SPCNVME_SRBEXT>(NonPagedPool, TAG_SRBEXT);
     srbext->Init(this->DevExt, this, NULL);
     srbext->DeleteInComplete = TRUE;
     srbext->CompletionCB = HandleAsyncEvent;
@@ -860,10 +861,12 @@ NTSTATUS CNvmeDevice::RequestAsyncEvent()
 NTSTATUS CNvmeDevice::GetLogPageForAsyncEvent(UCHAR logid)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    PSPCNVME_SRBEXT srbext = new(NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
+    PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)MemAlloc(NonPagedPool,
+                                sizeof(SPCNVME_SRBEXT),
+                                TAG_SRBEXT);
     srbext->Init(this->DevExt, this, NULL);
     srbext->DeleteInComplete = TRUE;
-    srbext->ExtBuf = new (NonPagedPool, TAG_GENBUF) UCHAR[PAGE_SIZE];
+    srbext->ExtBuf = MemAlloc(NonPagedPool, PAGE_SIZE, TAG_GENBUF);
     //RtlZeroMemory(srbext->ExtBuf, PAGE_SIZE);
 
     switch(logid)
@@ -892,33 +895,29 @@ NTSTATUS CNvmeDevice::SetArbitration()
     if (!IsWorking())
         return STATUS_INVALID_DEVICE_STATE;
 
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr;
-    PSPCNVME_SRBEXT my_srbext = NULL;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr(true);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    
-    my_srbext = new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
-    my_srbext->Init(this->DevExt, this, NULL);
-    srbext_ptr.Reset(my_srbext);
+    //my_srbext = new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT();
+    srbext_ptr->Init(this->DevExt, this, NULL);
 
-    BuildCmd_SetArbitration(my_srbext);
-    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    BuildCmd_SetArbitration(srbext_ptr);
+    status = SubmitAdmCmd(srbext_ptr, &srbext_ptr->NvmeCmd);
 
     do
     {
         StorPortStallExecution(StallDelay);
-    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+    } while (SRB_STATUS_PENDING == srbext_ptr->SrbStatus);
 
-    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+    if (SRB_STATUS_SUCCESS == srbext_ptr->SrbStatus)
         status = STATUS_SUCCESS;
     else
         status = STATUS_UNSUCCESSFUL;
 
     return status;
 }
-NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
+NTSTATUS CNvmeDevice::SetSyncHostTime()
 {
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr;
-    PSPCNVME_SRBEXT my_srbext = srbext;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> srbext_ptr(true);
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
     if (!IsWorking())
@@ -930,12 +929,7 @@ NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
         return STATUS_NOT_SUPPORTED;
     }
 
-    if (NULL == srbext)
-    {
-        srbext_ptr.Reset(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
-        srbext_ptr->Init(this, NULL);
-        my_srbext = srbext_ptr.Get();
-    }
+    srbext_ptr->Init(this, NULL);
 
     //KeQuerySystemTime() get system tick(100 ns) count since 1601/1/1 00:00:00
     LARGE_INTEGER systime = { 0 };
@@ -944,15 +938,15 @@ NTSTATUS CNvmeDevice::SetSyncHostTime(PSPCNVME_SRBEXT srbext)
     RtlTimeToSecondsSince1970(&systime, &elapsed.LowPart);
     elapsed.QuadPart = elapsed.LowPart * 1000;
 
-    BuildCmd_SyncHostTime(my_srbext, elapsed);
-    status = SubmitAdmCmd(my_srbext, &my_srbext->NvmeCmd);
+    BuildCmd_SyncHostTime(srbext_ptr, elapsed);
+    status = SubmitAdmCmd(srbext_ptr, &srbext_ptr->NvmeCmd);
 
     do
     {
         StorPortStallExecution(StallDelay);
-    } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
+    } while (SRB_STATUS_PENDING == srbext_ptr->SrbStatus);
 
-    if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+    if (SRB_STATUS_SUCCESS == srbext_ptr->SrbStatus)
         status = STATUS_SUCCESS;
     else
         status = STATUS_UNSUCCESSFUL;
@@ -1024,8 +1018,8 @@ NTSTATUS CNvmeDevice::SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
     if(!IsWorking() || NULL == AdmQueue)
         return STATUS_DEVICE_NOT_READY;
 
-    if(MAXUSHORT == srbext->NvmeCmd.CDW0.CID)
-        srbext->NvmeCmd.CDW0.CID = AdmQueue->GetNextCid();
+    if(MAXUSHORT == cmd->CDW0.CID)
+        cmd->CDW0.CID = AdmQueue->GetNextCid();
     return AdmQueue->SubmitCmd(srbext, cmd);
 }
 NTSTATUS CNvmeDevice::SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd)
@@ -1117,7 +1111,7 @@ void CNvmeDevice::SaveAsyncEventLogPage(PVOID page)
     PVOID temp = AsyncEventLogPage[CurrentLogPage];
     AsyncEventLogPage[CurrentLogPage] = page;
     if(NULL != temp)
-        delete[] temp;
+        MemDelete(temp, TAG_GENBUF);
 }
 bool CNvmeDevice::IsFitValidIoRange(ULONG nsid, ULONG64 offset, ULONG len)
 {
@@ -1152,8 +1146,7 @@ bool CNvmeDevice::IsLunExist(UCHAR lun)
 NTSTATUS CNvmeDevice::RegisterIoQueues(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> 
-            temp(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> temp(true);
 
     if (!IsWorking())
     { 
@@ -1223,8 +1216,7 @@ END:
 NTSTATUS CNvmeDevice::UnregisterIoQueues(PSPCNVME_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> 
-            temp(new (NonPagedPool, TAG_SRBEXT) SPCNVME_SRBEXT());
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> temp(true);
     if (!IsWorking())
     {
         status = STATUS_INVALID_DEVICE_STATE;
@@ -1312,7 +1304,8 @@ NTSTATUS CNvmeDevice::CreateAdmQ()
     //AdmQ histroy depth should reserve one more element for AsyncEvent.
     cfg.HistoryDepth = 1 + MAX_IO_PER_LU;
     GetAdmQueueDbl(cfg.SubDbl , cfg.CplDbl);
-    AdmQueue = new(NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue();
+    AdmQueue = MemAllocEx<CNvmeQueue>(NonPagedPool, TAG_NVME_QUEUE);
+    //new(NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue();
     AdmQueue->Setup(&cfg);
     if(!AdmQueue->IsInitOK())
         return STATUS_MEMORY_NOT_ALLOCATED;
@@ -1366,7 +1359,7 @@ NTSTATUS CNvmeDevice::DeleteAdmQ()
         return STATUS_MEMORY_NOT_ALLOCATED;
 
     AdmQueue->Teardown();
-    delete AdmQueue;
+    MemDelete(AdmQueue, TAG_NVME_QUEUE);
     AdmQueue = NULL;
     return STATUS_SUCCESS;
 }
@@ -1495,7 +1488,6 @@ bool CNvmeDevice::WaitForCtrlerShst(ULONG time_us)
 }
 void CNvmeDevice::InitVars()
 {
-    Guard = 0x87327864;
 //DeviceExtension is created by storport and ZEROED.
 //It WILL NOT call constructor of class or struct.
 //Should re-init variables again.
@@ -1533,9 +1525,8 @@ void CNvmeDevice::InitVars()
     //e.g. AMD EPYC 9654.
     //So MsgGroupAffinity should be allocated by CpuCount.
     CpuCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
-    MsgGroupAffinity = (PGROUP_AFFINITY) 
-                new(NonPagedPool, TAG_GROUP_AFFINITY) GROUP_AFFINITY[CpuCount];
-    RtlZeroMemory(MsgGroupAffinity, sizeof(GROUP_AFFINITY) * CpuCount);
+    ULONG size = CpuCount * sizeof(GROUP_AFFINITY);
+    MsgGroupAffinity = (PGROUP_AFFINITY) MemAlloc(NonPagedPool, size, TAG_GENBUF);
 
     CtrlReg = NULL;
     PortCfg = NULL;
@@ -1625,11 +1616,11 @@ NTSTATUS CNvmeDevice::CreateIoQ()
         //Dbl[0] is for AdminQ
         cfg.QID = i + 1;
         this->GetQueueDbl(cfg.QID, cfg.SubDbl, cfg.CplDbl);
-        CNvmeQueue* queue = new(NonPagedPool, TAG_NVME_QUEUE) CNvmeQueue();
+        CNvmeQueue* queue = MemAllocEx<CNvmeQueue>(NonPagedPool, TAG_NVME_QUEUE);
         status = queue->Setup(&cfg);
         if(!NT_SUCCESS(status))
         {
-            delete queue;
+            MemDelete(queue, TAG_NVME_QUEUE);
             return status;
         }
         IoQueue[i] = queue;
@@ -1646,7 +1637,7 @@ NTSTATUS CNvmeDevice::DeleteIoQ()
             continue;
 
         queue->Teardown();
-        delete queue;
+        MemDelete(queue, TAG_NVME_QUEUE);
         AllocatedIoQ--;
     }
 
