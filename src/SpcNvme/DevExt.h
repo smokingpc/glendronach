@@ -13,13 +13,7 @@ public:
     UCHAR PrimaryBus;
     UCHAR MyBus;
     UCHAR MyBusIdx;       //MyBusIndex = MyBus - ParentBus. It represents bus offset in PciConfigSpace.
-    PUCHAR Bar0SpaceForAllDevs;
-
-    //for bridge memory windows setup.
-    //np stands for "NonPrefetchable"
-    //pf stands for "Prefetchable"
-    PHYSICAL_ADDRESS NpMemBase;
-    PHYSICAL_ADDRESS NpMemLimit;
+    PUCHAR Bar0SpaceForDevAndBridge;
 
     CVrocBus();
     ~CVrocBus();
@@ -28,12 +22,12 @@ public:
                 PUCHAR bus_space, PUCHAR dev_bar0_space);
     void Teardown();
     void AddDevice(class CVrocDevice* dev);
-    void UpdateBridgeMemoryWindow(PHYSICAL_ADDRESS window_start, PHYSICAL_ADDRESS window_end);
+    void UpdateBridgeInfo(UINT64 msi_addr);
     void RemoveAllDevices();
 
     inline PUCHAR GetBar0SpaceForDevice(UCHAR dev_idx)
     {
-        return (Bar0SpaceForAllDevs + (VROC_NVME_BAR0_SIZE * dev_idx));
+        return (Bar0SpaceForDevAndBridge + (VROC_NVME_BAR0_SIZE * dev_idx));
     }
 };
 
@@ -68,7 +62,7 @@ typedef struct _VROC_RAID_VIRTUAL_BUS_CAP {
 
 typedef struct _VROC_DEVEXT {
 
-    PCI_COMMON_CONFIG PciCfg;       //pci config space of RaidController
+    PCI_COMMON_CONFIG CopiedPciCfg;       //pci config space of RaidController
     PPORT_CONFIGURATION_INFORMATION PortCfg;
     ACCESS_RANGE AccessRanges[ACCESS_RANGE_COUNT];
 
@@ -81,18 +75,18 @@ typedef struct _VROC_DEVEXT {
     PHYSICAL_ADDRESS RaidPcieCfgSpacePA;
     ULONG RaidPcieCfgSpaceSize;
 
-    //RaidNvmeCfgSpace is collection of all VROC NVMe device's 
-    //BAR0 (Controller Register region).
+    //BusBar0Space is collection of all VROC NVMe device's 
+    //BAR0 (Controller Register region) and Bridge's BAR0.
     //RaidController should calc and write back to VROC NVMe device's
     //BAR0 and update bridge's MemBase/MemLimit. Then you can see content of 
     //NVMe device's ControllerRegister region.
-    PUCHAR RaidNvmeCfgSpace;    //BAR1 of RaidController
-    PHYSICAL_ADDRESS RaidNvmeCfgSpacePA;
-    ULONG RaidNvmeCfgSpaceSize;
+    PUCHAR BusBar0Space;    //BAR1 of RaidController
+    PHYSICAL_ADDRESS BusBar0SpacePA;
+    ULONG BusBar0SpaceSize;
 
-    PUCHAR RaidMsixCfgSpace;    //BAR2 of RaidController
-    PHYSICAL_ADDRESS RaidMsixCfgSpacePA;
-    ULONG RaidMsixCfgSpaceSize;
+    PUCHAR RaidMsixTable;    //BAR2 of RaidController
+    PHYSICAL_ADDRESS RaidMsixTablePA;
+    ULONG RaidMsixTableSize;
 
     //Each NVMe device are located BEHIND a pci bridge.
     //The bridge memory(resource) window should be setup correctly.
@@ -124,8 +118,9 @@ typedef struct _VROC_DEVEXT {
     void UpdateVrocNvmeDevInfo();
     inline PUCHAR GetNvmeBar0SpaceForBus(UCHAR bus_idx)
     {
-    //Each Block only 512K....not 1MB
-        return (RaidNvmeCfgSpace + (VROC_NVME_BAR0_SIZE* VROC_DEV_PER_BUS * bus_idx));
+    //Each Block has 2MB, 1st 1MB is for devices, 2nd 1MB is for bridge.
+        return (BusBar0Space + (bus_idx * VROC_BUS_BAR0_REGION_SIZE));
+        //(VROC_NVME_BAR0_SIZE* VROC_DEV_PER_BUS * bus_idx));
     }
     inline CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {

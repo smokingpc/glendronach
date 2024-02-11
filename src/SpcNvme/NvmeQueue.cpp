@@ -82,7 +82,6 @@ static __inline void SetCidForAsyncEvent(CNvmeQueue *queue, PNVME_COMMAND cmd)
     }
 }
 
-#pragma region ======== class CNvmeQueue ========
 VOID CNvmeQueue::QueueCplDpcRoutine(
     _In_ PSTOR_DPC dpc,
     _In_ PVOID devext,
@@ -374,8 +373,9 @@ void CNvmeQueue::DeallocQueueBuffer()
 }
 bool CNvmeQueue::AllocSrbExtBuffer()
 {
+    DbgBreakPoint();
     OriginalSrbExt = (PSPCNVME_SRBEXT*) 
-            new(NonPagedPool, TAG_SRB_HISTORY) PSPCNVME_SRBEXT[Depth];
+            new(NonPagedPool, TAG_SRB_HISTORY) UCHAR[sizeof(PSPCNVME_SRBEXT) * Depth];
     if(NULL == OriginalSrbExt)
         return false;
 
@@ -390,4 +390,3 @@ void CNvmeQueue::DeallocSrbExtBuffer()
         OriginalSrbExt = NULL;
     }
 }
-#pragma endregion

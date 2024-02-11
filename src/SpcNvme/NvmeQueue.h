@@ -124,6 +124,7 @@ public:
     volatile USHORT InternalCid = 0;
     PSPCNVME_SRBEXT *OriginalSrbExt = NULL;    //record the caller's SRBEXT, complete them when request done.
     PSPCNVME_SRBEXT SpecialSrbExt = NULL;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
+    ULONG Guard=0x23939889;
 
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
@@ -154,7 +155,7 @@ public:
         else
         {
             PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
-                (volatile PVOID*)OriginalSrbExt + idx, srbext, NULL);
+                (volatile PVOID*)&OriginalSrbExt[idx], srbext, NULL);
 
             if (NULL != old_srbext)
                 old_srbext->CompleteSrb(SRB_STATUS_ABORTED);

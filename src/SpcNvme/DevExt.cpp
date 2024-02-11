@@ -7,14 +7,19 @@ BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid)
     CNvmeDevice* nvme = NULL;
     CNvmeQueue* queue = NULL;
     DbgBreakPoint();
-    for (ULONG i = 0; i < MAX_CHILD_VROC_DEV; i++)
+
+    for (ULONG i = 0; i < devext->NvmeDevCount; i++)
     {
         nvme = devext->NvmeDev[i];
         if (NULL == nvme)
             continue;
-
-        queue = (msgid == 0) ? nvme->AdmQueue : nvme->IoQueue[msgid - 1];
-        ok = StorPortIssueDpc(devext, &queue->QueueCplDpc, NULL, NULL);
+        if(0 == msgid)
+            DbgBreakPoint();
+        else
+        {
+            queue = ((msgid-1) == 0) ? nvme->AdmQueue : nvme->IoQueue[msgid - 1 - 1];
+            ok = StorPortIssueDpc(devext, &queue->QueueCplDpc, NULL, NULL);
+        }
     }
 
     return TRUE;
@@ -115,7 +120,7 @@ void CVrocBus::Setup(
     PrimaryBus = primary_bus;
     MyBusIdx = bus_idx;
     MyBus = bus_idx + primary_bus;
-    Bar0SpaceForAllDevs = dev_bar0_space;
+    Bar0SpaceForDevAndBridge = dev_bar0_space;
 }
 void CVrocBus::Teardown()
 {
@@ -136,21 +141,47 @@ void CVrocBus::RemoveAllDevices()
         delete dev;
     }
 }
-void CVrocBus::UpdateBridgeMemoryWindow(PHYSICAL_ADDRESS window_start, PHYSICAL_ADDRESS window_end)
+void CVrocBus::UpdateBridgeInfo(UINT64 msi_addr)
 {
 //todo : update prefetch mem range and i/o range....
     //NonPrefetchable MemBase
-    NpMemBase = window_start;
-    NpMemLimit = window_end;
-    UINT16 base = (UINT16)((window_start.LowPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
-    UINT16 limit = (UINT16)((window_end.LowPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
+    PHYSICAL_ADDRESS addr = { 0 };
+    PPCI_MSI_CAP msi = NULL;
+    PPCI_MSIX_CAP msix = NULL;
+    //Each bus has 2 MB region in Bar0SpaceForDevAndBridge.
+    //It should be split into 2 parts:
+    //  1st 1MB is used for all child NVMe devices.
+    //  2nd 1MB is used for Bridge's BAR0.
+    addr = MmGetPhysicalAddress(this->Bar0SpaceForDevAndBridge);
+
+    //np stands for "NonPrefetchable"
+    //pf stands for "Prefetchable"
+    UINT16 base = (UINT16)((addr.LowPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
+    UINT16 limit = (UINT16)((addr.LowPart >> 16) & 0xFFF0ULL); //low 4 bits are readonly, ignore them. 
     
     this->BridgeCfg->u.type1.MemoryBase = base;
     this->BridgeCfg->u.type1.MemoryLimit = limit;
-    this->BridgeCfg->u.type1.PrefetchBase = base;
-    this->BridgeCfg->u.type1.PrefetchLimit = limit;
-    this->BridgeCfg->u.type1.PrefetchBaseUpper32 = window_start.HighPart;
-    this->BridgeCfg->u.type1.PrefetchLimitUpper32 = window_end.HighPart;
+    //this->BridgeCfg->u.type1.PrefetchBase = base;
+    //this->BridgeCfg->u.type1.PrefetchLimit = limit;
+    //this->BridgeCfg->u.type1.PrefetchBaseUpper32 = window_start.HighPart;
+    //this->BridgeCfg->u.type1.PrefetchLimitUpper32 = window_end.HighPart;
+
+    addr = MmGetPhysicalAddress(this->Bar0SpaceForDevAndBridge + MB_SIZE);
+    this->BridgeCfg->u.type1.BaseAddresses[0] = 
+                        (UINT32) (addr.QuadPart & 0xFFFFFFFFULL);
+    this->BridgeCfg->u.type1.BaseAddresses[1] = 
+                        (UINT32) (addr.QuadPart >> 32);
+
+    ParseMsiCaps(BridgeCfg, msi, msix);
+    //enable MSI of bridge to make NVMe device's MSIX can passthru.
+    if(NULL != msi)
+    {
+        PHYSICAL_ADDRESS temp;
+        temp.QuadPart = msi_addr;
+        msi->MA_LOW = temp.LowPart;
+        msi->MA_UP = temp.HighPart;
+        msi->MC.MSIE = TRUE;
+    }
 }
 #pragma endregion
 #pragma region ======== CVrocDevice ========
@@ -209,12 +240,12 @@ NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 }
 NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
 {
-    ULONG size = sizeof(PciCfg);
+    ULONG size = sizeof(CopiedPciCfg);
     ULONG status = StorPortGetBusData(this, 
                         PortCfg->AdapterInterfaceType, 
                         PortCfg->SystemIoBusNumber, 
                         PortCfg->SlotNumber, 
-                        &PciCfg, size);
+                        &CopiedPciCfg, size);
 
     if(2 == status || status != size)
         return STATUS_UNSUCCESSFUL;
@@ -223,7 +254,7 @@ NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
     //It is first CAP in PCI_COMMON_HEADER::DeviceSpecific.
     //All regular CAPs will be after this CAP.
     PVROC_RAID_VIRTUAL_BUS_CAP cap = 
-            (PVROC_RAID_VIRTUAL_BUS_CAP)PciCfg.DeviceSpecific;
+            (PVROC_RAID_VIRTUAL_BUS_CAP)CopiedPciCfg.DeviceSpecific;
     if(cap->UseMask)
     {
         switch(cap->BusMask)
@@ -242,7 +273,7 @@ NTSTATUS _VROC_DEVEXT::GetRaidCtrlPciCfg()
         }
     }
 
-    MsixCount = GetMsixTableSize(&PciCfg);
+    MsixCount = GetMsixTableSize(&CopiedPciCfg);
     return STATUS_SUCCESS;
 }
 void _VROC_DEVEXT::EnableNvmeDevMsix()
@@ -255,38 +286,6 @@ void _VROC_DEVEXT::EnableNvmeDevMsix()
         nvme->EnableMsix();
     }
 }
-#if 0
-void _VROC_DEVEXT::EnableNvmeDevMsixTable()
-{
-    PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)this->RaidMsixCfgSpace;
-    for (ULONG i=0; i< MAX_CHILD_VROC_DEV; i++)
-    {
-        CNvmeDevice * nvme = NvmeDev[i];
-        if(NULL == nvme)
-            continue;
-
-        //find the MSIX table begin addr of NVMe device 
-        PMSIX_TABLE_ENTRY msix = (PMSIX_TABLE_ENTRY)
-                        (((PUCHAR)nvme->CtrlReg) + 0x2000);
-        if(0 != msix->GetApicBaseAddr() || TRUE != msix->VectorCtrl.Mask)
-        {
-            msix = (PMSIX_TABLE_ENTRY) (((PUCHAR)nvme->CtrlReg) + 0x3000);
-        }
-
-        for(ULONG msgid=0; msgid < nvme->MsixCount; msgid++)
-        {
-            if(msgid < (nvme->DesiredIoQ+1))
-            {
-                //only set MsgAddr for AdmQ and IoQ
-                msix[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
-                msix[msgid].MsgAddr.DestinationID = msgid + 1;
-            }
-            msix[msgid].VectorCtrl.Mask = FALSE;
-        }
-        nvme->EnableMsix();
-    }
-}
-#endif
 void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
 {
     AccessRangeCount = min(ACCESS_RANGE_COUNT, count);
@@ -318,9 +317,9 @@ void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
         range->RangeLength, in_iospace);
     if (NULL != addr)
     {
-        RaidNvmeCfgSpace = addr;
-        RaidNvmeCfgSpaceSize = range->RangeLength;
-        RaidNvmeCfgSpacePA = range->RangeStart;
+        BusBar0Space = addr;
+        BusBar0SpaceSize = range->RangeLength;
+        BusBar0SpacePA = range->RangeStart;
     }
 
     range = &AccessRanges[2];
@@ -331,9 +330,9 @@ void _VROC_DEVEXT::MapRaidCtrlBar0(ACCESS_RANGE* ranges, ULONG count)
         range->RangeLength, in_iospace);
     if (NULL != addr)
     {
-        RaidMsixCfgSpace = addr;
-        RaidMsixCfgSpaceSize = range->RangeLength;
-        RaidMsixCfgSpacePA = range->RangeStart;
+        RaidMsixTable = addr;
+        RaidMsixTableSize = range->RangeLength;
+        RaidMsixTablePA = range->RangeStart;
     }
 }
 void _VROC_DEVEXT::EnumVrocBuses()
@@ -370,10 +369,13 @@ void _VROC_DEVEXT::EnumVrocBuses()
         //Bridge Memory Window SHOULD BE SET BETORE Bar0 been set for All Device on this bus.
         //The Bridge Memory Windows is 1MB at least. Bar0 of 32 NVMe devices are 512K.
         //It's smaller than 1MB, just set start and end addr to same value.
-        PHYSICAL_ADDRESS addr = { 0 };
-        addr = MmGetPhysicalAddress(bus->Bar0SpaceForAllDevs);
-        bus->UpdateBridgeMemoryWindow(addr, addr);
 
+        //tricky way:
+        // using 1st entry of RaidController's MSIX to get MsgAddr fields.
+        MSIX_TABLE_ENTRY entry = {0};
+        entry.MsgAddr.AsULONG64 = ((PMSIX_TABLE_ENTRY)this->RaidMsixTable)->MsgAddr.AsULONG64;
+        entry.MsgAddr.DestinationID = 0;
+        bus->UpdateBridgeInfo(entry.MsgAddr.AsULONG64);
         EnumVrocDevsOnBus(bus);
         InsertTailList(&BusListHead, &bus->List);
     }
@@ -399,6 +401,9 @@ void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
 }
 void _VROC_DEVEXT::Teardown()
 {
+    RtlZeroMemory(NvmeDev, sizeof(NvmeDev));
+    NvmeDevCount = 0;
+
     while(!IsListEmpty(&BusListHead))
     {
         PLIST_ENTRY entry = RemoveHeadList(&BusListHead);
@@ -440,16 +445,11 @@ NTSTATUS _VROC_DEVEXT::InitAllVrocNvme()
 
         status = ptr->InitController();
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
+
         status = ptr->IdentifyController(NULL, &ptr->CtrlIdent, true);
         if (!NT_SUCCESS(status))
-        {
-            DbgBreakPoint();
             return status;
-        }
     }
 
     return STATUS_SUCCESS;
@@ -466,7 +466,6 @@ NTSTATUS _VROC_DEVEXT::PassiveInitAllVrocNvme()
         if (NULL == nvme)
             continue;
 
-        nvme->EnableMsix();
         status = nvme->InitNvmeStage1();
         if (!NT_SUCCESS(status))
             return status;

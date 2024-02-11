@@ -137,7 +137,8 @@ public:
 
     //Following are huge data.
     //for more convenient windbg debugging, I put them on tail of class data.
-    PCI_COMMON_CONFIG                   PciCfg;
+    PCI_COMMON_CONFIG                   CopiedPciCfg;
+    PPCI_COMMON_CONFIG                  PciCfgPtr;
     PVOID DevExt;
 public:
     CNvmeDevice();

@@ -141,7 +141,6 @@ _Use_decl_annotations_ BOOLEAN HwInitialize(PVOID hbaext)
     if (STOR_STATUS_SUCCESS != stor_status)
         return FALSE;
 
-    devext->EnableNvmeDevMsix();
     StorPortEnablePassiveInitialization(hbaext, HwPassiveInitialize);
     return TRUE;
 }
@@ -446,16 +445,4 @@ void HwCompleteServiceIrp(PVOID hbaext)
     UNREFERENCED_PARAMETER(hbaext);
     //if any async request in HwProcessServiceRequest, 
     //we should complete them here and let them go back asap.
-}
-
-//BOOLEAN
-//HW_INTERRUPT(
-//    _In_ PVOID DeviceExtension
-//);
-
-_Use_decl_annotations_
-BOOLEAN HwIrqHandler(_In_ PVOID hbaext)
-{
-    UNREFERENCED_PARAMETER(hbaext);
-    return TRUE;
 }

@@ -40,9 +40,8 @@
 // ================================================================
 
 
-#pragma push(1)
 #pragma warning(disable:4201)   // nameless struct/union
-
+#pragma push(1)
 //MSIX Table data example: (only allocated 3 MSIX interrupt)
 //0: kd > dd 0xffffe501eaaea000
 //ffffe501`eaaea000  fee0400c 00000000 000049b3 00000000
@@ -109,22 +108,21 @@ typedef struct _PCI_MSI_CAP
         UINT16 RESERVED : 7;
     }MC;            //Message Signaled Interrupt Message Control
 
-    union
-    {
-        struct
-        {
-            struct {
-                UINT32 RESERVED : 2;
-                UINT32 ADDR : 30;       //Low 30 bits of system specificed message address. always DWORD aligned.
-            }MLA;            //Message Signaled Interrupt Message Address
-            UINT32 MUA;      //Message Signaled Interrupt Upper Address
-        };
-        UINT64 MA;      //Message Signaled Interrupt Address(64 bits)
-    };
-
-    UINT32 MD;            //Message Signaled Interrupt Message Data
-    UINT32 MMASK;         //Message Signaled Interrupt Mask Bits (Optional). each bit can mask associated message.(by id)
-    UINT32 MPEND;         //Message Signaled Interrupt Pending Bits (Optional) each bit indicates has pending msg(by id)
+    //union
+    //{
+    //    struct
+    //    {
+    //        UINT32 RESERVED : 2;
+    //        UINT32 Lower : 30;       //Low 30 bits of system specificed message address. always DWORD aligned.
+    //        UINT32 Upper;      //Message Signaled Interrupt Upper Address
+    //    };
+    //    UINT64 AsUINT64;      //Message Signaled Interrupt Address(64 bits)
+    //}MsgAddr;
+    UINT32 MA_LOW;       //30 bits of system specificed message address. always DWORD aligned.
+    UINT32 MA_UP;       //Message Signaled Interrupt Upper Address
+    UINT32 MD;          //Message Signaled Interrupt Message Data
+    UINT32 MMASK;       //Message Signaled Interrupt Mask Bits (Optional). each bit can mask associated message.(by id)
+    UINT32 MPEND;       //Message Signaled Interrupt Pending Bits (Optional) each bit indicates has pending msg(by id)
 }PCI_MSI_CAP, * PPCI_MSI_CAP;
 
 typedef struct _PCI_MSIX_CAP {

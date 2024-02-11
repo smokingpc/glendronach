@@ -291,9 +291,10 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
     InitVars();
     DevExt = devext;
     InitDpcs();
-    RtlCopyMemory(&PciCfg, pcidata, sizeof(PciCfg));
-    VendorID = PciCfg.VendorID;
-    DeviceID = PciCfg.DeviceID;
+    RtlCopyMemory(&CopiedPciCfg, pcidata, sizeof(CopiedPciCfg));
+    PciCfgPtr = (PPCI_COMMON_CONFIG)pcidata;
+    VendorID = PciCfgPtr->VendorID;
+    DeviceID = PciCfgPtr->DeviceID;
 
     CtrlReg = (PNVME_CONTROLLER_REGISTERS) ctrlreg;
     Bar0Size = 4 * PAGE_SIZE;
@@ -306,25 +307,27 @@ NTSTATUS CNvmeDevice::Setup(PVOID devext, PVOID pcidata, PVOID ctrlreg)
         return status;
 
     State = NVME_STATE::RUNNING;
-    DesiredIoQ = MAX_IO_QUEUE_COUNT;
     return STATUS_SUCCESS;
 }
 void CNvmeDevice::EnableMsix()
 {
     PPCI_MSI_CAP msi = NULL;
     PPCI_MSIX_CAP msix = NULL;
-    ParseMsiCaps(&PciCfg, msi, msix);
-
-    DbgBreakPoint();
+    ParseMsiCaps(PciCfgPtr, msi, msix);
     if (NULL != msix)
         msix->MXC.MXE = TRUE;
+
+    //set pci cfg Command to "Disable Interrupt(traditional IRQ) to make MSI work.
+    USHORT cmd = PciCfgPtr->Command;
+    cmd |= 0x0400;
+    PciCfgPtr->Command = cmd;
 }
 void CNvmeDevice::DisableMsix()
 {
     PPCI_MSI_CAP msi = NULL;
     PPCI_MSIX_CAP msix = NULL;
 
-    ParseMsiCaps(&PciCfg, msi, msix);
+    ParseMsiCaps(PciCfgPtr, msi, msix);
 
     if (NULL != msix)
         msix->MXC.MXE = FALSE;
@@ -333,11 +336,11 @@ void CNvmeDevice::UpdateMsixTable()
 {
     PPCI_MSI_CAP msi = NULL;
     PPCI_MSIX_CAP msix = NULL;
-    ParseMsiCaps(&PciCfg, msi, msix);
-    MsixCount = GetMsixTableSize(&PciCfg);
+    ParseMsiCaps(PciCfgPtr, msi, msix);
+    MsixCount = GetMsixTableSize(&CopiedPciCfg);
 
     PVROC_DEVEXT raid = (PVROC_DEVEXT)this->DevExt;
-    PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)raid->RaidMsixCfgSpace;
+    PMSIX_TABLE_ENTRY src = (PMSIX_TABLE_ENTRY)raid->RaidMsixTable;
     PMSIX_TABLE_ENTRY entry = (PMSIX_TABLE_ENTRY)
         (((PUCHAR)CtrlReg) + (msix->MTAB.TO << 3));
 
@@ -348,9 +351,10 @@ void CNvmeDevice::UpdateMsixTable()
         if(msgid < raid->MsixCount)
         {
             entry[msgid].MsgAddr.BaseAddr = src->MsgAddr.BaseAddr;
-            entry[msgid].MsgAddr.DestinationID = msgid + 1;
-            entry[msgid].VectorCtrl.Mask = FALSE;
+            //DestinationID will be MsgID when interrupt fired.
+            entry[msgid].MsgAddr.DestinationID = msgid+1;
         }
+        entry[msgid].VectorCtrl.Mask = FALSE;
     }
 }
 void CNvmeDevice::Teardown()
@@ -494,7 +498,9 @@ NTSTATUS CNvmeDevice::InitController()
     if (!NT_SUCCESS(status))
         return status;
 
+    //setup MSIX during controller disabled.
     UpdateMsixTable();
+    EnableMsix();
 
     status = EnableController();
     return status;
@@ -502,7 +508,6 @@ NTSTATUS CNvmeDevice::InitController()
 NTSTATUS CNvmeDevice::InitNvmeStage1()
 {
     NTSTATUS status = STATUS_SUCCESS;
-    DbgBreakPoint();
 
     //Todo: supports multiple controller of NVMe v2.0  
     status = IdentifyController(NULL, &this->CtrlIdent);
@@ -763,7 +768,8 @@ NTSTATUS CNvmeDevice::SetNumberOfIoQueue(USHORT count, bool poll)
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
     {
         status = STATUS_SUCCESS;
-        DesiredIoQ = (MAXUSHORT & (my_srbext->NvmeCpl.DW0 + 1));
+        DesiredIoQ = 
+            min(DesiredIoQ, (MAXUSHORT & (my_srbext->NvmeCpl.DW0 + 1)));
     }
     else
         status = STATUS_UNSUCCESSFUL;
@@ -1390,8 +1396,8 @@ bool CNvmeDevice::MapCtrlRegisters()
     STOR_PHYSICAL_ADDRESS bar0 = { 0 };
     INTERFACE_TYPE type = PortCfg->AdapterInterfaceType;
     //I got this mapping method by cracking stornvme.sys.
-    bar0.LowPart = (PciCfg.u.type0.BaseAddresses[0] & BAR0_LOWPART_MASK);
-    bar0.HighPart = PciCfg.u.type0.BaseAddresses[1];
+    bar0.LowPart = (PciCfgPtr->u.type0.BaseAddresses[0] & BAR0_LOWPART_MASK);
+    bar0.HighPart = PciCfgPtr->u.type0.BaseAddresses[1];
 
     for (ULONG i = 0; i < AccessRangeCount; i++)
     {
@@ -1417,15 +1423,15 @@ bool CNvmeDevice::MapCtrlRegisters()
 }
 bool CNvmeDevice::GetPciBusData(INTERFACE_TYPE type, ULONG bus, ULONG slot)
 {
-    ULONG size = sizeof(PciCfg);
-    ULONG status = StorPortGetBusData(DevExt, type, bus, slot, &PciCfg, size);
+    ULONG size = sizeof(CopiedPciCfg);
+    ULONG status = StorPortGetBusData(DevExt, type, bus, slot, &CopiedPciCfg, size);
 
     //refer to MSDN StorPortGetBusData() to check why 2==status is error.
     if (2 == status || status != size)
         return false;
 
-    VendorID = PciCfg.VendorID;
-    DeviceID = PciCfg.DeviceID;
+    VendorID = CopiedPciCfg.VendorID;
+    DeviceID = CopiedPciCfg.DeviceID;
     return true;
 }
 bool CNvmeDevice::WaitForCtrlerState(ULONG time_us, BOOLEAN csts_rdy)
@@ -1535,7 +1541,7 @@ void CNvmeDevice::InitVars()
     PortCfg = NULL;
     Doorbells = NULL;
     AdmQueue = NULL;
-    RtlZeroMemory(IoQueue, sizeof(IoQueue));
+    RtlZeroMemory(IoQueue, sizeof(CNvmeQueue*) * MAX_IO_QUEUE_COUNT);
     UncachedExt = NULL;
 
     RtlZeroMemory(AsyncEventLog, sizeof(AsyncEventLog));
@@ -1543,7 +1549,7 @@ void CNvmeDevice::InitVars()
     RtlZeroMemory(AsyncEventLogPage, sizeof(AsyncEventLogPage));
     CurrentLogPage = MAXULONG;
 
-    RtlZeroMemory(&PciCfg, sizeof(PciCfg));
+    RtlZeroMemory(&CopiedPciCfg, sizeof(CopiedPciCfg));
 }
 void CNvmeDevice::InitDpcs()
 {
