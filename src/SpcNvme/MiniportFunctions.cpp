@@ -186,6 +186,16 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
         //should handle PNP remove adapter
         srb_status = BuildIo_SrbPnpHandler(srbext);
         break;
+
+//SpcNvme has no volatile cache in HBA, so skip them...
+    case SRB_FUNCTION_FLUSH:
+    case SRB_FUNCTION_SHUTDOWN:
+        srb_status = SRB_STATUS_SUCCESS;
+        break;
+    case SRB_FUNCTION_FLUSH_QUEUE:
+        srb_status = SRB_STATUS_REQUEST_FLUSHED;
+        break;
+
 	default:
         srb_status = BuildIo_DefaultHandler(srbext);
         break;

@@ -92,3 +92,16 @@ END:
     srbext->SetTransferLength(ret_size);
     return srb_status;
 }
+
+UCHAR Scsi_SynchronizeCache16(PSPCNVME_SRBEXT srbext)
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    ULONG nsid = LunToNsId(srbext->ScsiLun);
+    if (FALSE == srbext->DevExt->CtrlIdent.VWC.Present)
+        return SRB_STATUS_SUCCESS;
+
+    BuildCmd_Flush(srbext, nsid);
+    status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
+
+    return NtStatusToSrbStatus(status);
+}

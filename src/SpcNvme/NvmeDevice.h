@@ -167,6 +167,7 @@ public:
     NTSTATUS RequestAsyncEvent();
     NTSTATUS GetLogPageForAsyncEvent(UCHAR logid);
     NTSTATUS SetArbitration();
+    NTSTATUS SetVolatileWriteCache();
     NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
     NTSTATUS SetPowerManagement();
     NTSTATUS SetHostBuffer();

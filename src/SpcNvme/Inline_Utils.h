@@ -82,3 +82,13 @@ FORCEINLINE void CalcMaxTxSize(
     max_tx_size = (ULONG)((1ul << mdts) * min_page_size);
     max_tx_pages = max_tx_size / PAGE_SIZE;
 }
+
+FORCEINLINE UCHAR NtStatusToSrbStatus(NTSTATUS status)
+{
+    if (NT_SUCCESS(status))
+        return SRB_STATUS_PENDING;
+    else if (STATUS_DEVICE_BUSY == status)
+        return SRB_STATUS_BUSY;
+
+    return SRB_STATUS_ERROR;
+}

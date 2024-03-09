@@ -12,7 +12,6 @@ UCHAR Scsi_ReadWrite(
     bool is_write)
 {
     //the SCSI I/O are based for BLOCKs of device, not bytes....
-    UCHAR srb_status = SRB_STATUS_PENDING;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
 
@@ -22,18 +21,7 @@ UCHAR Scsi_ReadWrite(
     BuiildCmd_ReadWrite(srbext, offset, len, is_write);
     //srbext->CompletionCB = NULL;
     status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
-    if (!NT_SUCCESS(status))
-    {
-        if(STATUS_DEVICE_BUSY == status)
-            srb_status = SRB_STATUS_BUSY;
-        else
-            srb_status = SRB_STATUS_ERROR;
-    
-    }
-    else
-        srb_status = SRB_STATUS_PENDING;
-
-    return srb_status;
+    return NtStatusToSrbStatus(status);
 }
 
 bool ParseReadWriteOffsetAndLen(CDB& cdb, ULONG64& offset, ULONG& len)

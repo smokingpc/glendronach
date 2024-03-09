@@ -46,3 +46,4 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_ModeSelect10(PSPCNVME_SRBEXT srbext);
 UCHAR Scsi_ModeSense10(PSPCNVME_SRBEXT srbext);
+UCHAR Scsi_SynchronizeCache10(PSPCNVME_SRBEXT srbext);

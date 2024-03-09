@@ -65,3 +65,5 @@ void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb);
 void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext);
 void BuildCmd_GetLogPage(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
 void BuildCmd_GetLogPageV13(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
+void BuildCmd_SetVolatileWriteCache(PSPCNVME_SRBEXT srbext);
+void BuildCmd_Flush(PSPCNVME_SRBEXT srbext, ULONG nsid);

@@ -235,7 +235,6 @@ void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT
 
     BuildPrp(srbext, cmd, info, sizeof(NVME_FIRMWARE_SLOT_INFO_LOG));
 }
-
 void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
@@ -276,7 +275,6 @@ void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb)
 
     BuildPrp(srbext, cmd, srbext->DataBuffer, srbext->DataBufLen);
 }
-
 void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext)
 {
     PNVME_COMMAND cmd = &srbext->NvmeCmd;
@@ -316,4 +314,24 @@ void BuildCmd_GetLogPageV13(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf,
     //NUMD should match the log length you want...
     cmd->u.GETLOGPAGE.CDW10_V13.NUMDL = (USHORT)(numd & MAXUSHORT);
     cmd->u.GETLOGPAGE.CDW11.NUMDU = (USHORT)((numd >> 16) & MAXUSHORT);
+}
+void BuildCmd_SetVolatileWriteCache(PSPCNVME_SRBEXT srbext)
+{
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+
+    cmd->CDW0.CID = MAXUSHORT;
+    cmd->CDW0.OPC = NVME_ADMIN_COMMAND_SET_FEATURES;
+    cmd->NSID = UNSPECIFIC_NSID;
+    cmd->u.SETFEATURES.CDW10.FID = NVME_FEATURE_VOLATILE_WRITE_CACHE;
+    cmd->u.SETFEATURES.CDW11.VolatileWriteCache.WCE = TRUE;
+}
+void BuildCmd_Flush(PSPCNVME_SRBEXT srbext, ULONG nsid)
+{
+    PNVME_COMMAND cmd = &srbext->NvmeCmd;
+    RtlZeroMemory(cmd, sizeof(NVME_COMMAND));
+
+    cmd->CDW0.CID = MAXUSHORT;
+    cmd->CDW0.OPC = NVME_NVM_COMMAND_FLUSH;
+    cmd->NSID = nsid;
 }

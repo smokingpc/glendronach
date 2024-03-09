@@ -456,6 +456,9 @@ NTSTATUS CNvmeDevice::InitNvmeStage2()
     status = SetPowerManagement();
     ASSERT(NT_SUCCESS(status));
 
+    status = SetVolatileWriteCache();
+    ASSERT(NT_SUCCESS(status));
+
     status = SetHostBuffer();
     ASSERT(NT_SUCCESS(status));
 
@@ -823,6 +826,32 @@ NTSTATUS CNvmeDevice::SetArbitration()
     } while (SRB_STATUS_PENDING == my_srbext->SrbStatus);
 
     if (SRB_STATUS_SUCCESS == my_srbext->SrbStatus)
+        status = STATUS_SUCCESS;
+    else
+        status = STATUS_UNSUCCESSFUL;
+
+    return status;
+}
+NTSTATUS CNvmeDevice::SetVolatileWriteCache()
+{
+    if (!IsWorking())
+        return STATUS_INVALID_DEVICE_STATE;
+
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    CAutoPtr<SPCNVME_SRBEXT, NonPagedPool, TAG_SRBEXT> 
+        srbext((PSPCNVME_SRBEXT)new UCHAR[sizeof(SPCNVME_SRBEXT)]);
+
+    srbext->Init(this, NULL);
+    BuildCmd_SetVolatileWriteCache(srbext);
+
+    status = SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+
+    do
+    {
+        StorPortStallExecution(StallDelay);
+    } while (SRB_STATUS_PENDING == srbext->SrbStatus);
+
+    if (SRB_STATUS_SUCCESS == srbext->SrbStatus)
         status = STATUS_SUCCESS;
     else
         status = STATUS_UNSUCCESSFUL;
