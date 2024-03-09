@@ -81,7 +81,19 @@ static __inline void SetCidForAsyncEvent(CNvmeQueue *queue, PNVME_COMMAND cmd)
         cmd->CDW0.CID = queue->Depth+1;
     }
 }
-
+inline USHORT CNvmeQueue::GetNextCid()
+{
+    ULONG new_cid = (ULONG)InterlockedIncrement((volatile LONG*)&InternalCid);
+    return 1 + (new_cid % Depth); //let CID be 1-based index so add 1.
+}
+inline USHORT CNvmeQueue::CidToSrbExtIdx(USHORT cid)
+{
+    return cid - 1;
+}
+inline bool CNvmeQueue::IsSafeForSubmit()
+{
+    return ((Depth - SAFE_SUBMIT_THRESHOLD) > (USHORT)InflightCmds) ? true : false;
+}
 #pragma region ======== class CNvmeQueue ========
 VOID CNvmeQueue::QueueCplDpcRoutine(
     _In_ PSTOR_DPC dpc,
@@ -171,16 +183,17 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
 {
     if (!this->IsReady)
         return STATUS_DEVICE_NOT_READY;
-
     //throttle of submittion. If SubTail exceed CplHead, 
     //NVMe device will have fatal error and stopped.
     if(!IsSafeForSubmit())
         return STATUS_DEVICE_BUSY;
-
     {
         CQueuedSpinLock lock(&SubLock);
 
         ASSERT(NULL != srbext);
+        if (MAXUSHORT == src_cmd->CDW0.CID)
+            src_cmd->CDW0.CID = this->GetNextCid();
+
         PushSrbExt(srbext, src_cmd->CDW0.CID);
 
         //For Debugging
@@ -201,12 +214,12 @@ void CNvmeQueue::GiveupAllCmd()
     CQueuedSpinLock lock(&SubLock);
 
     for (ULONG i = 0; i < Depth; i++)
-    {
-        if (OriginalSrbExt[i] != NULL)
-        {
-            OriginalSrbExt[i]->CompleteSrb(SRB_STATUS_BUS_RESET);
-            OriginalSrbExt[i] = NULL;
-        }
+    {   
+        PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
+                (volatile PVOID*)&OriginalSrbExt[i], NULL);
+
+        if (NULL != srbext)
+            srbext->CompleteSrb(SRB_STATUS_BUS_RESET);
     }
 
     InflightCmds = 0;
@@ -303,6 +316,40 @@ void CNvmeQueue::WriteCplHead(ULONG value)
     if (IsValidQid(QueueID) && NULL != CplDbl)
         return WriteDbl(DevExt, CplDbl, value);
     KdBreakPoint();
+}
+void CNvmeQueue::PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid)
+{
+//for easier debugging, define this variable at first line.
+    USHORT idx = CidToSrbExtIdx(cid);
+    if(NVME_ASYNC_REQ_CID == cid)
+        SpecialSrbExt = srbext;
+    else
+    {
+        PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
+            (volatile PVOID*)OriginalSrbExt + idx, srbext, NULL);
+
+        if (NULL != old_srbext)
+            old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
+    }
+}
+PSPCNVME_SRBEXT CNvmeQueue::PopSrbExt(USHORT cid)
+{
+    //for easier debugging, define these variables at first line.
+    USHORT idx = CidToSrbExtIdx(cid);
+    PSPCNVME_SRBEXT srbext = NULL;
+    if (NVME_ASYNC_REQ_CID == cid)
+    {
+        srbext = SpecialSrbExt;
+        SpecialSrbExt = NULL;
+    }
+    else
+    {
+        srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
+            (volatile PVOID*)OriginalSrbExt + idx, NULL);
+
+        ASSERT(srbext != NULL);
+    }
+    return srbext;
 }
 
 bool CNvmeQueue::AllocQueueBuffer()

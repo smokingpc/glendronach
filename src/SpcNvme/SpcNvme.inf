@@ -53,9 +53,9 @@ AddReg         = Parameters
 HKR, "Interrupt Management", 0x00000010
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", 0x00000010
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported,       %REG_DWORD%,   1
-HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   17
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   65
 HKR, "Interrupt Management\Affinity" Policy, 0x00000010
-HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 2 ;IrqPolicyOneCloseProcessor
+HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 5 ;IrqPolicySpreadMessagesAcrossAllProcessors
 HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3 ;IrqPriorityHigh, for low latency
 HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
 

@@ -43,7 +43,7 @@
 #define NVME_INVALID_ID     (MAXULONG)
 #define NVME_INVALID_CID    (MAXUSHORT)        //should align to NVME CID size
 #define NVME_INVALID_QID    (MAXUSHORT)
-
+#define NVME_ASYNC_REQ_CID  ((USHORT)0x8000)
 //const char* SpcVendorID = "SPC     ";           //vendor name
 //const char* SpcProductID = "SomkingPC NVMe  ";  //model name
 //const char* SpcProductRev = "0100";
