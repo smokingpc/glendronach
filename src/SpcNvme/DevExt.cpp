@@ -6,7 +6,6 @@ BOOLEAN RaidMsixISR(IN PVOID hbaext, IN ULONG msgid)
     BOOLEAN ok = FALSE;
     CNvmeDevice* nvme = NULL;
     CNvmeQueue* queue = NULL;
-    //DbgBreakPoint();
 
     for (ULONG i = 0; i < devext->NvmeDevCount; i++)
     {
@@ -99,8 +98,8 @@ PUCHAR GetDevCfgSpace(PUCHAR bus_space, UCHAR dev_id)
     return (bus_space + GetPciDevCfgSpaceSize(1) * dev_id);
 }
 
-#pragma region ======== CVrocBus ========
-void CVrocBus::Setup(
+#pragma region ======== _VROC_BUS ========
+void _VROC_BUS::Setup(
                 UCHAR primary_bus, 
                 UCHAR bus_idx, 
                 PPCI_COMMON_CONFIG bridge_cfg, 
@@ -118,26 +117,26 @@ void CVrocBus::Setup(
     Bar0SpaceForDevAndBridge = dev_bar0_space;
     Guard = 0x23939889;
 }
-void CVrocBus::Teardown()
+void _VROC_BUS::Teardown()
 {
     RemoveAllDevices();
 }
-void CVrocBus::AddDevice(class CVrocDevice* dev)
+void _VROC_BUS::AddDevice(struct _VROC_DEVICE* dev)
 {
     InsertTailList(&this->DevListHead, &dev->List);
 //    dev->ParentBus = this;
 }
-void CVrocBus::RemoveAllDevices()
+void _VROC_BUS::RemoveAllDevices()
 {
     while(!IsListEmpty(&DevListHead))
     {
         PLIST_ENTRY entry = RemoveHeadList(&DevListHead);
-        CVrocDevice *dev = CONTAINING_RECORD(entry, CVrocDevice, List);
+        _VROC_DEVICE *dev = CONTAINING_RECORD(entry, _VROC_DEVICE, List);
         dev->Teardown();
         MemDelete(dev, TAG_VROC_DEVICE);
     }
 }
-void CVrocBus::UpdateBridgeInfo(UINT64 msi_addr)
+void _VROC_BUS::UpdateBridgeInfo(UINT64 msi_addr)
 {
 //todo : update prefetch mem range and i/o range....
     //NonPrefetchable MemBase
@@ -179,9 +178,13 @@ void CVrocBus::UpdateBridgeInfo(UINT64 msi_addr)
         msi->MC.MSIE = TRUE;
     }
 }
+PUCHAR _VROC_BUS::GetBar0SpaceForDevice(UCHAR dev_idx)
+{
+    return (Bar0SpaceForDevAndBridge + (VROC_NVME_BAR0_SIZE * dev_idx));
+}
 #pragma endregion
-#pragma region ======== CVrocDevice ========
-void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0)
+#pragma region ======== _VROC_DEVICE ========
+void _VROC_DEVICE::Setup(PVOID devext, VROC_BUS *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0)
 {
     Guard = 0x23939889;
     InitializeListHead(&this->List);
@@ -207,12 +210,13 @@ void CVrocDevice::Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_C
 //    NvmeDev = (CNvmeDevice*) MemAlloc(NonPagedPool, sizeof(CNvmeDevice), TAG_VROC_NVME);
     NvmeDev = MemAllocEx<CNvmeDevice>(NonPagedPool, TAG_VROC_NVME);
     NvmeDev->Setup(devext, DevCfg, Bar0VA);
+    DbgBreakPoint();
 }
-void CVrocDevice::Teardown()
+void _VROC_DEVICE::Teardown()
 {
     DeleteNvmeDevice();
 }
-void CVrocDevice::DeleteNvmeDevice()
+void _VROC_DEVICE::DeleteNvmeDevice()
 {
     if(NULL != NvmeDev)
     {
@@ -222,7 +226,6 @@ void CVrocDevice::DeleteNvmeDevice()
     }
 }
 #pragma endregion
-
 #pragma region ======== VROC_DEVEXT ========
 NTSTATUS _VROC_DEVEXT::Setup(PPORT_CONFIGURATION_INFORMATION portcfg)
 {
@@ -338,7 +341,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
     //Bus0 has only PCI Bridges, and all NVMe are located on Bus1~Bus31.
     //Each Bus has NVMe devices and connected to VMD RaidController via 1 bridge.
     //So we should treat as a real PCI bridged bus => It is similar as extra PCI segment.
-
+    DbgBreakPoint();
     //PCI bus has max 32 devices on 1 bus....
     //Enum bridges first.
     //Bus 0 stores Pci Bridges, other Bus stores VROC NVMe devices.
@@ -357,7 +360,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
         //System can't access resources of all devices behind this bridge, 
         // if you didn't setup MemBase/MemLimit.
         UCHAR bus_idx = bridge->u.type1.SecondaryBus - bridge->u.type1.PrimaryBus;
-        CVrocBus* bus = MemAllocEx<CVrocBus>(NonPagedPool, TAG_VROC_BUS);
+        _VROC_BUS* bus = MemAllocEx<_VROC_BUS>(NonPagedPool, TAG_VROC_BUS);
         PUCHAR bus_space = GetBusCfgSpace(RaidPcieCfgSpace, RaidPcieCfgSpaceSize, bus_idx);
         bus->Setup(PrimaryBus, bus_idx, bridge, 
                     bus_space, GetNvmeBar0SpaceForBus(bus_idx));
@@ -376,7 +379,7 @@ void _VROC_DEVEXT::EnumVrocBuses()
         InsertTailList(&BusListHead, &bus->List);
     }
 }
-void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
+void _VROC_DEVEXT::EnumVrocDevsOnBus(_VROC_BUS *bus)
 {
     //enumerate all devices on this child bus.
     for (UCHAR dev_id = 0; dev_id < PCI_MAX_DEVICES; dev_id++)
@@ -386,8 +389,8 @@ void _VROC_DEVEXT::EnumVrocDevsOnBus(CVrocBus *bus)
         if (!IsValidVendorID(dev_space))
             continue;
         
-//        CVrocDevice *dev = new (NonPagedPool, TAG_VROC_DEVICE) CVrocDevice();
-        CVrocDevice* dev = MemAllocEx<CVrocDevice>(NonPagedPool, TAG_VROC_DEVICE);
+//        _VROC_DEVICE *dev = new (NonPagedPool, TAG_VROC_DEVICE) _VROC_DEVICE();
+        _VROC_DEVICE* dev = MemAllocEx<_VROC_DEVICE>(NonPagedPool, TAG_VROC_DEVICE);
         dev->Setup(this, bus, dev_id, dev_space, bus->GetBar0SpaceForDevice(dev_id));
         bus->AddDevice(dev);
         NvmeDev[NvmeDevCount++] = dev->NvmeDev;
@@ -404,7 +407,7 @@ void _VROC_DEVEXT::Teardown()
     while(!IsListEmpty(&BusListHead))
     {
         PLIST_ENTRY entry = RemoveHeadList(&BusListHead);
-        CVrocBus *bus = CONTAINING_RECORD(entry, CVrocBus, List);
+        _VROC_BUS *bus = CONTAINING_RECORD(entry, _VROC_BUS, List);
         bus->Teardown();
         MemDelete(bus, TAG_VROC_BUS);
     }
@@ -462,22 +465,34 @@ NTSTATUS _VROC_DEVEXT::PassiveInitAllVrocNvme()
         CNvmeDevice* nvme = NvmeDev[i];
         if (NULL == nvme)
             continue;
+        DbgBreakPoint();
 
         status = nvme->InitNvmeStage1();
         if (!NT_SUCCESS(status))
+        {
+            DbgBreakPoint();
             return status;
+        }
 
         status = nvme->InitNvmeStage2();
         if (!NT_SUCCESS(status))
+        {
+            DbgBreakPoint();
             return status;
-
+        }
         status = nvme->CreateIoQueues();
         if (!NT_SUCCESS(status))
+        {
+            DbgBreakPoint();
             return status;
+        }
 
         status = nvme->RegisterIoQueues(NULL);
         if (!NT_SUCCESS(status))
+        {
+            DbgBreakPoint();
             return status;
+        }
     }
 
     return STATUS_SUCCESS;

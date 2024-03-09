@@ -57,12 +57,12 @@ HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported,   
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, %REG_DWORD%,   64
 HKR, "Interrupt Management\Affinity" Policy, 0x00000010
 HKR, "Interrupt Management\Affinity" Policy, DevicePolicy, %REG_DWORD%, 5 ;IrqPolicySpreadMessagesAcrossAllProcessors
-HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3 ;IrqPriorityHigh, for low latency
+;HKR, "Interrupt Management\Affinity" Policy, DevicePriority, %REG_DWORD%, 3 ;IrqPriorityHigh, for low latency
 ;HKR, "Interrupt Management\Affinity" Policy, GroupPolicy, %REG_DWORD%, 1 ;GROUP_AFFINITY::Group
 
 [Parameters]
 HKR, Parameters\PnpInterface, "5", %REG_DWORD%, 0x00000001    ;PCIBus
-HKR, Parameters, "BusType", %REG_DWORD%, 0x00000008           ;STORAGE_BUS_TYPE::BusTypeRAID
+HKR, Parameters, "BusType", %REG_DWORD%, 0x00000000           ;STORAGE_BUS_TYPE::Unknown
 
 [Strings]
 ManufacturerName="SmokingPC"

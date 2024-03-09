@@ -114,8 +114,6 @@ static PSPCNVME_SRBEXT PopSrbExt(CNvmeQueue* queue, USHORT cid)
     }
     return srbext;
 }
-
-
 VOID CNvmeQueue::QueueCplDpcRoutine(
     _In_ PSTOR_DPC dpc,
     _In_ PVOID devext,

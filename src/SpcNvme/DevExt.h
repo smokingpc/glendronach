@@ -1,10 +1,9 @@
 #pragma once
 
-class CVrocDevice;
+struct _VROC_DEVICE;
 //Virtual Bus behind Virtual Bridge in in VROC RaidController's BAR0(child PciCfg Space).
-class CVrocBus
+typedef struct _VROC_BUS
 {
-public:
     LIST_ENTRY List;     //bus list behind same virtual bridge.
     LIST_ENTRY DevListHead;
     PPCI_COMMON_CONFIG BridgeCfg;       //PCI config of bridge
@@ -20,32 +19,27 @@ public:
                 UCHAR bus_idx, PPCI_COMMON_CONFIG bridge_cfg, 
                 PUCHAR bus_space, PUCHAR dev_bar0_space);
     void Teardown();
-    void AddDevice(class CVrocDevice* dev);
+    void AddDevice(struct _VROC_DEVICE* dev);
     void UpdateBridgeInfo(UINT64 msi_addr);
     void RemoveAllDevices();
+    PUCHAR GetBar0SpaceForDevice(UCHAR dev_idx);
+}VROC_BUS, *PVROC_BUS;
 
-    inline PUCHAR GetBar0SpaceForDevice(UCHAR dev_idx)
-    {
-        return (Bar0SpaceForDevAndBridge + (VROC_NVME_BAR0_SIZE * dev_idx));
-    }
-};
-
-class CVrocDevice
+typedef struct _VROC_DEVICE
 {
-public:
     LIST_ENTRY List;     //device list on same virtual bus.
     PPCI_COMMON_CONFIG DevCfg;
     PUCHAR Bar0VA;
     ULONG Bar0Len;
-    CVrocBus *ParentBus;
+    _VROC_BUS *ParentBus;
     UCHAR DevId;        //Device ID in PCI Bus
     CNvmeDevice *NvmeDev;
     ULONG Guard;
 
-    void Setup(PVOID devext, CVrocBus *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0);
+    void Setup(PVOID devext, VROC_BUS *bus, UCHAR dev_id, PPCI_COMMON_CONFIG cfg, PUCHAR bar0);
     void Teardown();
     void DeleteNvmeDevice();
-};
+}VROC_DEVICE, *PVROC_DEVICE;
 
 
 #pragma push(1)
@@ -100,7 +94,7 @@ typedef struct _VROC_DEVEXT {
     ULONG MaxTxPages;
     ULONG AccessRangeCount;
     ULONG MsixCount;
-    UCHAR Pagging[PAGE_SIZE];   //make devext larger than 1 page...
+//    UCHAR Pagging[PAGE_SIZE];   //make devext larger than 1 page...
     ULONG Guard;
 
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION portcfg);
@@ -108,20 +102,20 @@ typedef struct _VROC_DEVEXT {
     void EnableNvmeDevMsix();
     void MapRaidCtrlBar0(ACCESS_RANGE *ranges, ULONG count);
     void EnumVrocBuses();
-    void EnumVrocDevsOnBus(CVrocBus *bus);
+    void EnumVrocDevsOnBus(_VROC_BUS *bus);
     void Teardown();
     void ShutdownAllVrocNvmeControllers();
     void DisableAllVrocNvmeControllers();
     NTSTATUS InitAllVrocNvme();
     NTSTATUS PassiveInitAllVrocNvme();
     void UpdateVrocNvmeDevInfo();
-    inline PUCHAR GetNvmeBar0SpaceForBus(UCHAR bus_idx)
+    PUCHAR GetNvmeBar0SpaceForBus(UCHAR bus_idx)
     {
     //Each Block has 2MB, 1st 1MB is for devices, 2nd 1MB is for bridge.
         return (BusBar0Space + (bus_idx * VROC_BUS_BAR0_REGION_SIZE));
         //(VROC_NVME_BAR0_SIZE* VROC_DEV_PER_BUS * bus_idx));
     }
-    inline CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
+    CNvmeDevice* _VROC_DEVEXT::FindVrocNvmeDev(UCHAR target_id)
     {
         //treat vroc virtual bus index as scsi target id.
         //there is only one bus of this storage.

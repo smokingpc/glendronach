@@ -60,6 +60,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
 
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     PVROC_DEVEXT devext = (PVROC_DEVEXT)hbaext;
+
     status = devext->Setup(port_cfg);
     if (!NT_SUCCESS(status))
         goto ERROR;
@@ -83,7 +84,7 @@ _Use_decl_annotations_ ULONG HwFindAdapter(
     //this should be called AFTER InitController() , because 
     //we need identify controller to know MaxTxSize.
     FillPortConfiguration(port_cfg, devext);
-    return SP_RETURN_FOUND;
+//    return SP_RETURN_FOUND;
 
 ERROR:
     //return SP_RETURN_NOT_FOUND causes driver installation hanging?

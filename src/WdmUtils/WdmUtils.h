@@ -60,7 +60,6 @@ void DebugSrbFunctionCode(ULONG code);
 void DebugScsiOpCode(UCHAR opcode);
 void DebugAdapterControlCode(SCSI_ADAPTER_CONTROL_TYPE code);
 void DebugUnitControlCode(SCSI_UNIT_CONTROL_TYPE code);
-
 bool IsSupportedOS(ULONG major, ULONG minor = 0);
 
 class CDebugCallInOut
@@ -70,7 +69,7 @@ private:
 
     //don't call ExAllocatePool() at DIRQL, or DriverVerifier will BugCheck(0xc4)
     //using a array, don't allocate dynamically.
-    char Name[BufSize] = {0};
+    char Name[BufSize];
 public:
     CDebugCallInOut(char* name);
     CDebugCallInOut(const char* name);

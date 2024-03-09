@@ -52,10 +52,10 @@ typedef struct _QUEUE_PAIR_CONFIG {
     PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
     PVOID PreAllocBuffer = NULL;            //SubQ and CplQ should be continuous memory together
     size_t PreAllocBufSize = 0; 
-    _QUEUE_PAIR_CONFIG()
-    {
-        RtlZeroMemory(this, sizeof(_QUEUE_PAIR_CONFIG));
-    }
+    //_QUEUE_PAIR_CONFIG()
+    //{
+    //    RtlZeroMemory(this, sizeof(_QUEUE_PAIR_CONFIG));
+    //}
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
 class CNvmeQueue

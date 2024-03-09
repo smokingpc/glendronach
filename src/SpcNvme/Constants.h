@@ -138,7 +138,7 @@
 #define VROC_BUS_BAR0_REGION_SIZE   (2*MB_SIZE) //this region is shared by NVMe and Bridge
 #define PCI_LOW32BIT_BAR_ADDR_MASK  (0xFFFFFFF0)
 #define PCI_BAR_ADDR_MASK           (0xFFFFFFFFFFFFFFF0)        //low 4 bits are readonly, ignore them.
-#define TAG_VROC_BUS        ((ULONG)' BRV')
-#define TAG_VROC_DEVICE     ((ULONG)' DRV')
+#define TAG_VROC_BUS        ((ULONG)'-BRV')
+#define TAG_VROC_DEVICE     ((ULONG)'-DRV')
 #define TAG_VROC_NVME       ((ULONG)'DNRV')
 #pragma endregion
