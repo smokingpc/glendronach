@@ -9,7 +9,7 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
     portcfg->MiniportDumpData = NULL;
     portcfg->InitiatorBusId[0] = 1;
-    portcfg->CachesData = FALSE;
+    portcfg->CachesData = FALSE;    //if set it to TRUE, miniport will get SRB_FUNCTION_FLUSH after SCSIOP_SYNCHRONIZE_CACHE when flush cache.
     portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
     portcfg->MaximumNumberOfTargets = MAX_SCSI_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
