@@ -1233,11 +1233,11 @@ NTSTATUS CNvmeDevice::UnregisterIoQueues(PSPCNVME_SRBEXT srbext)
         if (temp->SrbStatus != SRB_STATUS_SUCCESS)
             goto END;
 
-        RegisteredIoQ++;
+        RegisteredIoQ--;
     }
 
 END:
-    if (RegisteredIoQ == DesiredIoQ)
+    if (0 == RegisteredIoQ)
         status = STATUS_SUCCESS;
 
     if (NULL != srbext)
