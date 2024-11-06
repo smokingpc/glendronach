@@ -4,28 +4,6 @@ EXTERN_C_START
 sp_DRIVER_INITIALIZE DriverEntry;
 ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
 {
-    VROC_BUS* bus = NULL;
-    VROC_DEVICE* dev = NULL;
-    PVOID test = ExAllocatePoolWithTag(NonPagedPool, 72, TAG_GENBUF);
-    DbgBreakPoint();
-    ExFreePool(test, TAG_GENBUF);
-    for (ULONG i = 0; i < 3; i++)
-    {
-        bus = (VROC_BUS*)ExAllocatePoolWithTag(NonPagedPool, sizeof(VROC_BUS), TAG_VROC_BUS);
-        DbgBreakPoint();
-        dev = (VROC_DEVICE*)ExAllocatePoolWithTag(NonPagedPool, sizeof(VROC_DEVICE), TAG_VROC_DEVICE);
-        ExFreePool(bus, TAG_VROC_BUS);
-        ExFreePool(dev, TAG_VROC_DEVICE);
-
-        //bus = MemAllocEx<_VROC_BUS>(NonPagedPool, TAG_VROC_BUS);
-        //dev = MemAllocEx<_VROC_DEVICE>(NonPagedPool, TAG_VROC_DEVICE);
-        //DbgBreakPoint();
-        //MemDelete(bus, TAG_VROC_BUS);
-        //MemDelete(dev, TAG_VROC_DEVICE);
-        //DbgBreakPoint();
-    }
-
-    //CDebugCallInOut inout(__FUNCTION__);
     if (IsSupportedOS(10) == FALSE)
         return STOR_STATUS_UNSUPPORTED_VERSION;
 
