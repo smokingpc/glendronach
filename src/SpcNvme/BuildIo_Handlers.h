@@ -1,8 +1,8 @@
 #pragma once
 
-UCHAR BuildIo_DefaultHandler(PSPCNVME_SRBEXT srbext);
-UCHAR BuildIo_IoctlHandler(PSPCNVME_SRBEXT srbext);
-UCHAR BuildIo_ScsiHandler(PSPCNVME_SRBEXT srbext);
-UCHAR BuildIo_SrbPowerHandler(PSPCNVME_SRBEXT srbext);
-UCHAR BuildIo_SrbPnpHandler(PSPCNVME_SRBEXT srbext);
+UCHAR BuildIo_DefaultHandler(PSPC_SRBEXT srbext);
+UCHAR BuildIo_IoctlHandler(PSPC_SRBEXT srbext);
+UCHAR BuildIo_ScsiHandler(PSPC_SRBEXT srbext);
+UCHAR BuildIo_SrbPowerHandler(PSPC_SRBEXT srbext);
+UCHAR BuildIo_SrbPnpHandler(PSPC_SRBEXT srbext);
 

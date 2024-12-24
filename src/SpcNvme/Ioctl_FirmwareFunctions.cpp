@@ -82,13 +82,13 @@ static void FillFirmwareInfoV1(
         ret_info->Slot[0].ReadOnly = TRUE;
 }
 
-VOID Complete_FirmwareInfo(SPCNVME_SRBEXT *srbext)
+VOID Complete_FirmwareInfo(PSPC_SRBEXT srbext)
 {
-    CNvmeDevice* nvme = srbext->DevExt;
+    CNvmeDevice* nvme = (CNvmeDevice*)srbext->DevExt;
     PSRB_IO_CONTROL ioctl = (PSRB_IO_CONTROL)srbext->DataBuffer;
     PFIRMWARE_REQUEST_BLOCK request = (PFIRMWARE_REQUEST_BLOCK)(ioctl + 1);
     PSTORAGE_FIRMWARE_INFO buffer = (PSTORAGE_FIRMWARE_INFO)((PUCHAR)ioctl + request->DataBufferOffset);
-    PNVME_FIRMWARE_SLOT_INFO_LOG logpage = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtBuf;
+    PNVME_FIRMWARE_SLOT_INFO_LOG logpage = (PNVME_FIRMWARE_SLOT_INFO_LOG)srbext->ExtraBuf;
     PNVME_IDENTIFY_CONTROLLER_DATA ctrl = &nvme->CtrlIdent;
     ULONG buf_len = request->DataBufferLength;
     UCHAR total_slots = ctrl->FRMW.SlotCount;
@@ -136,21 +136,22 @@ END:
     ioctl->ReturnCode = fw_status;
 }
 
-UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
+UCHAR Firmware_GetInfo(PSPC_SRBEXT srbext)
 {
-    PNVME_FIRMWARE_SLOT_INFO_LOG logpage = NULL;
+    PNVME_FIRMWARE_SLOT_INFO_LOG logpage = nullptr;
+    CNvmeDevice* nvme = (CNvmeDevice*)srbext->DevExt;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
     logpage = new NVME_FIRMWARE_SLOT_INFO_LOG();
     srbext->ResetExtBuf(logpage);
     srbext->CompletionCB = Complete_FirmwareInfo;
 
-    if(srbext->DevExt->NvmeVer.AsUlong > 0x10000)
+    if(nvme->NvmeVer.AsUlong > 0x10000)
         BuildCmd_GetFirmwareSlotsInfo(srbext, logpage);
     else
         BuildCmd_GetFirmwareSlotsInfoV1(srbext, logpage);
 
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = nvme->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
     {
         delete logpage;
@@ -159,14 +160,14 @@ UCHAR Firmware_GetInfo(PSPCNVME_SRBEXT srbext)
     
     return SRB_STATUS_PENDING;
 }
-UCHAR Firmware_DownloadToAdapter(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request)
+UCHAR Firmware_DownloadToAdapter(PSPC_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request)
 {
     UNREFERENCED_PARAMETER(srbext);
     UNREFERENCED_PARAMETER(ioctl);
     UNREFERENCED_PARAMETER(request);
     return SRB_STATUS_INVALID_REQUEST;
 }
-UCHAR Firmware_ActivateSlot(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request)
+UCHAR Firmware_ActivateSlot(PSPC_SRBEXT srbext, PSRB_IO_CONTROL ioctl, PFIRMWARE_REQUEST_BLOCK request)
 {
     UNREFERENCED_PARAMETER(srbext);
     UNREFERENCED_PARAMETER(ioctl);

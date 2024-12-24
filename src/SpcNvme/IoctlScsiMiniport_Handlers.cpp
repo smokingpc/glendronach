@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "IoctlScsiMiniport_Handlers.h"
 
-UCHAR IoctlScsiMiniport_Firmware(PSPCNVME_SRBEXT srbext, PSRB_IO_CONTROL ioctl)
+UCHAR IoctlScsiMiniport_Firmware(PSPC_SRBEXT srbext, PSRB_IO_CONTROL ioctl)
 {
     ULONG data_len = srbext->DataBufLen;
     PFIRMWARE_REQUEST_BLOCK request = (PFIRMWARE_REQUEST_BLOCK)(ioctl + 1);

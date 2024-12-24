@@ -38,56 +38,24 @@
 // Enjoy it.
 // ================================================================
 
+enum class SRBEXT_FLAG {
+    NONE = 0,
+    INIT_OK = 0x00000001,
+    IS_COMPLETED = 0x00000002,
+    FREE_PRP2_LIST = 0x00000004,
+    //DEL_IN_COMPLETE = 0x00000008,
+    //IS_READ_IO = 0x00000010,
+    //IS_WRITE_IO = 0x00000020,
+    //IS_PNP_SRB = 0x00000040,  //this SRB is PnpRequest.
+    //IS_SRBEX = 0x80000000,  //indicates SRB in SRBEXT is STORAGE_REQUEST_BLOCK, not SCSI_REQUEST_BLOCK.
+    MAX = 0x7FFFFFFF
+};
 
-FORCEINLINE size_t DivRoundUp(size_t value, size_t align_size)
-{
-    return (size_t)((value + (align_size-1))/align_size);
-}
+//in VisualC++, there is macro "DEFINE_ENUM_FLAG_OPERATORS" can make enum type support bit-operation.
+DEFINE_ENUM_FLAG_OPERATORS(SRBEXT_FLAG);
 
-FORCEINLINE size_t RoundUp(size_t value, size_t align_size)
-{
-    return (DivRoundUp(value, align_size) * align_size);
-}
 
-FORCEINLINE bool IsAddrEqual(PPHYSICAL_ADDRESS a, PPHYSICAL_ADDRESS b)
-{
-    if (a->QuadPart == b->QuadPart)
-        return true;
-    return false;
-}
-FORCEINLINE bool IsAddrEqual(PHYSICAL_ADDRESS& a, PHYSICAL_ADDRESS& b)
-{
-    return IsAddrEqual(&a, &b);
-}
 
-FORCEINLINE ULONG LunToNsId(UCHAR lun)
-{
-//LUN is zero-based, Namespace ID is 1-based.
-    return (ULONG)(lun+1);
-}
 
-FORCEINLINE UCHAR NsIdToLun(ULONG nsid)
-{
-    //LUN is zero-based, Namespace ID is 1-based.
-    return (UCHAR)(nsid-1);
-}
 
-FORCEINLINE void CalcMaxTxSize(
-    ULONG &max_tx_size, 
-    ULONG &max_tx_pages, 
-    UCHAR mdts, 
-    ULONG min_page_size)
-{
-    max_tx_size = (ULONG)((1ul << mdts) * min_page_size);
-    max_tx_pages = max_tx_size / PAGE_SIZE;
-}
 
-FORCEINLINE UCHAR NtStatusToSrbStatus(NTSTATUS status)
-{
-    if (NT_SUCCESS(status))
-        return SRB_STATUS_PENDING;
-    else if (STATUS_DEVICE_BUSY == status)
-        return SRB_STATUS_BUSY;
-
-    return SRB_STATUS_ERROR;
-}

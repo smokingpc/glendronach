@@ -1,6 +1,6 @@
 #include "pch.h"
 
-UCHAR AdapterPnp_QueryCapHandler(PSPCNVME_SRBEXT srbext)
+UCHAR AdapterPnp_QueryCapHandler(PSPC_SRBEXT srbext)
 {
     PSTOR_DEVICE_CAPABILITIES_EX cap = 
         (PSTOR_DEVICE_CAPABILITIES_EX)srbext->DataBuffer;

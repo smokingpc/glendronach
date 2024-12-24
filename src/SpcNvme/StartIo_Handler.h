@@ -33,13 +33,12 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
 
-UCHAR StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext);
-UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext);
-UCHAR StartIo_IoctlHandler(PSPCNVME_SRBEXT srbext);
+UCHAR StartIo_DefaultHandler(PSPC_SRBEXT srbext);
+UCHAR StartIo_ScsiHandler(PSPC_SRBEXT srbext);
+UCHAR StartIo_IoctlHandler(PSPC_SRBEXT srbext);

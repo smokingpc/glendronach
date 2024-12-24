@@ -53,15 +53,15 @@ ULONG DriverEntry(IN PVOID DrvObj, IN PVOID RegPath)
     init_data.FeatureSupport =
             STOR_FEATURE_ADAPTER_CONTROL_PRE_FINDADAPTER |
             STOR_FEATURE_EXTRA_IO_INFORMATION |         //what is this?
-            STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES | 
-            STOR_FEATURE_NVME;
+            STOR_FEATURE_FULL_PNP_DEVICE_CAPABILITIES |     //handle full PCIe PNP info before FindAdapter.
+            STOR_FEATURE_NVME;      //handle SRB in different way , for NVMe device specially.
 
     /* Set required extension sizes. */
     init_data.DeviceExtensionSize = sizeof(CNvmeDevice);
-    init_data.SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
+    init_data.SrbExtensionSize = sizeof(SPC_SRBEXT);
 
     // Call StorPortInitialize to register with HwInitData
-    status = StorPortInitialize(DrvObj, RegPath, &init_data, NULL);
+    status = StorPortInitialize(DrvObj, RegPath, &init_data, nullptr);
 
     return status;
 }

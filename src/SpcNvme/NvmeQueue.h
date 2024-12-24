@@ -33,23 +33,24 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
-
+//QUEUE_PAIR stands for "Submission and Completion Queue in one pair".
+//Each SubmissionQueue match to a unique CompletionQueue.
+//So I combine them into a "Queue Pair". 
+//Each NVMe device has multiple "Queue Pair" to handle I/O and Admin Cmds.
 typedef struct _QUEUE_PAIR_CONFIG {
-    PVOID DevExt = NULL;
+    PVOID DevExt = nullptr;
     USHORT QID = 0;         //QueueID is zero-based. ID==0 is assigned to AdminQueue constantly
-    USHORT Depth = 0;
-    USHORT HistoryDepth = 0;
+    USHORT Depth = 0;       //How many Submission Entry(equal to Completion Entry) in each queue?
     ULONG NumaNode = MM_ANY_NODE_OK;
     QUEUE_TYPE Type = QUEUE_TYPE::IO_QUEUE;
-    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
-    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
-    PVOID PreAllocBuffer = NULL;            //SubQ and CplQ should be continuous memory together
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = nullptr;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = nullptr;
+    PVOID PreAllocBuffer = nullptr;            //SubQ and CplQ should be continuous memory together
     size_t PreAllocBufSize = 0; 
 }QUEUE_PAIR_CONFIG, * PQUEUE_PAIR_CONFIG;
 
@@ -71,9 +72,9 @@ public:
     NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
     void Teardown();
 
-    inline bool IsInitOK(){return this->IsReady;}
+    inline bool IsInitOK(){return IsReady;}
     
-    NTSTATUS SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd);
+    NTSTATUS SubmitCmd(PSPC_SRBEXT srbext, PNVME_COMMAND src_cmd);
     void CompleteCmd(ULONG max_count = 0);
     void GiveupAllCmd();
     void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
@@ -83,7 +84,7 @@ public:
     void GetCplQAddr(PHYSICAL_ADDRESS* cplq);
 
     STOR_DPC QueueCplDpc;
-    PVOID DevExt = NULL;
+    PVOID DevExt = nullptr;
     USHORT QueueID = NVME_INVALID_QID;  //1-based ID, 0 is reserved for AdminQ
     USHORT Depth = 0;       //how many entries in both SubQ and CplQ?
     ULONG NumaNode = MM_ANY_NODE_OK;
@@ -94,8 +95,8 @@ public:
     ULONG SubHead = INIT_DBL_VALUE;
     ULONG CplHead = INIT_DBL_VALUE;
     USHORT PhaseTag = CPL_INIT_PHASETAG;
-    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = NULL;
-    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = NULL;
+    PNVME_SUBMISSION_QUEUE_TAIL_DOORBELL SubDbl = nullptr;
+    PNVME_COMPLETION_QUEUE_HEAD_DOORBELL CplDbl = nullptr;
 
     KSPIN_LOCK SubLock;
 
@@ -104,21 +105,21 @@ public:
     //In CNvmeQueuePair, it allocates SubQ and CplQ in one large continuous block.
     //QueueBuffer is pointer of this large block.
     //Then divide into 2 blocks for SubQ and CplQ.
-    PVOID Buffer = NULL;
+    PVOID Buffer = nullptr;
     PHYSICAL_ADDRESS BufferPA = {0};
     size_t BufferSize = 0;      //total size of entire queue buffer, BufferSize >= (SubQ_Size + CplQ_Size)
 
-    PNVME_COMMAND SubQ_VA = NULL;       //Virtual address of SubQ Buffer.
+    PNVME_COMMAND SubQ_VA = nullptr;       //Virtual address of SubQ Buffer.
     PHYSICAL_ADDRESS SubQ_PA = { 0 }; 
     size_t SubQ_Size = 0;       //total length of SubQ Buffer.
 
-    PNVME_COMPLETION_ENTRY CplQ_VA = NULL;       //Virtual address of CplQ Buffer.
+    PNVME_COMPLETION_ENTRY CplQ_VA = nullptr;       //Virtual address of CplQ Buffer.
     PHYSICAL_ADDRESS CplQ_PA = { 0 }; 
     size_t CplQ_Size = 0;       //total length of CplQ Buffer.
 
     volatile USHORT InternalCid = 0;
-    PSPCNVME_SRBEXT *OriginalSrbExt = NULL;    //record the caller's SRBEXT, complete them when request done.
-    PSPCNVME_SRBEXT SpecialSrbExt = NULL;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
+    PSPC_SRBEXT *OriginalSrbExt = nullptr;    //record the caller's SRBEXT, complete them when request done.
+    PSPC_SRBEXT SpecialSrbExt = nullptr;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
 
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
@@ -133,6 +134,6 @@ public:
     USHORT GetNextCid();
     USHORT CidToSrbExtIdx(USHORT cid);
     bool IsSafeForSubmit();
-    void PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid);
-    PSPCNVME_SRBEXT PopSrbExt(USHORT cid);
+    void PushSrbExt(PSPC_SRBEXT srbext, USHORT cid);
+    PSPC_SRBEXT PopSrbExt(USHORT cid);
 };

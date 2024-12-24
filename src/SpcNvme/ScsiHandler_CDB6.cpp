@@ -16,9 +16,9 @@ typedef struct _CDB6_REQUESTSENSE
     }Control;
 }CDB6_REQUESTSENSE, *PCDB6_REQUESTSENSE;
 
-static UCHAR Reply_VpdSupportPages(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR Reply_VpdSupportPages(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
-    ULONG &srb_buf_size = srbext->DataBufLen;
+    UINT32 srb_buf_size = srbext->DataBufLen;
     UCHAR valid_pages = 5;
     ULONG page_size = (FIELD_OFFSET(VPD_SUPPORTED_PAGES_PAGE, SupportedPageList) 
                 + valid_pages * sizeof(UCHAR));
@@ -43,11 +43,12 @@ static UCHAR Reply_VpdSupportPages(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     RtlCopyMemory(srbext->DataBuffer, page, ret_size);
     return SRB_STATUS_SUCCESS;
 }
-static UCHAR Reply_VpdSerialNumber(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR Reply_VpdSerialNumber(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
     PVPD_SERIAL_NUMBER_PAGE page = (PVPD_SERIAL_NUMBER_PAGE)srbext->DataBuffer;
-    ULONG &buf_size = srbext->DataBufLen;
-    size_t sn_len = strlen((char*)srbext->DevExt->CtrlIdent.SN);
+    UINT32 buf_size = srbext->DataBufLen;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    size_t sn_len = strlen((char*)devext->CtrlIdent.SN);
     sn_len = min(sn_len, 255);
     ULONG size = (ULONG)(sn_len + sizeof(VPD_SERIAL_NUMBER_PAGE) + 1);
     ret_size = size;
@@ -61,13 +62,14 @@ static UCHAR Reply_VpdSerialNumber(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->PageCode = VPD_SERIAL_NUMBER;
     page->PageLength = (UCHAR) sn_len;
     page++;
-    memcpy(page, srbext->DevExt->CtrlIdent.SN, sn_len);
+    memcpy(page, devext->CtrlIdent.SN, sn_len);
 
     return SRB_STATUS_SUCCESS;
 }
-static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR Reply_VpdIdentifier(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
-    char *subnqn = (char*)srbext->DevExt->CtrlIdent.SUBNQN;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    char *subnqn = (char*)devext->CtrlIdent.SUBNQN;
     ULONG nqn_size = (ULONG)strlen((char*)subnqn);
     ULONG vid_size = (ULONG)strlen((char*)VENDOR_ID);
     size_t buf_size = (ULONG)sizeof(VPD_IDENTIFICATION_PAGE) +
@@ -77,7 +79,7 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
         page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
 
     //NQN is too long. So only use VID + SN as Identifier.
-    PVPD_IDENTIFICATION_DESCRIPTOR desc = NULL;
+    PVPD_IDENTIFICATION_DESCRIPTOR desc = nullptr;
     ULONG size = (ULONG)buf_size - sizeof(VPD_IDENTIFICATION_PAGE);
     page->DeviceType = DIRECT_ACCESS_DEVICE;
     page->DeviceTypeQualifier = DEVICE_CONNECTED;
@@ -99,10 +101,11 @@ static UCHAR Reply_VpdIdentifier(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 
     return SRB_STATUS_SUCCESS;
 }
-static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR Reply_VpdBlockLimits(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
     //Max SCSI transfer block size
     //question : is it really used in modern windows system? Orz
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
     ULONG buf_size = sizeof(VPD_BLOCK_LIMITS_PAGE);
     SPC::CAutoPtr<VPD_BLOCK_LIMITS_PAGE, PagedPool, TAG_VPDPAGE>
         page(new(PagedPool, TAG_VPDPAGE) UCHAR[buf_size]);
@@ -112,7 +115,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
     page->PageCode = VPD_BLOCK_LIMITS;
     REVERSE_BYTES_2(page->PageLength, &buf_size);
 
-    ULONG max_tx = srbext->DevExt->MaxTxSize;
+    ULONG max_tx = devext->MaxTxSize;
     //tell I/O system: max tx size and optimal tx size of this adapter.
     REVERSE_BYTES_4(page->MaximumTransferLength, &max_tx);
     REVERSE_BYTES_4(page->OptimalTransferLength, &max_tx);
@@ -127,7 +130,7 @@ static UCHAR Reply_VpdBlockLimits(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
 
     return SRB_STATUS_SUCCESS;
 }
-static UCHAR Reply_VpdBlockDeviceCharacteristics(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR Reply_VpdBlockDeviceCharacteristics(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
     ULONG buf_size = sizeof(VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE);
     SPC::CAutoPtr<VPD_BLOCK_DEVICE_CHARACTERISTICS_PAGE, PagedPool, TAG_VPDPAGE>
@@ -145,7 +148,7 @@ static UCHAR Reply_VpdBlockDeviceCharacteristics(PSPCNVME_SRBEXT srbext, ULONG& 
 
     return SRB_STATUS_SUCCESS;
 }
-static UCHAR HandleInquiryVPD(PSPCNVME_SRBEXT srbext, ULONG& ret_size)
+static UCHAR HandleInquiryVPD(PSPC_SRBEXT srbext, ULONG& ret_size)
 {
     PCDB &cdb = srbext->Cdb;
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
@@ -199,7 +202,7 @@ static void BuildInquiryData(PINQUIRYDATA data, char* vid, char* pid, char* rev)
     RtlCopyMemory((PUCHAR)&data->ProductRevisionLevel[0], rev, sizeof(data->ProductRevisionLevel));
 }
 
-UCHAR Scsi_RequestSense6(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_RequestSense6(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -249,27 +252,17 @@ UCHAR Scsi_RequestSense6(PSPCNVME_SRBEXT srbext)
     //SrbSetDataTransferLength(srbext->Srb, copy_size);
     //return srb_status;
 }
-UCHAR Scsi_Read6(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadWrite6(PSPC_SRBEXT srbext)
 {
 //the SCSI I/O are based for BLOCKs of device, not bytes....
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB& cdb = srbext->Cdb;
 
-    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, false);
+    ParseReadWriteLBA(cdb->CDB6READWRITE, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, srbext->IsWrite);
 }
-UCHAR Scsi_Write6(PSPCNVME_SRBEXT srbext)
-{
-    //the SCSI I/O are based for BLOCKs of device, not bytes....
-    ULONG64 offset = 0; //in blocks
-    ULONG len = 0;    //in blocks
-    PCDB& cdb = srbext->Cdb;
-
-    ParseReadWriteOffsetAndLen(cdb->CDB6READWRITE, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, true);
-}
-UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext) 
+UCHAR Scsi_Inquiry6(PSPC_SRBEXT srbext) 
 {
     ULONG ret_size = 0;
     UCHAR srb_status = SRB_STATUS_ERROR;
@@ -287,7 +280,7 @@ UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext)
         }
         else
         {
-            ULONG &size = srbext->DataBufLen;
+            UINT32 size = srbext->DataBufLen;
             ret_size = 0;
             srb_status = SRB_STATUS_DATA_OVERRUN;
             //in Win2000 and older version, NT SCSI system only query 
@@ -306,16 +299,17 @@ UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext)
         }
     }
     
-    SrbSetDataTransferLength(srbext->Srb, ret_size);
+    //SrbSetDataTransferLength(srbext->Srb, ret_size);
+    srbext->SetDataBufTxLength(ret_size);
     return srb_status;
 }
-UCHAR Scsi_Verify6(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify6(PSPC_SRBEXT srbext)
 {
 ////VERIFY(6) seems obsoleted? I didn't see description in Seagate SCSI reference.
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
 }
-UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSelect6(PSPC_SRBEXT srbext)
 {
     CDB::_MODE_SELECT *select = &srbext->Cdb->MODE_SELECT;
     PUCHAR buffer = (PUCHAR)srbext->DataBuffer;
@@ -338,7 +332,7 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
         return SRB_STATUS_INVALID_REQUEST;
 
     if(0 == header->BlockDescriptorLength)
-        param_block = NULL;
+        param_block = nullptr;
 
     //windows set header->ModeDataLength to 0. No idea if it is bug or lazy....
     mode_data_size = srbext->DataBufLen - 
@@ -357,15 +351,16 @@ UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext)
         if(page->PageCode != MODE_PAGE_CACHING || page->PageLength != (sizeof(MODE_CACHING_PAGE)-2))
             continue;
 
-        srbext->DevExt->ReadCacheEnabled = !page->ReadDisableCache;
-        srbext->DevExt->WriteCacheEnabled = page->WriteCacheEnable;
+        CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+        devext->ReadCacheEnabled = !page->ReadDisableCache;
+        devext->WriteCacheEnabled = page->WriteCacheEnable;
     }
 
     SrbSetDataTransferLength(srbext->Srb, 0);
     return SRB_STATUS_SUCCESS;
 }
 
-UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSense6(PSPC_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_ERROR;
     PCDB &cdb = srbext->Cdb;
@@ -375,7 +370,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
     ULONG ret_size = 0;
     ULONG page_size = 0;    //this is "copied ModePage size", not OS PAGE_SIZE...
 
-    if (buf_size < sizeof(MODE_PARAMETER_HEADER) || NULL == buffer)
+    if (buf_size < sizeof(MODE_PARAMETER_HEADER) || nullptr == buffer)
     {
         srb_status = SRB_STATUS_DATA_OVERRUN;
         ret_size = sizeof(MODE_PARAMETER_HEADER);
@@ -392,7 +387,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
     {
     case MODE_PAGE_CACHING:
     {
-        page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
+        page_size = ReplyModePageCaching((CNvmeDevice*)srbext->DevExt, buffer, buf_size, ret_size);
         header->ModeDataLength += (UCHAR)page_size;
         srb_status = SRB_STATUS_SUCCESS;
         break;
@@ -419,7 +414,7 @@ UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext)
         if (buf_size > 0)
         {
         //buffer size and buffer will be updated in function.
-            page_size = ReplyModePageCaching(srbext->DevExt, buffer, buf_size, ret_size);
+            page_size = ReplyModePageCaching((CNvmeDevice*)srbext->DevExt, buffer, buf_size, ret_size);
             header->ModeDataLength += (UCHAR)page_size;
         }
         if (buf_size > 0)
@@ -447,7 +442,7 @@ end:
     SrbSetDataTransferLength(srbext->Srb, ret_size);
     return srb_status;
 }
-UCHAR Scsi_TestUnitReady(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_TestUnitReady(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;

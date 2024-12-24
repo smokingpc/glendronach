@@ -33,8 +33,7 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
@@ -56,7 +55,13 @@ EXTERN_C_END
 #include "..\WdmUtils\AutoPtr.hpp"
 #include "PoolTags.h"
 #include "Constants.h"
+#include "Enumerations.h"
 #include "Inline_Utils.h"
+
+
+
+
+
 #include "NvmeEnums.h"
 #include "PCIe_Msix.h"
 #include "SrbExt.h"

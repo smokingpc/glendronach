@@ -1,6 +1,6 @@
 #include "pch.h"
 
-UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReportLuns12(PSPC_SRBEXT srbext)
 {
 //according SEAGATE SCSI reference, SCSIOP_REPORT_LUNS
 //is used to query SCSI Logical Unit class address.
@@ -13,27 +13,17 @@ UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext)
     return SRB_STATUS_INVALID_REQUEST;
 }
 
-UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadWrite12(PSPC_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB& cdb = srbext->Cdb;
 
-    ParseReadWriteOffsetAndLen(cdb->CDB12, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, false);
+    ParseReadWriteLBA(cdb->CDB12, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, srbext->IsWrite);
 }
 
-UCHAR Scsi_Write12(PSPCNVME_SRBEXT srbext)
-{
-    ULONG64 offset = 0; //in blocks
-    ULONG len = 0;    //in blocks
-    PCDB& cdb = srbext->Cdb;
-
-    ParseReadWriteOffsetAndLen(cdb->CDB12, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, true);
-}
-
-UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify12(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -62,18 +52,19 @@ UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext)
 //Then in disk.sys it picks CDB data and send to NVMe driver via SCSI command.
 
 //SCSIOP_SECURITY_PROTOCOL_IN => Host retrieve security protocol data from device
-UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_SecurityProtocolIn(PSPC_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    BOOLEAN is_support = devext->CtrlIdent.OACS.SecurityCommands;
     if(!is_support)
         return SRB_STATUS_ERROR;
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
     BuildCmd_AdminSecurityRecv(srbext, DEFAULT_CTRLID, srbext->Cdb);
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = devext->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;
     else
@@ -82,18 +73,19 @@ UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext)
     return srb_status;
 }
 //SCSIOP_SECURITY_PROTOCOL_OUT => Host send security protocol data to device
-UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_SecurityProtocolOut(PSPC_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    BOOLEAN is_support = srbext->DevExt->CtrlIdent.OACS.SecurityCommands;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    BOOLEAN is_support = devext->CtrlIdent.OACS.SecurityCommands;
     if (!is_support)
         return SRB_STATUS_ERROR;
 
     //Note: In this command , payload data should be aligned to block size 
     //of namespace format. Usually it is PAGE_SIZE from app.
     BuildCmd_AdminSecuritySend(srbext, DEFAULT_CTRLID, srbext->Cdb);
-    status = srbext->DevExt->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
+    status = devext->SubmitAdmCmd(srbext, &srbext->NvmeCmd);
     if (!NT_SUCCESS(status))
         srb_status = SRB_STATUS_ERROR;
     else

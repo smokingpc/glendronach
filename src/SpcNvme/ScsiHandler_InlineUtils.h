@@ -33,8 +33,7 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
@@ -119,28 +118,28 @@ inline ULONG ReplyModePageInfoExceptionCtrl(PUCHAR& buffer, ULONG& buf_size, ULO
 
 #pragma region ======== Parse SCSI ReadWrite length and offset ======== 
 //Note: In SCSI, all read/write request are in "BLOCKS", not in bytes.
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG &len)
+inline void ParseReadWriteLBA(CDB::_CDB6READWRITE &rw, ULONG64 &offset, ULONG &len)
 {
     offset = (rw.LogicalBlockMsb1 << 16) | (rw.LogicalBlockMsb0 << 8) | rw.LogicalBlockLsb;
     len = rw.TransferBlocks;
     if(0 == len)
         len = 256;
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB10& rw, ULONG64& offset, ULONG &len)
+inline void ParseReadWriteLBA(CDB::_CDB10& rw, ULONG64& offset, ULONG &len)
 {
     offset = 0;
     len = 0;
     REVERSE_BYTES_4(&offset, &rw.LogicalBlockByte0);
     REVERSE_BYTES_2(&len, &rw.TransferBlocksMsb);
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB12& rw, ULONG64& offset, ULONG &len)
+inline void ParseReadWriteLBA(CDB::_CDB12& rw, ULONG64& offset, ULONG &len)
 {
     offset = 0;
     len = 0;
     REVERSE_BYTES_4(&offset, &rw.LogicalBlock);
     REVERSE_BYTES_4(&len, &rw.TransferLength);
 }
-inline void ParseReadWriteOffsetAndLen(CDB::_CDB16& rw, ULONG64& offset, ULONG &len)
+inline void ParseReadWriteLBA(CDB::_CDB16& rw, ULONG64& offset, ULONG &len)
 {
     REVERSE_BYTES_8(&offset, &rw.LogicalBlock);
     REVERSE_BYTES_4(&len, &rw.TransferLength);

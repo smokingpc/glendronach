@@ -1,13 +1,13 @@
 #include "pch.h"
 
-UCHAR StartIo_DefaultHandler(PSPCNVME_SRBEXT srbext)
+UCHAR StartIo_DefaultHandler(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     //SetScsiSenseBySrbStatus(srbext->Srb, SRB_STATUS_INVALID_REQUEST);
     //StorPortNotification(RequestComplete, srbext->DevExt, srbext->Srb);
     return SRB_STATUS_INVALID_REQUEST;
 }
-UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
+UCHAR StartIo_ScsiHandler(PSPC_SRBEXT srbext)
 {
     UCHAR opcode = srbext->Cdb->CDB6GENERIC.OperationCode;
     UCHAR srb_status = SRB_STATUS_ERROR;
@@ -55,14 +55,12 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     case SCSIOP_MODE_SELECT:        //cache and other feature options
         srb_status = Scsi_ModeSelect6(srbext);
         break;
+    //case SCSIOP_RECEIVE:
+    //case SCSIOP_PRINT:
+    //case SCSIOP_SEND:
     case SCSIOP_READ6:
-        //case SCSIOP_RECEIVE:
-        srb_status = Scsi_Read6(srbext);
-        break;
     case SCSIOP_WRITE6:
-        //case SCSIOP_PRINT:
-        //case SCSIOP_SEND:
-        srb_status = Scsi_Write6(srbext);
+        srb_status = Scsi_ReadWrite6(srbext);
         break;
     case SCSIOP_INQUIRY:
         srb_status = Scsi_Inquiry6(srbext);
@@ -135,11 +133,11 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     case SCSIOP_READ_CAPACITY:
         srb_status = Scsi_ReadCapacity10(srbext);
         break;
+    //case SCSIOP_PRINT:
+    //case SCSIOP_SEND:
     case SCSIOP_READ:
-        srb_status = Scsi_Read10(srbext);
-        break;
     case SCSIOP_WRITE:
-        srb_status = Scsi_Write10(srbext);
+        srb_status = Scsi_ReadWrite10(srbext);
         break;
     case SCSIOP_VERIFY:
         srb_status = Scsi_Verify10(srbext);
@@ -198,12 +196,10 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
     case SCSIOP_REPORT_LUNS:
         srb_status = Scsi_ReportLuns12(srbext);
         break;
+    //case SCSIOP_GET_MESSAGE:
     case SCSIOP_READ12:
-        //case SCSIOP_GET_MESSAGE:
-        srb_status = Scsi_Read12(srbext);
-        break;
     case SCSIOP_WRITE12:
-        srb_status = Scsi_Write12(srbext);
+        srb_status = Scsi_ReadWrite12(srbext);
         break;
     case SCSIOP_VERIFY12:
         srb_status = Scsi_Verify12(srbext);
@@ -245,10 +241,8 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 #endif
 
     case SCSIOP_READ16:
-        srb_status = Scsi_Read16(srbext);
-        break;
     case SCSIOP_WRITE16:
-        srb_status = Scsi_Write16(srbext);
+        srb_status = Scsi_ReadWrite16(srbext);
         break;
     case SCSIOP_VERIFY16:
         srb_status = Scsi_Verify16(srbext);
@@ -273,7 +267,7 @@ UCHAR StartIo_ScsiHandler(PSPCNVME_SRBEXT srbext)
 
     return srb_status;
 }
-UCHAR StartIo_IoctlHandler(PSPCNVME_SRBEXT srbext)
+UCHAR StartIo_IoctlHandler(PSPC_SRBEXT srbext)
 {
 
     //SRB_FUNCTION_IO_CONTROL handles serveral kinds (groups) of IOCTL:

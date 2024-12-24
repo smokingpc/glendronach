@@ -33,11 +33,22 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
 
-bool BuildPrp(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd, PVOID buffer, size_t buf_size);
+//bool BuildPrp(PSPC_SRBEXT srbext, PNVME_COMMAND cmd, PVOID buffer, size_t buf_size);
+bool BuildPrp(
+    _Out_ PVOID& prp1va,
+    _Out_ PVOID& prp2va,
+    _Out_ ULONG& prp_count,
+    _Out_opt_ PVOID& prp2list,
+    _In_ PVOID buffer,
+    _In_ size_t buf_size);
+bool BuildPrp(
+    _Inout_ PSPC_SRBEXT srbext, 
+    _Inout_ PNVME_COMMAND cmd,
+    _In_ PVOID buffer,
+    _In_ size_t buf_size);

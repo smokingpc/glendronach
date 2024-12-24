@@ -33,37 +33,36 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
 
-void BuiildCmd_ReadWrite(PSPCNVME_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write);
-void BuildCmd_IdentCtrler(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data);
-void BuildCmd_IdentActiveNsidList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, size_t list_size);
-void BuildCmd_IdentSpecifiedNS(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid);
-void BuildCmd_IdentAllNSList(PSPCNVME_SRBEXT srbext, PVOID ns_buf, size_t buf_size);
-void BuildCmd_SetIoQueueCount(PSPCNVME_SRBEXT srbext, USHORT count);
+void BuiildCmd_ReadWrite(PSPC_SRBEXT srbext, ULONG64 offset, ULONG blocks, bool is_write);
+void BuildCmd_IdentCtrler(PSPC_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA data);
+void BuildCmd_IdentActiveNsidList(PSPC_SRBEXT srbext, PVOID nsid_list, size_t list_size);
+void BuildCmd_IdentSpecifiedNS(PSPC_SRBEXT srbext, PNVME_IDENTIFY_NAMESPACE_DATA data, ULONG nsid);
+void BuildCmd_IdentAllNSList(PSPC_SRBEXT srbext, PVOID ns_buf, size_t buf_size);
+void BuildCmd_SetIoQueueCount(PSPC_SRBEXT srbext, USHORT count);
 
-void BuildCmd_RegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
-void BuildCmd_RegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
-void BuildCmd_UnRegIoSubQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
-void BuildCmd_UnRegIoCplQ(PSPCNVME_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_RegIoSubQ(PSPC_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_RegIoCplQ(PSPC_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_UnRegIoSubQ(PSPC_SRBEXT srbext, CNvmeQueue* queue);
+void BuildCmd_UnRegIoCplQ(PSPC_SRBEXT srbext, CNvmeQueue* queue);
 
-void BuildCmd_InterruptCoalescing(PSPCNVME_SRBEXT srbext, UCHAR threshold, UCHAR interval);
-void BuildCmd_SetArbitration(PSPCNVME_SRBEXT srbext);
-void BuildCmd_SyncHostTime(PSPCNVME_SRBEXT srbext, LARGE_INTEGER& timestamp);
-void BuildCmd_SetAsyncEvent(PSPCNVME_SRBEXT srbext);
-void BuildCmd_GetFirmwareSlotsInfo(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
-void BuildCmd_GetFirmwareSlotsInfoV1(PSPCNVME_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
+void BuildCmd_InterruptCoalescing(PSPC_SRBEXT srbext, UCHAR threshold, UCHAR interval);
+void BuildCmd_SetArbitration(PSPC_SRBEXT srbext);
+void BuildCmd_SyncHostTime(PSPC_SRBEXT srbext, LARGE_INTEGER& timestamp);
+void BuildCmd_SetAsyncEvent(PSPC_SRBEXT srbext);
+void BuildCmd_GetFirmwareSlotsInfo(PSPC_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
+void BuildCmd_GetFirmwareSlotsInfoV1(PSPC_SRBEXT srbext, PNVME_FIRMWARE_SLOT_INFO_LOG info);
 
-void BuildCmd_AdminSecuritySend(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb);
-void BuildCmd_AdminSecurityRecv(PSPCNVME_SRBEXT srbext, ULONG nsid, PCDB cdb);
+void BuildCmd_AdminSecuritySend(PSPC_SRBEXT srbext, ULONG nsid, PCDB cdb);
+void BuildCmd_AdminSecurityRecv(PSPC_SRBEXT srbext, ULONG nsid, PCDB cdb);
 
-void BuildCmd_RequestAsyncEvent(PSPCNVME_SRBEXT srbext);
-void BuildCmd_GetLogPage(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
-void BuildCmd_GetLogPageV13(PSPCNVME_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
-void BuildCmd_SetVolatileWriteCache(PSPCNVME_SRBEXT srbext);
-void BuildCmd_Flush(PSPCNVME_SRBEXT srbext, ULONG nsid);
+void BuildCmd_RequestAsyncEvent(PSPC_SRBEXT srbext);
+void BuildCmd_GetLogPage(PSPC_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
+void BuildCmd_GetLogPageV13(PSPC_SRBEXT srbext, UCHAR log_id, PVOID log_buf, UINT32 buf_size);
+void BuildCmd_SetVolatileWriteCache(PSPC_SRBEXT srbext);
+void BuildCmd_Flush(PSPC_SRBEXT srbext, ULONG nsid);

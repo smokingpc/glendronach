@@ -300,6 +300,7 @@
     <ClCompile Include="BuildIo_Handler.cpp" />
     <ClInclude Include="AdapterPnpHandler.h" />
     <ClInclude Include="BuildIo_Handlers.h" />
+    <ClInclude Include="Enumerations.h" />
     <ClInclude Include="IoctlScsiMiniport_Handlers.h" />
     <ClInclude Include="Ioctl_FirmwareFunctions.h" />
     <ClInclude Include="IoctlStorageQuery_Handlers.h" />

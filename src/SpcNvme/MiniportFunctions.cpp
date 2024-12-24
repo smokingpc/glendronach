@@ -7,14 +7,14 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     portcfg->MaximumTransferLength = nvme->MaxTxSize;
     portcfg->NumberOfPhysicalBreaks = nvme->MaxTxPages;
     portcfg->AlignmentMask = FILE_LONG_ALIGNMENT;    //PRP 1 need align DWORD in some case. So set this align is better.
-    portcfg->MiniportDumpData = NULL;
+    portcfg->MiniportDumpData = nullptr;
     portcfg->InitiatorBusId[0] = 1;
     portcfg->CachesData = FALSE;    //if set it to TRUE, miniport will get SRB_FUNCTION_FLUSH after SCSIOP_SYNCHRONIZE_CACHE when flush cache.
     portcfg->MapBuffers = STOR_MAP_ALL_BUFFERS_INCLUDING_READ_WRITE; //specify bounce buffer type?
     portcfg->MaximumNumberOfTargets = MAX_SCSI_TARGETS;
     portcfg->SrbType = SRB_TYPE_STORAGE_REQUEST_BLOCK;
     portcfg->DeviceExtensionSize = sizeof(CNvmeDevice);
-    portcfg->SrbExtensionSize = sizeof(SPCNVME_SRBEXT);
+    portcfg->SrbExtensionSize = sizeof(SPC_SRBEXT);
     portcfg->MaximumNumberOfLogicalUnits = MAX_SCSI_LOGICAL_UNIT;
     portcfg->SynchronizationModel = StorSynchronizeFullDuplex;
     portcfg->HwMSInterruptRoutine = CNvmeDevice::NvmeMsixISR;
@@ -34,8 +34,8 @@ static void FillPortConfiguration(PPORT_CONFIGURATION_INFORMATION portcfg, CNvme
     //Dump is not supported now. Will be supported in future.
     portcfg->RequestedDumpBufferSize = 0;
     portcfg->DumpMode = 0;//DUMP_MODE_CRASH;
-    portcfg->DumpRegion.VirtualBase = NULL;
-    portcfg->DumpRegion.PhysicalBase.QuadPart = NULL;
+    portcfg->DumpRegion.VirtualBase = nullptr;
+    portcfg->DumpRegion.PhysicalBase.QuadPart = 0;
     portcfg->DumpRegion.Length = 0;
     portcfg->FeatureSupport = STOR_ADAPTER_DMA_V3_PREFERRED;
 }
@@ -136,7 +136,7 @@ BOOLEAN HwPassiveInitialize(PVOID devext)
     if (!NT_SUCCESS(status))
         return FALSE;
 
-    status = nvme->RegisterIoQueues(NULL);
+    status = nvme->RegisterIoQueues(nullptr);
     if (!NT_SUCCESS(status))
         return FALSE;
 
@@ -150,10 +150,10 @@ BOOLEAN HwBuildIo(_In_ PVOID devext,_In_ PSCSI_REQUEST_BLOCK srb)
 //In this callback, also dispatch some behavior which need be handled very fast.
 //some event (e.g. REMOVE_DEVICE and POWER_EVENTS) only fire once and need to be handled quickly.
 //We can't dispatch such events to StartIo(), that could waste too much time.
-    PSPCNVME_SRBEXT srbext = InitSrbExt(devext, srb);
+    PSPC_SRBEXT srbext = InitAndGetSrbExt(devext, srb);
     UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
 
-    switch (srbext->SrbFuncCode)
+    switch (srbext->FunctionCode)
     {
     case SRB_FUNCTION_RESET_LOGICAL_UNIT:
     case SRB_FUNCTION_ABORT_COMMAND:
@@ -213,10 +213,10 @@ _Use_decl_annotations_
 BOOLEAN HwStartIo(PVOID devext, PSCSI_REQUEST_BLOCK srb)
 {
     UNREFERENCED_PARAMETER(devext);
-    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
+    PSPC_SRBEXT srbext = GetSrbExt(srb);
     UCHAR srb_status = SRB_STATUS_ERROR;
 
-    switch (srbext->SrbFuncCode)
+    switch (srbext->FunctionCode)
     {
     //case SRB_FUNCTION_RESET_LOGICAL_UNIT:     //dispatched in HwUnitControl
     //case SRB_FUNCTION_RESET_DEVICE:           //dispatched in HwAdapterControl

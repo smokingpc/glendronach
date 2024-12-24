@@ -1,40 +1,31 @@
 #include "pch.h"
-inline void FillReadCapacityEx(UCHAR lun, PSPCNVME_SRBEXT srbext)
+inline void FillReadCapacityEx(UCHAR lun, PSPC_SRBEXT srbext)
 {
     PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
     ULONG block_size = 0;
     ULONG64 blocks = 0;
-    srbext->DevExt->GetNamespaceBlockSize(lun+1, block_size);
+    devext->GetNamespaceBlockSize(lun+1, block_size);
 
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(lun+1, blocks);
+    devext->GetNamespaceTotalBlocks(lun+1, blocks);
     blocks -= 1;
     REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
     REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);
 }
 
-UCHAR Scsi_Read16(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadWrite16(PSPC_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB& cdb = srbext->Cdb;
 
-    ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, false);
+    ParseReadWriteLBA(cdb->CDB16, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, srbext->IsWrite);
 }
 
-UCHAR Scsi_Write16(PSPCNVME_SRBEXT srbext)
-{
-    ULONG64 offset = 0; //in blocks
-    ULONG len = 0;    //in blocks
-    PCDB& cdb = srbext->Cdb;
-
-    ParseReadWriteOffsetAndLen(cdb->CDB16, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, true);
-}
-
-UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify16(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -56,16 +47,17 @@ UCHAR Scsi_Verify16(PSPCNVME_SRBEXT srbext)
     //return srb_status;
 }
 
-UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadCapacity16(PSPC_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
     PREAD_CAPACITY_DATA_EX cap = (PREAD_CAPACITY_DATA_EX)srbext->DataBuffer;
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
     ULONG block_size = 0;
     ULONG64 blocks = 0;
 
-    if (!srbext->DevExt->IsWorking())
+    if (!devext->IsWorking())
     {
         srb_status = SRB_STATUS_NO_DEVICE;
         goto END;
@@ -78,10 +70,10 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
         goto END;
     }
 
-    srbext->DevExt->GetNamespaceBlockSize(nsid, block_size);
+    devext->GetNamespaceBlockSize(nsid, block_size);
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(nsid, blocks);
+    devext->GetNamespaceTotalBlocks(nsid, blocks);
     blocks -= 1;
     REVERSE_BYTES_4(&cap->BytesPerBlock, &block_size);
     REVERSE_BYTES_8(&cap->LogicalBlockAddress.QuadPart, &blocks);
@@ -89,19 +81,20 @@ UCHAR Scsi_ReadCapacity16(PSPCNVME_SRBEXT srbext)
     srb_status = SRB_STATUS_SUCCESS;
 
 END:
-    srbext->SetTransferLength(ret_size);
+    srbext->SetDataBufTxLength(ret_size);
     return srb_status;
 }
 
-UCHAR Scsi_SynchronizeCache16(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_SynchronizeCache16(PSPC_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
-    if (FALSE == srbext->DevExt->CtrlIdent.VWC.Present)
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    if (FALSE == devext->CtrlIdent.VWC.Present)
         return SRB_STATUS_SUCCESS;
 
     BuildCmd_Flush(srbext, nsid);
-    status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
+    status = devext->SubmitIoCmd(srbext, &srbext->NvmeCmd);
 
     return NtStatusToSrbStatus(status);
 }

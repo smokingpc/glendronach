@@ -36,7 +36,7 @@ void SetScsiSenseBySrbStatus(PSCSI_REQUEST_BLOCK srb, UCHAR &status)
 
             PSENSE_DATA sdata = (PSENSE_DATA)SrbGetSenseInfoBuffer(srb);
             UCHAR sdata_size = SrbGetSenseInfoBufferLength(srb);
-            if (NULL == sdata || sdata_size == 0)
+            if (nullptr == sdata || sdata_size == 0)
             {
                 SrbSetScsiStatus(srb, SCSISTAT_CONDITION_MET);
             }

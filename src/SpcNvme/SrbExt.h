@@ -33,39 +33,45 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
-class CNvmeDevice;
-struct _SPCNVME_SRBEXT;
-typedef VOID SPC_SRBEXT_COMPLETION(struct _SPCNVME_SRBEXT *srbext);
+typedef VOID SPC_SRBEXT_COMPLETION(struct _SPC_SRBEXT *srbext);
 typedef SPC_SRBEXT_COMPLETION* PSPC_SRBEXT_COMPLETION;
 
-typedef struct _SPCNVME_SRBEXT
+//SPC stands for SmokingPC  ... :p
+typedef struct _SPC_SRBEXT
 {
-    CNvmeDevice *DevExt;
+    PVOID DevExt;
     PSCSI_REQUEST_BLOCK Srb;
-    PSTORAGE_REQUEST_BLOCK SrbEx;
-//    PSCSI_PNP_REQUEST_BLOCK ScsiPnp;
 
+    bool InitOK;
+    bool IsCompleted;
+    bool IsWrite;
+    bool DeleteInComplete;
     UCHAR SrbStatus;        //returned SrbStatus for SyncCall of Admin cmd (e.g. IndeitfyController) 
-    BOOLEAN InitOK;
-    BOOLEAN FreePrp2List;
-    BOOLEAN DeleteInComplete;
-    BOOLEAN IsCompleted;
     NVME_COMMAND NvmeCmd;
     NVME_COMPLETION_ENTRY NvmeCpl;
-    PVOID Prp1VA;
-    PHYSICAL_ADDRESS Prp1PA;
-    PVOID Prp2VA;
-    PHYSICAL_ADDRESS Prp2PA;
+
+    PVOID Prp1VA;               //for debug tracking
+    PHYSICAL_ADDRESS Prp1PA;    //for debug tracking
+    PVOID Prp2VA;               //for debug tracking
+    PHYSICAL_ADDRESS Prp2PA;    //for debug tracking
+    PVOID Prp2List;             //if (PrpCount > 2), this field will assign to new page to store PRP2 Entries
+    ULONG PrpCount;            //total PRP entries
     PSPC_SRBEXT_COMPLETION CompletionCB;
-    //ExtBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPageForAsyncEvent().
+    
+    //ExtraBuf is used to retrieve data by cmd. e.g. LogPage Buffer in GetLogPageForAsyncEvent().
     //It should be freed in CompletionCB.
-    PVOID ExtBuf;
+    PVOID ExtraBuf;
+    ULONG ExtraBufSize;        //size in bytes
+
+#pragma region ======== Information parsed from SRB ========
+    ULONG FunctionCode;        //SRB_FUNCTION_XXX code from srb
+    PVOID DataBuffer;
+    ULONG DataBufLen;
     USHORT StoragePort;
     UCHAR ScsiPath;
     UCHAR ScsiTarget;
@@ -73,45 +79,65 @@ typedef struct _SPCNVME_SRBEXT
     ULONG ScsiTag;          //scsi tag from storport, unique id for each LU
     PCDB Cdb;
     UCHAR CdbLen;
-    PVOID DataBuffer;
-    ULONG DataBufLen;
-    ULONG SrbFuncCode;
+#pragma endregion ======== Information parsed from SRB ========
+
     #pragma region ======== for Debugging ========
     class CNvmeQueue *SubmittedQ;
-    ULONG SubTail;
+    UINT32 SubTail;
     PNVME_COMMAND SubmitCmdPtr;
     #pragma endregion
 
-    void Init(PVOID devext, PSCSI_REQUEST_BLOCK srb);
+    ULONG OverrunGuard;
+
+    void Init(
+        _In_ PVOID devext, 
+        _In_ PSCSI_REQUEST_BLOCK srb, 
+        _In_ PSPC_SRBEXT_COMPLETION callback = nullptr);
     void CleanUp();
-    void CompleteSrb(UCHAR status);
-    void CompleteSrb(NVME_COMMAND_STATUS& nvme_status);
-    void SetTransferLength(ULONG length);
-    void ResetExtBuf(PVOID new_buffer = NULL);
-    PSRBEX_DATA_PNP GetSrbExPnpData();  //for STORAGE_REQUESTS_BLOCK only.
+    void CompleteSrb(_In_ UCHAR status);
+    void CompleteSrb(_In_ NVME_COMMAND_STATUS& nvme_status);
+    void SetDataBufTxLength(_In_ ULONG length);
+    void ResetExtBuf(_In_ PVOID new_buffer = nullptr);
+    bool GetPnpRequest(_Out_ STOR_PNP_ACTION& action, _Out_ ULONG& flags);
+    PVOID AllocExtraBuf(ULONG size);
+
+#if 0    
+    bool BuildPrpByBuffer(PVOID buffer, UINT32 buf_size);
+    inline bool BuildPrpByDataBuf()
+    {
+        this->BuildPrpByBuffer(this->DataBuffer, this->DataBufLen);
+    }
+    inline bool BuildPrpByExtraBuf()
+    {
+        this->BuildPrpByBuffer(this->ExtraBuf, this->ExtraBufSize);
+    }
     inline bool IsSrbEx()
     {
         //in storport system, STORAGE_REQUEST_BLOCK also named as SRBEX.
-        if(NULL == Srb)
+        if(nullptr == Srb)
             return false;
         return (SRB_FUNCTION_STORAGE_REQUEST_BLOCK == SrbFuncCode);
     }
     inline bool IsScsiSrb()
     {
-        if (NULL == Srb)
+        if (nullptr == Srb)
             return false;
         return (SRB_FUNCTION_STORAGE_REQUEST_BLOCK != SrbFuncCode);
     }
-}SPCNVME_SRBEXT, * PSPCNVME_SRBEXT;
+#endif
+}SPC_SRBEXT, * PSPC_SRBEXT;
 
-inline _SPCNVME_SRBEXT* GetSrbExt(PSCSI_REQUEST_BLOCK srb)
+__inline PSPC_SRBEXT GetSrbExt(_In_ PSCSI_REQUEST_BLOCK srb)
 {
-    return (PSPCNVME_SRBEXT)SrbGetMiniportContext(srb);
+    return (PSPC_SRBEXT)SrbGetMiniportContext(srb);
 }
-inline _SPCNVME_SRBEXT* InitSrbExt(PVOID devext, PSCSI_REQUEST_BLOCK srb)
+__inline PSPC_SRBEXT InitAndGetSrbExt(
+    _In_ PVOID devext,
+    _In_ PSCSI_REQUEST_BLOCK srb,
+    _In_ PSPC_SRBEXT_COMPLETION callback = nullptr)
 {
-    PSPCNVME_SRBEXT srbext = GetSrbExt(srb);
-    srbext->Init(devext, srb);
+    PSPC_SRBEXT srbext = GetSrbExt(srb);
+    srbext->Init(devext, srb, callback);
     return srbext;
 }
 

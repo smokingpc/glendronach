@@ -33,18 +33,16 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
 
-UCHAR Scsi_RequestSense6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Read6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Write6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Inquiry6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Verify6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_ModeSelect6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_ModeSense6(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_TestUnitReady(PSPCNVME_SRBEXT srbext);
+UCHAR Scsi_RequestSense6(PSPC_SRBEXT srbext);
+UCHAR Scsi_ReadWrite6(PSPC_SRBEXT srbext);
+UCHAR Scsi_Inquiry6(PSPC_SRBEXT srbext);
+UCHAR Scsi_Verify6(PSPC_SRBEXT srbext);
+UCHAR Scsi_ModeSelect6(PSPC_SRBEXT srbext);
+UCHAR Scsi_ModeSense6(PSPC_SRBEXT srbext);
+UCHAR Scsi_TestUnitReady(PSPC_SRBEXT srbext);

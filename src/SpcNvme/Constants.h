@@ -33,8 +33,7 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
@@ -47,6 +46,10 @@
 //const char* SpcVendorID = "SPC     ";           //vendor name
 //const char* SpcProductID = "SomkingPC NVMe  ";  //model name
 //const char* SpcProductRev = "0100";
+
+#pragma region  ======== for Debugging ========
+#define OVERRUN_GUARD_TAG       0x28825252
+#pragma endregion  ======== for Debugging ========
 
 #pragma region  ======== SCSI and SRB ========
 #define SRB_FUNCTION_SPC_INTERNAL   0xFF

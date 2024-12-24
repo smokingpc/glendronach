@@ -1,25 +1,15 @@
 #include "pch.h"
-
-UCHAR Scsi_Read10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadWrite10(PSPC_SRBEXT srbext)
 {
     ULONG64 offset = 0; //in blocks
     ULONG len = 0;    //in blocks
     PCDB &cdb = srbext->Cdb;
 
-    ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, false);
-}
-UCHAR Scsi_Write10(PSPCNVME_SRBEXT srbext)
-{
-    ULONG64 offset = 0; //in blocks
-    ULONG len = 0;    //in blocks
-    PCDB &cdb = srbext->Cdb;
-
-    ParseReadWriteOffsetAndLen(cdb->CDB10, offset, len);
-    return Scsi_ReadWrite(srbext, offset, len, true);
+    ParseReadWriteLBA(cdb->CDB10, offset, len);
+    return Scsi_ReadWrite(srbext, offset, len, srbext->IsWrite);
 }
 
-UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ReadCapacity10(PSPC_SRBEXT srbext)
 {
     UCHAR srb_status = SRB_STATUS_SUCCESS;
     ULONG ret_size = 0;
@@ -27,8 +17,8 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
     ULONG block_size = 0;
     ULONG64 blocks = 0;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
-
-    if(!srbext->DevExt->IsWorking())
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    if(!devext->IsWorking())
     {
         srb_status = SRB_STATUS_NO_DEVICE;
         goto END;
@@ -43,8 +33,8 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
     
     //LogicalBlockAddress is MAX LBA index, it's zero-based id.
     //**this field is (total LBA count)-1.
-    srbext->DevExt->GetNamespaceTotalBlocks(nsid, blocks);
-    srbext->DevExt->GetNamespaceBlockSize(nsid, block_size);
+    devext->GetNamespaceTotalBlocks(nsid, blocks);
+    devext->GetNamespaceBlockSize(nsid, block_size);
     if (blocks > MAXULONG32)
     {
         srb_status = SRB_STATUS_INVALID_REQUEST;
@@ -67,10 +57,10 @@ UCHAR Scsi_ReadCapacity10(PSPCNVME_SRBEXT srbext)
     srb_status = SRB_STATUS_SUCCESS;
 
 END:
-    srbext->SetTransferLength(ret_size);
+    srbext->SetDataBufTxLength(ret_size);
     return srb_status;
 }
-UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_Verify10(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -91,16 +81,12 @@ UCHAR Scsi_Verify10(PSPCNVME_SRBEXT srbext)
     //SrbSetDataTransferLength(srbext->Srb, 0);
     //return srb_status;
 }
-UCHAR Scsi_ModeSelect10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSelect10(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
-
-    //UCHAR srb_status = SRB_STATUS_INVALID_REQUEST;
-    //UNREFERENCED_PARAMETER(srbext);
-    //return srb_status;
 }
-UCHAR Scsi_ModeSense10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_ModeSense10(PSPC_SRBEXT srbext)
 {
     UNREFERENCED_PARAMETER(srbext);
     return SRB_STATUS_INVALID_REQUEST;
@@ -114,7 +100,7 @@ UCHAR Scsi_ModeSense10(PSPCNVME_SRBEXT srbext)
 //    ULONG page_size = 0;
 //    ULONG mode_data_size = 0;
 //
-//    if (NULL == buffer || 0 == buf_size)
+//    if (nullptr == buffer || 0 == buf_size)
 //        return SRB_STATUS_ERROR;
 //
 //    if (buf_size < sizeof(MODE_PARAMETER_HEADER10))
@@ -192,14 +178,15 @@ UCHAR Scsi_ModeSense10(PSPCNVME_SRBEXT srbext)
 //    return srb_status;
 }
 
-UCHAR Scsi_SynchronizeCache10(PSPCNVME_SRBEXT srbext)
+UCHAR Scsi_SynchronizeCache10(PSPC_SRBEXT srbext)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     ULONG nsid = LunToNsId(srbext->ScsiLun);
-    if(FALSE == srbext->DevExt->CtrlIdent.VWC.Present)
+    CNvmeDevice* devext = (CNvmeDevice*)srbext->DevExt;
+    if(FALSE == devext->CtrlIdent.VWC.Present)
         return SRB_STATUS_SUCCESS;
 
     BuildCmd_Flush(srbext, nsid);
-    status = srbext->DevExt->SubmitIoCmd(srbext, &srbext->NvmeCmd);
+    status = devext->SubmitIoCmd(srbext, &srbext->NvmeCmd);
     return NtStatusToSrbStatus(status);
 }

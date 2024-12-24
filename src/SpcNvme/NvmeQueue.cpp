@@ -145,7 +145,7 @@ NTSTATUS CNvmeQueue::Setup(QUEUE_PAIR_CONFIG* config)
         goto ERROR;
     }
 
-    if(NULL == Buffer)
+    if(nullptr == Buffer)
     {
         BufferSize = CalcQueueBufferSize(Depth);
         ok = AllocQueueBuffer();
@@ -175,13 +175,13 @@ ERROR:
 }
 void CNvmeQueue::Teardown()
 {
-    this->IsReady = false;
+    IsReady = false;
     DeallocSrbExtBuffer();
     DeallocQueueBuffer();
 }
-NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
+NTSTATUS CNvmeQueue::SubmitCmd(PSPC_SRBEXT srbext, PNVME_COMMAND src_cmd)
 {
-    if (!this->IsReady)
+    if (!IsReady)
         return STATUS_DEVICE_NOT_READY;
     //throttle of submittion. If SubTail exceed CplHead, 
     //NVMe device will have fatal error and stopped.
@@ -190,9 +190,9 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
     {
         CQueuedSpinLock lock(&SubLock);
 
-        ASSERT(NULL != srbext);
+        ASSERT(nullptr != srbext);
         if (MAXUSHORT == src_cmd->CDW0.CID)
-            src_cmd->CDW0.CID = this->GetNextCid();
+            src_cmd->CDW0.CID = GetNextCid();
 
         PushSrbExt(srbext, src_cmd->CDW0.CID);
 
@@ -204,7 +204,7 @@ NTSTATUS CNvmeQueue::SubmitCmd(SPCNVME_SRBEXT* srbext, PNVME_COMMAND src_cmd)
         RtlCopyMemory((SubQ_VA+SubTail), src_cmd, sizeof(NVME_COMMAND));
         InterlockedIncrement(&InflightCmds);
         SubTail = (SubTail + 1) % Depth;
-        WriteDbl(this->DevExt, this->SubDbl, this->SubTail);
+        WriteDbl(DevExt, SubDbl, SubTail);
     }
 
     return STATUS_SUCCESS;
@@ -215,10 +215,10 @@ void CNvmeQueue::GiveupAllCmd()
 
     for (ULONG i = 0; i < Depth; i++)
     {   
-        PSPCNVME_SRBEXT srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
-                (volatile PVOID*)&OriginalSrbExt[i], NULL);
+        PSPC_SRBEXT srbext = (PSPC_SRBEXT)InterlockedExchangePointer(
+                (volatile PVOID*)&OriginalSrbExt[i], nullptr);
 
-        if (NULL != srbext)
+        if (nullptr != srbext)
             srbext->CompleteSrb(SRB_STATUS_BUS_RESET);
     }
 
@@ -235,25 +235,22 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
     ULONG done_count = 0;
 
     if(0 == max_count)
-        max_count = this->Depth;
+        max_count = Depth;
 
-    while(NewCplArrived(cpl, this->PhaseTag) && max_count > done_count)
+    while(NewCplArrived(cpl, PhaseTag) && max_count > done_count)
     {
         USHORT cid = cpl->DW3.CID;
-        PSPCNVME_SRBEXT srbext = PopSrbExt(cid);
+        PSPC_SRBEXT srbext = PopSrbExt(cid);
         SubHead = cpl->DW2.SQHD;
 
-        if(NULL != srbext)
+        if(nullptr != srbext)
         {
             done_count++;
             RtlCopyMemory(&srbext->NvmeCpl, cpl, sizeof(NVME_COMPLETION_ENTRY));
-            if (srbext->CompletionCB)
-                srbext->CompletionCB(srbext);
-
             srbext->CompleteSrb(srbext->NvmeCpl.DW3.Status);
             srbext->CleanUp();
-            if (srbext->DeleteInComplete)
-                delete srbext;
+            //if (srbext->DeleteInComplete)
+            //    delete srbext;
         }
         else
             KdBreakPoint();
@@ -267,10 +264,10 @@ void CNvmeQueue::CompleteCmd(ULONG max_count)
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subq, PVOID* cplq)
 {  
-    if(subq != NULL)
+    if(subq != nullptr)
         *subq = SubQ_VA;
 
-    if (cplq != NULL)
+    if (cplq != nullptr)
         *cplq = CplQ_VA;
 }
 void CNvmeQueue::GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa)
@@ -293,31 +290,31 @@ void CNvmeQueue::GetCplQAddr(PHYSICAL_ADDRESS* cplq)
 }
 ULONG CNvmeQueue::ReadSubTail()
 {
-    if (IsValidQid(QueueID) && NULL != SubDbl)
+    if (IsValidQid(QueueID) && nullptr != SubDbl)
         return ReadDbl(DevExt, SubDbl);
     KdBreakPoint();
     return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteSubTail(ULONG value)
 {
-    if (IsValidQid(QueueID) && NULL != SubDbl)
+    if (IsValidQid(QueueID) && nullptr != SubDbl)
         return WriteDbl(DevExt, SubDbl, value);
     KdBreakPoint();
 }
 ULONG CNvmeQueue::ReadCplHead()
 {
-    if (IsValidQid(QueueID) && NULL != CplDbl)
+    if (IsValidQid(QueueID) && nullptr != CplDbl)
         return ReadDbl(DevExt, CplDbl);
     KdBreakPoint();
     return INVALID_DBL_VALUE;
 }
 void CNvmeQueue::WriteCplHead(ULONG value)
 {
-    if (IsValidQid(QueueID) && NULL != CplDbl)
+    if (IsValidQid(QueueID) && nullptr != CplDbl)
         return WriteDbl(DevExt, CplDbl, value);
     KdBreakPoint();
 }
-void CNvmeQueue::PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid)
+void CNvmeQueue::PushSrbExt(PSPC_SRBEXT srbext, USHORT cid)
 {
 //for easier debugging, define this variable at first line.
     USHORT idx = CidToSrbExtIdx(cid);
@@ -325,29 +322,29 @@ void CNvmeQueue::PushSrbExt(PSPCNVME_SRBEXT srbext, USHORT cid)
         SpecialSrbExt = srbext;
     else
     {
-        PSPCNVME_SRBEXT old_srbext = (PSPCNVME_SRBEXT)InterlockedCompareExchangePointer(
-            (volatile PVOID*)OriginalSrbExt + idx, srbext, NULL);
+        PSPC_SRBEXT old_srbext = (PSPC_SRBEXT)InterlockedCompareExchangePointer(
+            (volatile PVOID*)OriginalSrbExt + idx, srbext, nullptr);
 
-        if (NULL != old_srbext)
+        if (nullptr != old_srbext)
             old_srbext->CompleteSrb(SRB_STATUS_ABORTED);
     }
 }
-PSPCNVME_SRBEXT CNvmeQueue::PopSrbExt(USHORT cid)
+PSPC_SRBEXT CNvmeQueue::PopSrbExt(USHORT cid)
 {
     //for easier debugging, define these variables at first line.
     USHORT idx = CidToSrbExtIdx(cid);
-    PSPCNVME_SRBEXT srbext = NULL;
+    PSPC_SRBEXT srbext = nullptr;
     if (NVME_ASYNC_REQ_CID == cid)
     {
         srbext = SpecialSrbExt;
-        SpecialSrbExt = NULL;
+        SpecialSrbExt = nullptr;
     }
     else
     {
-        srbext = (PSPCNVME_SRBEXT)InterlockedExchangePointer(
-            (volatile PVOID*)OriginalSrbExt + idx, NULL);
+        srbext = (PSPC_SRBEXT)InterlockedExchangePointer(
+            (volatile PVOID*)OriginalSrbExt + idx, nullptr);
 
-        ASSERT(srbext != NULL);
+        ASSERT(srbext != nullptr);
     }
     return srbext;
 }
@@ -363,10 +360,10 @@ bool CNvmeQueue::AllocQueueBuffer()
     //I am too lazy to check if NVMe device request continuous page or not, so.... 
     //Allocate SubQ and CplQ together into a continuous physical memory block.
     ULONG status = StorPortAllocateContiguousMemorySpecifyCacheNode(
-        this->DevExt, this->BufferSize,
+        DevExt, BufferSize,
         low, high, align,
-        CNvmeQueue::CacheType, this->NumaNode,
-        &this->Buffer);
+        CNvmeQueue::CacheType, NumaNode,
+        &Buffer);
 
     //todo: log 
     if(STOR_STATUS_SUCCESS != status)
@@ -384,30 +381,30 @@ bool CNvmeQueue::InitQueueBuffer()
     //1.Calculate total block size. 
     //2.Split total size to SubQ size and CplQ size. 
     //NOTE: both of them should be PAGE_ALIGNED
-    this->SubQ_Size = this->Depth * sizeof(NVME_COMMAND);
-    this->CplQ_Size = this->Depth * sizeof(NVME_COMPLETION_ENTRY);
+    SubQ_Size = Depth * sizeof(NVME_COMMAND);
+    CplQ_Size = Depth * sizeof(NVME_COMPLETION_ENTRY);
 
-    PUCHAR cursor = (PUCHAR) this->Buffer;
-    this->SubQ_VA = (PNVME_COMMAND)ROUND_TO_PAGES(cursor);
-    cursor += this->SubQ_Size;
-    this->CplQ_VA = (PNVME_COMPLETION_ENTRY)ROUND_TO_PAGES(cursor);
+    PUCHAR cursor = (PUCHAR) Buffer;
+    SubQ_VA = (PNVME_COMMAND)ROUND_TO_PAGES(cursor);
+    cursor += SubQ_Size;
+    CplQ_VA = (PNVME_COMPLETION_ENTRY)ROUND_TO_PAGES(cursor);
 
     //this->BufferSize = this->SubQ_Size + this->CplQ_Size;
     //Because Align to Page could cause extra waste space in memory.
     //So should check if CplQ exceeds total buffer length...
-    if((cursor + this->CplQ_Size) > ((PUCHAR)this->Buffer + this->BufferSize))
+    if((cursor + CplQ_Size) > ((PUCHAR)Buffer + BufferSize))
         goto ERROR; //todo: log
 
-    RtlZeroMemory(this->Buffer, this->BufferSize);
-    this->SubQ_PA = MmGetPhysicalAddress(this->SubQ_VA);
-    this->CplQ_PA = MmGetPhysicalAddress(this->CplQ_VA);
+    RtlZeroMemory(Buffer, BufferSize);
+    SubQ_PA = MmGetPhysicalAddress(SubQ_VA);
+    CplQ_PA = MmGetPhysicalAddress(CplQ_VA);
     return true;
 
 ERROR:
-    this->SubQ_Size = 0;
-    this->SubQ_VA = NULL;
-    this->CplQ_Size = 0;
-    this->CplQ_VA = NULL;
+    SubQ_Size = 0;
+    SubQ_VA = nullptr;
+    CplQ_Size = 0;
+    CplQ_VA = nullptr;
     return false;
 }
 void CNvmeQueue::DeallocQueueBuffer()
@@ -415,31 +412,31 @@ void CNvmeQueue::DeallocQueueBuffer()
     if(UseExtBuffer)
         return;
 
-    if(NULL != this->Buffer)
+    if(nullptr != Buffer)
     { 
         StorPortFreeContiguousMemorySpecifyCache(
-                DevExt, this->Buffer, this->BufferSize, CNvmeQueue::CacheType);
+                DevExt, Buffer, BufferSize, CNvmeQueue::CacheType);
     }
 
-    this->Buffer = NULL;
-    this->BufferSize = 0;
+    Buffer = nullptr;
+    BufferSize = 0;
 }
 bool CNvmeQueue::AllocSrbExtBuffer()
 {
-    OriginalSrbExt = (PSPCNVME_SRBEXT*) 
-            new(NonPagedPool, TAG_SRB_HISTORY) PSPCNVME_SRBEXT[Depth];
-    if(NULL == OriginalSrbExt)
+    OriginalSrbExt = (PSPC_SRBEXT*) 
+            new(NonPagedPool, TAG_SRB_HISTORY) PSPC_SRBEXT[Depth];
+    if(nullptr == OriginalSrbExt)
         return false;
 
-    RtlZeroMemory(OriginalSrbExt, sizeof(PSPCNVME_SRBEXT)*Depth);
+    RtlZeroMemory(OriginalSrbExt, sizeof(PSPC_SRBEXT)*Depth);
     return true;
 }
 void CNvmeQueue::DeallocSrbExtBuffer()
 {
-    if (NULL != OriginalSrbExt)
+    if (nullptr != OriginalSrbExt)
     {
         delete[] OriginalSrbExt;
-        OriginalSrbExt = NULL;
+        OriginalSrbExt = nullptr;
     }
 }
 #pragma endregion

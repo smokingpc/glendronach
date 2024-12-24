@@ -33,8 +33,7 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
@@ -82,18 +81,18 @@ typedef struct _NVME_DEVEXT{
     NVME_IDENTIFY_NAMESPACE_DATA        NsData[SUPPORT_NAMESPACES] = { 0 };
 
     //these 2 DPC and WorkItem are used for HwAdapterControl::ScsiRestartAdapter event.
-    PVOID                               RestartWorker = NULL;
+    PVOID                               RestartWorker = nullptr;
     STOR_DPC                            RestartDpc;
     ULONG                               CpuCount = 0;
-    PGROUP_AFFINITY                     MsgGroupAffinity = NULL;
+    PGROUP_AFFINITY                     MsgGroupAffinity = nullptr;
 
-    PNVME_CONTROLLER_REGISTERS          CtrlReg = NULL;
-    PPORT_CONFIGURATION_INFORMATION     PortCfg = NULL;
-    volatile ULONG* Doorbells = NULL;
-    PMSIX_TABLE_ENTRY MsixTable = NULL;
-    CNvmeQueue* AdmQueue = NULL;
+    PNVME_CONTROLLER_REGISTERS          CtrlReg = nullptr;
+    PPORT_CONFIGURATION_INFORMATION     PortCfg = nullptr;
+    volatile ULONG* Doorbells = nullptr;
+    PMSIX_TABLE_ENTRY MsixTable = nullptr;
+    CNvmeQueue* AdmQueue = nullptr;
     CNvmeQueue* IoQueue[MAX_IO_QUEUE_COUNT] = { 0 };
-    PVOID UncachedExt = NULL;
+    PVOID UncachedExt = nullptr;
     
     //note: if extend AsyncEvent to multiple event, here should be refactor to 
     //      make saving AsyncEventLog atomic.
@@ -129,13 +128,13 @@ public:
         _In_ PVOID Context,
         _In_ PVOID Worker);
     static VOID HandleAsyncEvent(
-        _In_ PSPCNVME_SRBEXT srbext);
+        _In_ PSPC_SRBEXT srbext);
     static VOID HandleErrorInfoLogPage(
-        _In_ PSPCNVME_SRBEXT srbext);
+        _In_ PSPC_SRBEXT srbext);
     static VOID HandleSmartInfoLogPage(
-        _In_ PSPCNVME_SRBEXT srbext);
+        _In_ PSPC_SRBEXT srbext);
     static VOID HandleFwSlotInfoLogPage(
-        _In_ PSPCNVME_SRBEXT srbext);
+        _In_ PSPC_SRBEXT srbext);
 public:
     NTSTATUS Setup(PPORT_CONFIGURATION_INFORMATION pci);
     void Teardown();
@@ -149,17 +148,17 @@ public:
     NTSTATUS InitNvmeStage1();      //InitNvmeStage1() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS InitNvmeStage2();      //InitNvmeStage2() should be called AFTER HwFindAdapte because it need interrupt.
     NTSTATUS RestartController();   //for AdapterControl's ScsiRestartAdaptor
-    NTSTATUS RegisterIoQueues(PSPCNVME_SRBEXT srbext);
-    NTSTATUS UnregisterIoQueues(PSPCNVME_SRBEXT srbext);
+    NTSTATUS RegisterIoQueues(PSPC_SRBEXT srbext);
+    NTSTATUS UnregisterIoQueues(PSPC_SRBEXT srbext);
 
     NTSTATUS IdentifyAllNamespaces();
     NTSTATUS IdentifyFirstNamespace();
     NTSTATUS CreateIoQueues(bool force = false);    //if(force) => delete exist queue objects and recreate again.
 
-    NTSTATUS IdentifyController(PSPCNVME_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA ident, bool poll = false);
-    NTSTATUS IdentifyNamespace(PSPCNVME_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);
+    NTSTATUS IdentifyController(PSPC_SRBEXT srbext, PNVME_IDENTIFY_CONTROLLER_DATA ident, bool poll = false);
+    NTSTATUS IdentifyNamespace(PSPC_SRBEXT srbext, ULONG nsid, PNVME_IDENTIFY_NAMESPACE_DATA data);
     //nsid_list : variable to store query result. It's size should be PAGE_SIZE.(NVMe max support 1024 NameSpace)
-    NTSTATUS IdentifyActiveNamespaceIdList(PSPCNVME_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count);
+    NTSTATUS IdentifyActiveNamespaceIdList(PSPC_SRBEXT srbext, PVOID nsid_list, ULONG &ret_count);
 
     NTSTATUS UpdateDesiredIoQueue(USHORT count);  //tell NVMe device: I want X i/o queues. then device reply: I permit you use Y queues.
     NTSTATUS SetInterruptCoalescing();
@@ -168,14 +167,14 @@ public:
     NTSTATUS GetLogPageForAsyncEvent(UCHAR logid);
     NTSTATUS SetArbitration();
     NTSTATUS SetVolatileWriteCache();
-    NTSTATUS SetSyncHostTime(PSPCNVME_SRBEXT srbext = NULL);
+    NTSTATUS SetSyncHostTime(PSPC_SRBEXT srbext = nullptr);
     NTSTATUS SetPowerManagement();
     NTSTATUS SetHostBuffer();
     NTSTATUS GetLbaFormat(ULONG nsid, NVME_LBA_FORMAT &format);
     NTSTATUS GetNamespaceBlockSize(ULONG nsid, ULONG& size);    //get LBA block size in Bytes
     NTSTATUS GetNamespaceTotalBlocks(ULONG nsid, ULONG64& blocks);    //get LBA total block count of specified namespace.
-    NTSTATUS SubmitAdmCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
-    NTSTATUS SubmitIoCmd(PSPCNVME_SRBEXT srbext, PNVME_COMMAND cmd);
+    NTSTATUS SubmitAdmCmd(PSPC_SRBEXT srbext, PNVME_COMMAND cmd);
+    NTSTATUS SubmitIoCmd(PSPC_SRBEXT srbext, PNVME_COMMAND cmd);
     void ReleaseOutstandingSrbs();
     NTSTATUS SetPerfOpts();
     void SaveAsyncEvent(PNVME_COMPLETION_DW0_ASYNC_EVENT_REQUEST event);

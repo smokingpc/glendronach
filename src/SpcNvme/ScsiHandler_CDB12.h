@@ -33,18 +33,16 @@
 // You can copy, modify, redistribute the source code. 
 // 
 // There is only one requirement to use this source code:
-// PLEASE DO NOT remove or modify the "original author" of this codes.
-// Keep "original author" declaration unmodified.
+// Please keep my name in "author" field.
 // 
 // Enjoy it.
 // ================================================================
 
 
-UCHAR Scsi_ReportLuns12(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Read12(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Write12(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_Verify12(PSPCNVME_SRBEXT srbext);
+UCHAR Scsi_ReportLuns12(PSPC_SRBEXT srbext);
+UCHAR Scsi_ReadWrite12(PSPC_SRBEXT srbext);
+UCHAR Scsi_Verify12(PSPC_SRBEXT srbext);
 
 //for SED feature. NVMe driver only need to forward the request to Admin Queue.
-UCHAR Scsi_SecurityProtocolIn(PSPCNVME_SRBEXT srbext);
-UCHAR Scsi_SecurityProtocolOut(PSPCNVME_SRBEXT srbext);
+UCHAR Scsi_SecurityProtocolIn(PSPC_SRBEXT srbext);
+UCHAR Scsi_SecurityProtocolOut(PSPC_SRBEXT srbext);
