@@ -57,6 +57,7 @@ typedef struct _QUEUE_PAIR_CONFIG {
 class CNvmeQueue
 {
 public:
+#pragma region ======== Static Functions ========
     const static MEMORY_CACHING_TYPE CacheType = MEMORY_CACHING_TYPE::MmNonCached;
     static VOID QueueCplDpcRoutine(
         _In_ PSTOR_DPC dpc,
@@ -64,25 +65,9 @@ public:
         _In_opt_ PVOID sysarg1,
         _In_opt_ PVOID sysarg2
     );
+#pragma endregion
 
-    CNvmeQueue();
-    CNvmeQueue(QUEUE_PAIR_CONFIG* config);
-    ~CNvmeQueue();
-
-    NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
-    void Teardown();
-
-    inline bool IsInitOK(){return IsReady;}
-    
-    NTSTATUS SubmitCmd(PSPC_SRBEXT srbext, PNVME_COMMAND src_cmd);
-    void CompleteCmd(ULONG max_count = 0);
-    void GiveupAllCmd();
-    void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
-    void GetQueueAddr(PVOID *subq, PVOID* cplq);
-    void GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
-    void GetSubQAddr(PHYSICAL_ADDRESS* subq);
-    void GetCplQAddr(PHYSICAL_ADDRESS* cplq);
-
+#pragma region ======== Data Members ========
     STOR_DPC QueueCplDpc;
     PVOID DevExt = nullptr;
     USHORT QueueID = NVME_INVALID_QID;  //1-based ID, 0 is reserved for AdminQ
@@ -106,20 +91,40 @@ public:
     //QueueBuffer is pointer of this large block.
     //Then divide into 2 blocks for SubQ and CplQ.
     PVOID Buffer = nullptr;
-    PHYSICAL_ADDRESS BufferPA = {0};
+    PHYSICAL_ADDRESS BufferPA = { 0 };
     size_t BufferSize = 0;      //total size of entire queue buffer, BufferSize >= (SubQ_Size + CplQ_Size)
 
     PNVME_COMMAND SubQ_VA = nullptr;       //Virtual address of SubQ Buffer.
-    PHYSICAL_ADDRESS SubQ_PA = { 0 }; 
+    PHYSICAL_ADDRESS SubQ_PA = { 0 };
     size_t SubQ_Size = 0;       //total length of SubQ Buffer.
 
     PNVME_COMPLETION_ENTRY CplQ_VA = nullptr;       //Virtual address of CplQ Buffer.
-    PHYSICAL_ADDRESS CplQ_PA = { 0 }; 
+    PHYSICAL_ADDRESS CplQ_PA = { 0 };
     size_t CplQ_Size = 0;       //total length of CplQ Buffer.
 
     volatile USHORT InternalCid = 0;
-    PSPC_SRBEXT *OriginalSrbExt = nullptr;    //record the caller's SRBEXT, complete them when request done.
+    PSPC_SRBEXT* OriginalSrbExt = nullptr;    //record the caller's SRBEXT, complete them when request done.
     PSPC_SRBEXT SpecialSrbExt = nullptr;     //special cmd's srbext which should reserve cid. e.g. AsyncEvent....
+#pragma endregion
+
+#pragma region ======== Ctor, Dtor, Setup and Teardown ========
+    CNvmeQueue();
+    CNvmeQueue(QUEUE_PAIR_CONFIG* config);
+    ~CNvmeQueue();
+
+    NTSTATUS Setup(QUEUE_PAIR_CONFIG* config);
+    void Teardown();
+#pragma endregion
+
+#pragma region ======== Methods ========
+    NTSTATUS SubmitCmd(PSPC_SRBEXT srbext, PNVME_COMMAND src_cmd);
+    void CompleteCmd(ULONG max_count = 0);
+    void GiveupAllCmd();
+    void GetQueueAddr(PVOID* subva, PHYSICAL_ADDRESS* subpa, PVOID* cplva, PHYSICAL_ADDRESS* cplpa);
+    void GetQueueAddr(PVOID *subq, PVOID* cplq);
+    void GetQueueAddr(PHYSICAL_ADDRESS* subq, PHYSICAL_ADDRESS* cplq);
+    void GetSubQAddr(PHYSICAL_ADDRESS* subq);
+    void GetCplQAddr(PHYSICAL_ADDRESS* cplq);
 
     ULONG ReadSubTail();
     void WriteSubTail(ULONG value);
@@ -136,4 +141,8 @@ public:
     bool IsSafeForSubmit();
     void PushSrbExt(PSPC_SRBEXT srbext, USHORT cid);
     PSPC_SRBEXT PopSrbExt(USHORT cid);
+#pragma endregion
+
+
+    inline bool IsInitOK(){return IsReady;}
 };
